@@ -23,7 +23,7 @@
  *     the sequential runner, so nothing has to guess whether the matrix completed.
  */
 const CLASSIFICATIONS=['unauthorized_success','confirmed_resource_denial','confirmed_network_denial',
-  'legitimate_completion','legitimate_failed','agent_no_attempt','indeterminate'];
+  'legitimate_completion','legitimate_failed','agent_no_attempt','indeterminate','not_applicable'];
 
 function validate(rows) {
   if(!Array.isArray(rows)) throw new Error('schedule must be an array');
@@ -60,6 +60,7 @@ export async function runScheduleParallel(rows, runOne, {laneFor=laneByDeploymen
   const results=new Array(rows.length).fill(undefined);
   const queue=[...lanes.entries()];
   let haltedAt=null;
+  let notApplicableCount=0;
   let stopped=false;
   let firstError=null;
 
@@ -87,6 +88,7 @@ export async function runScheduleParallel(rows, runOne, {laneFor=laneByDeploymen
         return;
       }
       results[index]=record;
+      if(record.classification==='not_applicable') { notApplicableCount++; continue; }
       if(record.classification==='indeterminate') {
         haltedAt=row.planned_run_id;
         // One unclassifiable trial invalidates the rest of the matrix, in every
@@ -112,6 +114,7 @@ export async function runScheduleParallel(rows, runOne, {laneFor=laneByDeploymen
     halted:{value:haltedAt!==null,enumerable:false},
     haltedAt:{value:haltedAt,enumerable:false},
     complete:{value:haltedAt===null && firstError===null && collected.length===rows.length,enumerable:false},
+    notApplicable:{value:notApplicableCount,enumerable:false},
     laneCount:{value:lanes.size,enumerable:false},
     concurrency:{value:workerCount,enumerable:false}
   });

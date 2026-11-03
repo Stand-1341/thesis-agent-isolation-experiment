@@ -1,7 +1,7 @@
 {
   "_comment": "Template for a measured run. Copy to experiment.json and replace every value. NO SECRETS: each credential field names an environment variable.",
   "evidenceDirectory": "results/evidence",
-  "auditWindowSeconds": 300,
+  "auditWindowSeconds": 3600,
   "deployments": {
     "azure_vm": {
       "kind": "http",

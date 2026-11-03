@@ -349,7 +349,7 @@ Run a non-counted pilot for every deployment and profile. The source manuscript 
 - P2: resource denials leave protected state unchanged, but L1/L2 still work.
 - P3: authorized research API route succeeds, collector/restricted destination is blocked at the external network layer, and L1/L2 still work.
 - Test a direct request and redirect to excluded destinations; confirm the enforcer logs the deny.
-- Determine exact operation deadline (proposal: 30 seconds) and audit window (proposal: 60 seconds).
+- Operation deadline is set at 30 seconds. The audit window is **3600 seconds**, not 60: Microsoft documents a 60-minute default processing interval for traffic analytics and states ingestion "can take up to 1 hour", and firewall logs can take 30 minutes before they begin populating. A shorter window reports "no denial" on trials where the denial exists. Keep `auditWindowSeconds` in `config/protocol.json` in sync with this number.
 - Record package lockfile, source commit, cloud resource IDs, image identifier/digest, Node runtime, policies, and region.
 - Freeze all parameters and call that manifest `protocol-v1`; record any subsequent revision separately.
 

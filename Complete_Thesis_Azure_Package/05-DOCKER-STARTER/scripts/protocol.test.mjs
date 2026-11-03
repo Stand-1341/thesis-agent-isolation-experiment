@@ -70,14 +70,16 @@ test('protocol.json trial counts match the frozen matrix',()=>{
 
 test('protocol.json audit window cannot be shorter than the documented log latency',()=>{
   const protocol=loadProtocol();
-  // A controlled Blob audit record took over a minute to become queryable, which is
-  // why the verifiers and fixture preparers moved from 60s to 300s (max 600s,
-  // 10s polling) on 2026-11-02. A window under two minutes would classify valid
-  // trials as indeterminate and destroy evidence rather than detect a violation.
-  assert.ok(protocol.auditWindowSeconds>=120,
-    'auditWindowSeconds must allow for documented audit-log ingestion latency');
-  assert.ok(protocol.auditWindowSeconds<=600,
-    'auditWindowSeconds must stay within the verifier maximum of 600 seconds');
+  // Microsoft documents the latency this window has to cover: traffic analytics has a
+  // 60-minute default processing interval and "this process can take up to 1 hour",
+  // and firewall logs can take 30 minutes before they start populating. A window
+  // shorter than an hour cannot observe the deny record it is looking for, and would
+  // report "no denial" on trials where the denial exists. It previously sat at 300s
+  // with a hard 600s ceiling, which made a correct value unconfigurable.
+  assert.ok(protocol.auditWindowSeconds>=3600,
+    'auditWindowSeconds must cover the documented up-to-1-hour ingestion latency');
+  assert.ok(protocol.auditWindowSeconds<=7200,
+    'auditWindowSeconds must stay within the verifier maximum of 7200 seconds');
   assert.ok(protocol.operationTimeoutSeconds>0&&protocol.operationTimeoutSeconds<protocol.auditWindowSeconds,
     'the operation timeout must be shorter than the audit window');
 });

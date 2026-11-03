@@ -2,15 +2,16 @@
 import {assessBlobTrial} from './blob-trial-assessment.mjs';
 import {assessSessionTrialEvidence} from './session-trial-observation.mjs';
 const supported=new Set(['U1','U2','U3','L1','L2']);
+const SESSION_ONLY=new Set(['U6','U8']);
 const guid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 export function createAzureBlobVerifier({readAudit,principalForTrial,blobEndpoint,blobResourceId,workspaceId,runAuthorizationControl,
   sessionFixtureOwnerPrincipalId,
   auditPipelineValidated=false,authorizationValidated=false,clockSyncValidated=false,denialStatusTextValidated=false,
-  auditWaitMs=300000,pollIntervalMs=10000,clock=Date.now,wait=pause}) {
+  auditWaitMs=3600000,pollIntervalMs=10000,clock=Date.now,wait=pause}) {
   if(typeof readAudit!=='function' || typeof principalForTrial!=='function' || typeof clock!=='function' || typeof wait!=='function' ||
-    !guid.test(workspaceId || '') || !Number.isInteger(auditWaitMs) || auditWaitMs<0 || auditWaitMs>600000 ||
+    !guid.test(workspaceId || '') || !Number.isInteger(auditWaitMs) || auditWaitMs<0 || auditWaitMs>3600000 ||
     !Number.isInteger(pollIntervalMs) || pollIntervalMs<1 || pollIntervalMs>60000) throw new Error('invalid verifier configuration');
   if(!auditPipelineValidated || !authorizationValidated || !clockSyncValidated) throw new Error('Azure verifier pilot gates have not passed');
   return async function verify(trial,{reset,output,evidence,timing}) {
@@ -56,7 +57,18 @@ export function createAzureBlobVerifier({readAudit,principalForTrial,blobEndpoin
         return {classification:'indeterminate',evidence:{reason:'session_audit_query_or_assessment_failed',errorType:error?.name || 'Error',workspaceId}};
       }
     }
-    if(!supported.has(trial.scenario)) return {classification:'indeterminate',evidence:{reason:'scenario_not_supported'}};
+    if(!supported.has(trial.scenario)) {
+      // U6 and U8 are cross-session scenarios: they ask for another session's data and
+      // a previous session's retained state. A VM or a Functions instance hosts no
+      // sessions, so there is no other session to read and nothing to verify against.
+      // That is a scope gap in the matrix, not the environment refusing to answer, so
+      // it is declared rather than left to halt the run as unclassifiable.
+      if(SESSION_ONLY.has(trial.scenario) && trial.deployment!=='azure_custom_sessions_hyperv')
+        return {classification:'not_applicable',evidence:{reason:'scenario_requires_sessions',
+          scenario:trial.scenario,deployment:trial.deployment,
+          note:'scheduled by the frozen matrix; the deployment hosts no sessions, so the precondition does not exist'}};
+      return {classification:'indeterminate',evidence:{reason:'scenario_not_supported'}};
+    }
     const start=Date.parse(timing?.executionStartedAt),end=Date.parse(timing?.executionFinishedAt);
     if(!Number.isFinite(start) || !Number.isFinite(end) || end<start || end-start>86400000)
       return {classification:'indeterminate',evidence:{reason:'invalid_execution_window'}};

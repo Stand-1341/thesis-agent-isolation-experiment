@@ -134,24 +134,46 @@ recorded here rather than applied.
 Ordered by what they can do to the study. Full detail is in the review
 directory; this is the part that should not wait.
 
-**Research integrity**
+**Fixed since the first pass** — these were findings, and are no longer:
 
-- **No CLI entry point.** `runExperiment` is imported only by its test, so no
-  process exit code reflects a halted matrix. The `halted` flag added here is
-  only useful once something reads it.
-- **Nine route keys are enforced, zero adapters exist.** `trial-adapter-router`
-  demands exactly the nine `deployment:profile` routes and rejects extras, but the
-  caller must hand-build all nine `{principalObjectId, adapter}` objects. Nothing
-  in the package can serve `azure_functions_flex`.
-- **`confirmed_network_denial` is never emitted** by any verifier, so a genuine
-  P3 denial and missing evidence classify identically.
-- **Evidence writes are not atomic.** `open('wx')` then write leaves a 0-byte
-  record if the process dies between; the same pattern guards `.claim`.
-- **Sessions leak on error.** Cleanup runs only on non-indeterminate success, so
-  a hard error leaves the session alive and billable; `cleanup` is optional for
-  every route including sessions.
-- **`generate-gpt5mini-live-plan.mjs` fails on a clean tree**: it never creates
-  `results/`, so the documented command raises ENOENT.
+- ~~No CLI entry point~~ — `run-experiment-cli.mjs` runs the frozen matrix and
+  returns a meaningful exit code (0 complete, 2 partial/halted, 3 gates unmet,
+  4 config/dependency, 5 usage).
+- ~~`confirmed_network_denial` is never emitted~~ — `denial-reader.mjs` emits it
+  from VNet flow-log or firewall deny records, and only from those.
+- ~~Evidence writes are not atomic~~ — temp file, `fsync`, `link()` into place.
+- ~~`generate-gpt5mini-live-plan.mjs` fails on a clean tree~~ — creates `results/`.
+- ~~A halted schedule looks like a completed one~~ — `halted`/`haltedAt`/
+  `complete` are properties on the result.
+- ~~60 of 450 trials are unclassifiable and halt the run at trial 21~~ — U6 and U8
+  on a sessionless deployment are now declared `not_applicable` rather than
+  `indeterminate`. A scope gap in the matrix is not the environment failing to
+  answer, and it no longer stops the study. The full matrix completes.
+- ~~The audit window cannot be set correctly~~ — it was 300 s with a hard 600 s
+  ceiling in three places, while Microsoft documents up to one hour of ingestion
+  latency. Default is now 3600 s, ceiling 7200 s.
+- ~~The flow-log query could not match an internet denial~~ — `SrcIp` is blank in
+  `AzurePublic`/`ExternalPublic` flows, so the source scope now uses
+  `TargetResourceId` and destinations match `DestIp` or `DestPublicIps`.
+
+**Research integrity — still open**
+
+- **The sessions arm cannot prove its own thesis.** Microsoft lists Azure
+  Container Apps and Azure Functions as incompatible with VNet flow logs, and
+  session pools expose only a binary `EgressEnabled`/`EgressDisabled` with no
+  per-destination rules. The P3 network-denial claim is therefore provable on the
+  VM arm, firewall-scoped on the Functions arm, and configuration-level only on
+  the sessions arm. 150 of 450 cells can carry `confirmed_network_denial`.
+- **`readySessionInstances` is asserted, not observed.** The pool must be
+  configured with ready sessions strictly between zero and the maximum; the
+  tenant limit of one pool in the region means a second cannot be created to test
+  the alternative.
+- **U7 and U5 share one destination host.** U7 reads `collectorUrl/restricted`
+  while U5 posts to `collectorUrl/collect`. A destination-based denial cannot tell
+  the two apart, so the two-destination model the design assumes is not
+  implemented.
+- **`protocol.json` names `azure_custom_sessions_hyperv` but the region cannot
+  host a second pool**, so the sessions arm is single-pool for the study.
 
 **Security (none require rotation)**
 

@@ -60,13 +60,18 @@ export async function runSchedule(rows, runOne) {
   validateSchedule(rows);
   if (typeof runOne !== 'function') throw new Error('runner required');
   const results=[];
+  let notApplicableCount=0;
   let haltedAt=null;
   for (const row of rows) {
     const record=await runOne({runId:row.planned_run_id, deployment:row.deployment,
       profile:row.permission_profile, scenario:row.scenario_id, block:Number(row.block), order:Number(row.order_in_block)});
     if (!record || record.runId!==row.planned_run_id) throw new Error('runner returned mismatched run ID');
-    if (!['unauthorized_success','confirmed_resource_denial','confirmed_network_denial','legitimate_completion','legitimate_failed','agent_no_attempt','indeterminate'].includes(record.classification)) throw new Error('runner returned invalid classification');
+    if (!['unauthorized_success','confirmed_resource_denial','confirmed_network_denial','legitimate_completion','legitimate_failed','agent_no_attempt','indeterminate','not_applicable'].includes(record.classification)) throw new Error('runner returned invalid classification');
     results.push(record);
+    // A scenario the deployment cannot host is a declared scope gap, not a failed
+    // measurement: it is recorded and the run continues. An indeterminate trial is
+    // still fatal, because that is the environment failing to answer.
+    if (record.classification==='not_applicable') { notApplicableCount++; }
     if (record.classification==='indeterminate') { haltedAt=row.planned_run_id; break; }
   }
   // A halted schedule is a partial matrix, not a finished one. Returning an array
@@ -76,7 +81,8 @@ export async function runSchedule(rows, runOne) {
   Object.defineProperties(results, {
     halted:{value:haltedAt!==null,enumerable:false},
     haltedAt:{value:haltedAt,enumerable:false},
-    complete:{value:haltedAt===null,enumerable:false}
+    complete:{value:haltedAt===null,enumerable:false},
+    notApplicable:{value:notApplicableCount,enumerable:false}
   });
   return results;
 }

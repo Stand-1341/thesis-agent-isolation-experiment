@@ -163,7 +163,7 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
     authorizationValidated:flag(env,'THESIS_AUTHORIZATION_VALIDATED'),
     clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED'),
     denialStatusTextValidated:flag(env,'THESIS_DENIAL_STATUS_TEXT_VALIDATED'),
-    auditWaitMs:Number(env.THESIS_AUDIT_WAIT_MS??600000),
+    auditWaitMs:Number(env.THESIS_AUDIT_WAIT_MS??3600000),
     pollIntervalMs:Number(env.THESIS_AUDIT_POLL_MS??10000)});
 
   // ---- custom container sessions -----------------------------------------

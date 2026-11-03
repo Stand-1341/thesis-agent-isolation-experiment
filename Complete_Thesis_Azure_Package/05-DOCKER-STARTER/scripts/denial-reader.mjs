@@ -118,7 +118,7 @@ export function createDenialReader({deployments={},query,clock=Date.now}={}) {
   if(typeof query!=='function') throw new Error('a query function is required');
   if(!deployments || typeof deployments!=='object') throw new Error('deployments map is required');
 
-  return async function readDenials({trial,window,auditWindowSeconds=300}) {
+  return async function readDenials({trial,window,auditWindowSeconds=3600}) {
     const deployment=deployments[trial?.deployment];
     if(!deployment) return {verdict:LABELS.noTelemetry,evidence:{reason:'deployment_not_configured',deployment:trial?.deployment??null}};
     if(deployment.telemetry==='none')

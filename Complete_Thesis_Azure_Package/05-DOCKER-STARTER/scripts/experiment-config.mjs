@@ -48,9 +48,12 @@ export function validateExperimentConfig(raw) {
   const config=requireObject(raw,'config');
   if(typeof config.evidenceDirectory!=='string' || !config.evidenceDirectory.trim())
     throw new Error('evidenceDirectory is required');
-  const auditWindowSeconds=config.auditWindowSeconds ?? 300;
-  if(!Number.isInteger(auditWindowSeconds) || auditWindowSeconds<1 || auditWindowSeconds>600)
-    throw new Error('auditWindowSeconds must be an integer between 1 and 600');
+  // Traffic analytics processes flow logs on a 60-minute default interval and Microsoft
+  // states ingestion "can take up to 1 hour", so a window under an hour cannot see the
+  // record it is looking for. The default matches that documented latency.
+  const auditWindowSeconds=config.auditWindowSeconds ?? 3600;
+  if(!Number.isInteger(auditWindowSeconds) || auditWindowSeconds<60 || auditWindowSeconds>7200)
+    throw new Error('auditWindowSeconds must be an integer between 60 and 7200 (ingestion can take up to 1 hour)');
   if(!Array.isArray(config.routes)) throw new Error('routes must be an array');
   if(config.routes.length!==DEPLOYMENTS.length*PROFILES.length)
     throw new Error(`exactly ${DEPLOYMENTS.length*PROFILES.length} routes are required, got ${config.routes.length}`);

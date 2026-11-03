@@ -46,7 +46,7 @@ function windowFor(observations) {
  */
 export function createExperimentVerifier({config,denialReader,blobVerifier,collectorVerifier,resourceVerifier}={}) {
   if(!config || !config.deployments) throw new Error('experiment config is required');
-  const auditWindowSeconds=config.auditWindowSeconds ?? 300;
+  const auditWindowSeconds=config.auditWindowSeconds ?? 3600;
 
   return async function verify(trial, observations) {
     if(!trial || typeof trial.scenario!=='string') throw new Error('verifier requires a scheduled trial');
@@ -104,9 +104,9 @@ export function createExperimentVerifier({config,denialReader,blobVerifier,colle
 }
 
 /** The verification window a denial reader must cover, with its documented bound. */
-export function denialWindow({start,end}, auditWindowSeconds=300, skewMs=0) {
+export function denialWindow({start,end}, auditWindowSeconds=3600, skewMs=0) {
   if(!Number.isFinite(start) || !Number.isFinite(end) || end<start) throw new Error('invalid denial window');
-  if(!Number.isInteger(auditWindowSeconds) || auditWindowSeconds<1 || auditWindowSeconds>600)
+  if(!Number.isInteger(auditWindowSeconds) || auditWindowSeconds<60 || auditWindowSeconds>7200)
     throw new Error('invalid audit window');
   // Firewall and flow records are delivered after the fact, so the query extends
   // past the trial rather than ending when the workload stopped.

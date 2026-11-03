@@ -261,7 +261,7 @@ async function main(argv) {
   for(const record of results) counts[record.classification]=(counts[record.classification]??0)+1;
   const summary={arm:'deterministic',matrixSha256,planned:selected.length,executed:results.length,
     halted:results.halted===true,haltedAt:results.haltedAt??null,complete:results.complete===true,classifications:counts,
-    concurrency:results.concurrency??1,lanes:results.laneCount??1,
+    concurrency:results.concurrency??1,lanes:results.laneCount??1,notApplicable:results.notApplicable??0,
     gates,gatesVerifiedByTool:false};
   if(options.json) process.stdout.write(`${JSON.stringify(summary,null,2)}\n`);
   else {
