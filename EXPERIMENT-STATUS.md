@@ -50,6 +50,31 @@ See `Complete_Thesis_Azure_Package/05-DOCKER-STARTER/PILOT-ACCEPTANCE.md` for
 the complete release gate. The detailed chronology below is retained as a
 working log; older entries may describe states superseded by later entries.
 
+## Local predeployment work completed in this checkout
+
+The Windows CLI preflight had two path bugs: direct invocation was silently
+skipped, and the default frozen-matrix path duplicated the Windows drive prefix.
+Both now use Node's canonical file-URL conversions. The existing CLI test file
+passes 8/8, `npm run verify` passes the build and 150/150 Node tests, and the
+supplied matrix validator confirms the 450 planned rows and frozen SHA-256.
+These checks ran locally only; no Azure deployment or trial was triggered.
+
+The corrected `npm run check:deploy` now reaches validation and reports all 24
+required credential environment variables as absent. No real run config or
+secrets were created. A dry run using temporary placeholder values read the
+450-row schedule, then correctly reported five structural blockers: no session
+factory, denial reader, Blob verifier, collector verifier, or resource verifier.
+Nothing executed. These placeholders were process-local and removed immediately.
+
+The live Azure pilot still does not supply the nine compatible route endpoints
+and workload identities required by the template. The VM has only private
+addresses and no public FQDN, while the deployed Functions app has one system
+identity; the existing nine fixture identities are not evidence that nine
+isolated workload routes are deployed. The session arm still cannot prove P3
+selective egress. Therefore the 24 runtime credentials and seven pilot
+assertions cannot be truthfully completed yet, and no deploy-ready config is
+available.
+
 The thesis calls for 450 deterministic trials: three deployments, three profiles, ten scenarios, five repetitions. They are distinct from any live model experiment. Per the user's latest direction, the live model arm uses Azure GPT-5 mini `2025-08-07`, reasoning effort `low`, with fallback disabled. No thesis trials have been performed.
 
 The starter is incomplete: no production deployment, independently verified P3 selective egress, full trial driver, verifier, or live model integration. Its local credentials must never be deployed to Azure. Read the guide and thesis before changing the protocol. The guide calls for Flex Consumption, while the starter README describes Functions on Container Apps; these are different hosting choices and the former is the specified arm.

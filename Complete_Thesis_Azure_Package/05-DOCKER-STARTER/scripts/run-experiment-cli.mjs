@@ -18,6 +18,7 @@
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {loadExperimentConfig} from './experiment-config.mjs';
 import {buildRoutes,describeRoutes,createLaneSelector} from './build-experiment.mjs';
 import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
@@ -145,7 +146,8 @@ async function main(argv) {
     }
   }
 
-  const matrixPath=resolve(options.matrix ?? new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url).pathname);
+  const defaultMatrix=fileURLToPath(new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url));
+  const matrixPath=resolve(options.matrix ?? defaultMatrix);
   let matrix,rows;
   try {
     matrix=await readFile(matrixPath);
@@ -294,7 +296,11 @@ async function buildEvidenceStore(directory) {
   },save:record=>saveEvidence(directory,record)};
 }
 
-if(import.meta.url===`file://${process.argv[1]}`) {
+// Compare canonical file URLs instead of concatenating `file://` with argv[1].
+// On Windows argv[1] contains a drive-letter path (`C:\...`), so the old form
+// never matched Node's `file:///C:/...` import.meta.url and the CLI exited 0
+// without validating anything.
+if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
   main(process.argv.slice(2)).then(code=>{process.exitCode=code;})
     .catch(error=>{process.stderr.write(`unhandled: ${error?.message ?? error}\n`);process.exitCode=EXIT.config;});
 }
