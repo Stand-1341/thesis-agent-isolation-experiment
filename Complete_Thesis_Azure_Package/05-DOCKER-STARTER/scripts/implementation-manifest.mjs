@@ -27,7 +27,7 @@ export async function implementationManifest(packageRoot=defaultRoot) {
     filesUnder(`${root}/src`,name=>/\.(?:ts|mts)$/.test(name)),
     filesUnder(`${root}/dist`,name=>/\.(?:js|mjs)$/.test(name)),
     filesUnder(`${root}/infra`,name=>/\.(?:bicep|sh|service|template)$/.test(name))
-  ])).flat().concat(['package.json','package-lock.json','compose.yaml','Dockerfile.node','Dockerfile.functions','Dockerfile.header-audit','Dockerfile.session-diagnostic-job'].map(name=>`${root}/${name}`)).sort();
+  ])).flat().concat(['package.json','package-lock.json','compose.yaml','Dockerfile.node','Dockerfile.functions','Dockerfile.header-audit','Dockerfile.managed-audit-probe','Dockerfile.session-diagnostic-job'].map(name=>`${root}/${name}`)).sort();
   const hashes=Object.fromEntries(await Promise.all(files.map(async path=>[path,digest(await readFile(resolve(packageRoot,path)))])));
   return {hashes,sha256:digest(Buffer.from(JSON.stringify(hashes),'utf8'))};
 }

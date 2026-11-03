@@ -62,6 +62,7 @@ a quota increase on the diagnostic pool.
 | `10a5035` | Three P0s: a malformed request target crashed the workload process (`new URL()` outside the try in an async handler); the implementation digest never hashed `functions/`, so the Functions adapter could change without moving the digest; `runSchedule` returned a partial array on halt that was indistinguishable from a completed run. All three fixed and covered by tests. |
 | `741f022` | Removed an `AzureFirewallDnsProxy` log category that cannot exist on a Basic-tier firewall; recorded in place that the environment has no Dedicated workload profile (so it cannot host the CustomContainer pools the session templates create) and that adding an E16 profile is a billable, quota-bearing decision; documented the session-pool name-pattern contradiction. |
 | `59d82ea` | CI: install Bicep into a writable directory. |
+| final pass | `trial-schedule.test.mjs` spawned a binary literally named `python`, which stock Debian/Ubuntu does not provide — the structural check failed before reaching the digest assertion. It now probes `python3`/`python`/`py`. `generate-gpt5mini-live-plan.mjs` never created `results/`, so the documented command died ENOENT on a clean tree; it now `mkdir`s first and produces the draft whose digest (`a62ba3dc…`) matches the one already recorded in `EXPERIMENT-STATUS.md`. `validate-flex-config.mjs` accepted TEST-NET and benchmarking ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 198.18.0.0/15, …) as the trusted controller address, producing an ingress rule that locks the operator out. `Dockerfile.managed-audit-probe` was the one image definition missing from the implementation digest. |
 
 ### Verified after the changes
 
@@ -70,7 +71,7 @@ npm test                         88 passed, 0 failed   (was 78/80 from a clean c
 bicep build + bicep lint         22/22 templates, exit 0
 docker build                     all 5 images, locally and in CI
 git sha256 03-PLANNED-…csv       39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298
-implementation manifest          e8f73fe13d62e3a10e0c2d44918190f35273cf7f0f539e396cde009a3db694f5  (138 files)
+implementation manifest          f774425fbda4cb9c749d944146482b58fb28a290db5365060c236dbaff4dd824  (139 files)
 ```
 
 The workload-crash fix was demonstrated before and after with the same request
