@@ -66,7 +66,11 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
   if(subscriptions && !GUID.test(subscriptions)) throw new Error('THESIS_SUBSCRIPTION_ID must be a GUID');
 
   const destinationIp=ip(env,missing,'THESIS_DENIAL_DESTINATION_IP');
-  const vmSource=overrides.azure_vm?.sourceIp ?? ip(env,missing,'THESIS_VM_SOURCE_IP');
+  const vmSource=overrides.azure_vm?.sourceIp ?? ip(env,missing,'THESIS_VM_SOURCE_IP',{optional:true});
+  // Scoping the VM arm's flow-log query on the VM's IP would return nothing for
+  // internet egress, because SrcIp is blank for AzurePublic/ExternalPublic flows.
+  // The resource ID is populated for every flow type, so it is the primary scope.
+  const vmTargetResourceId=reader(env,missing,'THESIS_VM_TARGET_RESOURCE_ID');
   const flexSource=overrides.azure_functions_flex?.sourceIp ?? ip(env,missing,'THESIS_FLEX_SOURCE_IP',{optional:true});
 
   // Fail before constructing anything, so the operator sees every missing variable
@@ -80,7 +84,7 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
   // ---- independent network-denial evidence -------------------------------
   const denialReader=missing.size?undefined:createDenialReader({
     deployments:{
-      azure_vm:{telemetry:'vnet_flow_log',sourceIp:vmSource,destinationIp},
+      azure_vm:{telemetry:'vnet_flow_log',sourceIp:vmSource,targetResourceId:vmTargetResourceId,destinationIp},
       // Microsoft lists Azure Functions as incompatible with VNet flow logs, so the
       // strongest available attribution for this arm is the firewall.
       azure_functions_flex:{telemetry:flexSource?'firewall':'none',sourceIp:flexSource,destinationIp},
@@ -90,7 +94,9 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
     },
     query:async kql=>{
       const token=await getLogsToken();
-      const response=await fetch(`https://api.loganalytics.io/v1/workspaces/${workspaceId}/query`,{
+      // api.loganalytics.io is being replaced by api.loganalytics.azure.com; the
+      // latter is the documented public endpoint and matches the existing audit reader.
+      const response=await fetch(`https://api.loganalytics.azure.com/v1/workspaces/${workspaceId}/query`,{
         method:'POST',redirect:'error',signal:AbortSignal.timeout(120000),
         headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},
         body:JSON.stringify({query:kql})});

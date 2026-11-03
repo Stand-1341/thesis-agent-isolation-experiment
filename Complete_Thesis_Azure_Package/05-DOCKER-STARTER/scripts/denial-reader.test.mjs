@@ -52,11 +52,31 @@ test('an unconfigured deployment never reaches the query layer',async()=>{
   assert.equal(result.verdict,LABELS.noTelemetry);
 });
 
-test('internet destinations are matched from DestPublicIps, never DestIp',()=>{
+test('internet destinations match on DestPublicIps as well as DestIp',()=>{
   const kql=vnetFlowDenyQuery({srcIp:'10.0.0.4',t0:'2026-11-03T04:00:00Z',t1:'2026-11-03T04:05:00Z',destinationIp:'203.0.113.10'});
   assert.match(kql,/DestPublicIps contains "203\.0\.113\.10"/);
+  assert.match(kql,/DestIp == "203\.0\.113\.10" or/);
   assert.match(kql,/FlowStatus in \("D","Denied"\)/);
-  assert.doesNotMatch(kql,/where DestIp ==/);
+});
+
+test('the source scope never relies on SrcIp alone for internet flows',()=>{
+  // SrcIp AND DestIp are blank in AzurePublic/ExternalPublic flows, so scoping the
+  // internet-denial case on SrcIp matches nothing. The resource ID is always populated.
+  const kql=vnetFlowDenyQuery({targetResourceId:'/subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic1',
+    t0:'2026-11-03T04:00:00Z',t1:'2026-11-03T04:05:00Z',destinationIp:'203.0.113.10'});
+  assert.match(kql,/TargetResourceId has "\/subscriptions\//);
+  assert.doesNotMatch(kql,/SrcIp ==/);
+});
+
+test('the positive control uses the same scope as the deny query',()=>{
+  const scope={targetResourceId:'/subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic1',
+    t0:'2026-11-03T04:00:00Z',t1:'2026-11-03T04:05:00Z'};
+  assert.match(vnetFlowControlQuery(scope),/TargetResourceId has/);
+  assert.match(vnetFlowDenyQuery(scope),/TargetResourceId has/);
+});
+
+test('a resource ID with quotes or newlines is refused',()=>{
+  assert.throws(()=>vnetFlowControlQuery({targetResourceId:'/subscriptions/x" or 1==1',t0:'2026-11-03T04:00:00Z',t1:'2026-11-03T04:05:00Z'}),/plain resource ID/);
 });
 
 test('queries render dates from validated timestamps, not caller strings',()=>{

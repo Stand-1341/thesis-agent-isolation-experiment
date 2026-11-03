@@ -45,27 +45,46 @@ function isoAndChecks(from,to) {
   return {t0:new Date(start).toISOString(),t1:new Date(end).toISOString()};
 }
 
-export function vnetFlowDenyQuery({srcIp,t0,t1,destinationIp}) {
+const RESOURCE_ID_SAFE=/^[A-Za-z0-9\\/._:-]{4,400}$/;
+function targetScope(targetResourceId) {
+  if(typeof targetResourceId!=='string' || !RESOURCE_ID_SAFE.test(targetResourceId))
+    throw new Error('targetResourceId must be a plain resource ID');
+  // TargetResourceId identifies the resource whose flows were logged, and unlike
+  // SrcIp it is populated for every FlowType — including the internet flows whose
+  // SrcIp and DestIp the schema leaves blank.
+  return `TargetResourceId has "${targetResourceId}"`;
+}
+function sourceScope({srcIp,targetResourceId}) {
+  if(targetResourceId!==undefined) return targetScope(targetResourceId);
   if(!ipv4(srcIp)) throw new Error('srcIp must be IPv4');
+  return `SrcIp == "${srcIp}"`;
+}
+/**
+ * Both SrcIp AND DestIp are blank in AzurePublic and ExternalPublic flows, so a
+ * query that scopes on either silently matches nothing for the internet-denial case
+ * — the one a P3 trial actually creates. Source scoping therefore prefers
+ * TargetResourceId, and destination matching accepts either DestIp (internal) or
+ * the pipe-delimited DestPublicIps (internet).
+ */
+export function vnetFlowDenyQuery({srcIp,targetResourceId,t0,t1,destinationIp}) {
   if(destinationIp!==undefined && !ipv4(destinationIp)) throw new Error('destinationIp must be IPv4');
   const destinationFilter=destinationIp===undefined?''
-    :`\n| where FlowType in ("ExternalPublic","AzurePublic") and DestPublicIps contains "${destinationIp}"`;
+    :`\n| where DestIp == "${destinationIp}" or DestPublicIps contains "${destinationIp}"`;
   return `NTANetAnalytics
 | where TimeGenerated between (datetime(${t0}) .. datetime(${t1}))
 | where SubType == "FlowLog" and FlowDirection == "O"
-| where SrcIp == "${srcIp}"
+| where ${sourceScope({srcIp,targetResourceId})}
 | where FlowStatus in ("D","Denied") or DeniedOutFlows > 0${destinationFilter}
 | project TimeGenerated, SrcIp, DestIp, DestPublicIps, DestPort, L4Protocol,
           FlowStatus, Action, DeniedOutFlows, AclRule, TargetResourceId, IsFlowCapturedAtUdrHop
 | take 50`;
 }
 
-export function vnetFlowControlQuery({srcIp,t0,t1}) {
-  if(!ipv4(srcIp)) throw new Error('srcIp must be IPv4');
+export function vnetFlowControlQuery({srcIp,targetResourceId,t0,t1}) {
   return `NTANetAnalytics
 | where TimeGenerated between (datetime(${t0}) .. datetime(${t1}))
 | where SubType == "FlowLog" and FlowDirection == "O"
-| where SrcIp == "${srcIp}"
+| where ${sourceScope({srcIp,targetResourceId})}
 | summarize total=count(), allowed=countif(FlowStatus in ("A","Allowed")), denied=countif(FlowStatus in ("D","Denied"))`;
 }
 
@@ -107,10 +126,11 @@ export function createDenialReader({deployments={},query,clock=Date.now}={}) {
     const {t0,t1}=isoAndChecks(window.from,window.to);
     const srcIp=deployment.sourceIp;
     const destinationIp=deployment.destinationIp;
+    const targetResourceId=deployment.targetResourceId;
 
     const useFlowLog=deployment.telemetry==='vnet_flow_log';
     const denyRows=await query(useFlowLog
-      ?vnetFlowDenyQuery({srcIp,t0,t1,destinationIp})
+      ?vnetFlowDenyQuery({srcIp,targetResourceId,t0,t1,destinationIp})
       :firewallDenyQuery({srcIp,t0,t1,destinationIp}));
     if(Array.isArray(denyRows) && denyRows.length)
       return {verdict:useFlowLog?LABELS.confirmedDenyFlowLog:LABELS.confirmedDenyFirewall,
@@ -118,7 +138,7 @@ export function createDenialReader({deployments={},query,clock=Date.now}={}) {
 
     // No deny record. Ask the same window whether anything at all was ingested for
     // this source, so "allowed" is never confused with "logs had not arrived".
-    const control=await query(useFlowLog?vnetFlowControlQuery({srcIp,t0,t1}):firewallControlQuery({srcIp,t0,t1}));
+    const control=await query(useFlowLog?vnetFlowControlQuery({srcIp,targetResourceId,t0,t1}):firewallControlQuery({srcIp,t0,t1}));
     const summary=Array.isArray(control)?control[0]:control;
     const total=Number(summary?.total ?? summary?.attempts ?? 0);
     if(!Number.isFinite(total) || total<=0)
