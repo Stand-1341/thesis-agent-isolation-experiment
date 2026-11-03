@@ -74,7 +74,9 @@ export RG=rg-thesis-agents
 export LOCATION=eastus
 export ACR=replacewithgloballyuniqueacrname
 az group create --name "$RG" --location "$LOCATION"
-az acr create --resource-group "$RG" --name "$ACR" --sku Basic
+# Premium, not Basic: Private Link for ACR (infra/registry-private-endpoint-pilot.bicep)
+# requires the Premium tier. Basic cannot host a private endpoint at all.
+az acr create --resource-group "$RG" --name "$ACR" --sku Premium --location "$LOCATION"
 az acr build --registry "$ACR" --image thesis-agent:v1 --file Dockerfile.node .
 az acr build --registry "$ACR" --image thesis-functions:v1 --file Dockerfile.functions .
 ```
