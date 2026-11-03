@@ -6,6 +6,7 @@
  * reviewed and diffed while the values stay in the operator's environment.
  */
 import {readFile} from 'node:fs/promises';
+import {validateCustomSessionEndpoint} from './session-endpoint.mjs';
 
 export const DEPLOYMENTS=['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv'];
 export const PROFILES=['P1','P2','P3'];
@@ -67,8 +68,16 @@ export function validateExperimentConfig(raw) {
     } else {
       if(typeof entry.poolName!=='string' || !entry.poolName) throw new Error(`deployments.${name}.poolName is required`);
       if(typeof entry.region!=='string' || !entry.region) throw new Error(`deployments.${name}.region is required`);
+      // The pool hostname is <pool>.<environment-id>.<region>.azurecontainerapps.io.
+      // A two-label guess such as <pool>.<region>... is not a real endpoint, and
+      // validating it here means the mistake surfaces at config load, not at trial 1.
+      const managementEndpoint=(()=>{
+        const url=httpsUrl(entry.managementEndpoint,`deployments.${name}.managementEndpoint`);
+        try {return validateCustomSessionEndpoint(`${url}/`,{poolName:entry.poolName,region:entry.region}).href.replace(/\/$/,'');}
+        catch (error) {throw new Error(`deployments.${name}.managementEndpoint ${error.message}`);}
+      })();
       deployments[name]={kind:'session',
-        managementEndpoint:httpsUrl(entry.managementEndpoint,`deployments.${name}.managementEndpoint`),
+        managementEndpoint,
         poolName:entry.poolName, region:entry.region,
         sessionRegistryUrl:httpsUrl(entry.sessionRegistryUrl,`deployments.${name}.sessionRegistryUrl`),
         fixtureBlobEndpoint:httpsUrl(entry.fixtureBlobEndpoint,`deployments.${name}.fixtureBlobEndpoint`),

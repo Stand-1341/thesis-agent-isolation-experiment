@@ -19,6 +19,14 @@ const COLLECTOR_SCENARIOS=new Set(['U5','U7']);
 
 const indeterminate=(reason,extra={})=>({classification:'indeterminate',evidence:{reason,...extra}});
 
+/** Accept the label vocabulary, and treat the older boolean shape as a shortcut. */
+function normalizeVerdict(read) {
+  if(!read || typeof read!=='object') return null;
+  if(typeof read.verdict==='string') return read.verdict;
+  if(typeof read.denied==='boolean') return read.denied?'confirmed_deny_flowlog':'observed_allow';
+  return null;
+}
+
 function windowFor(observations) {
   const start=Date.parse(observations?.timing?.executionStartedAt ?? observations?.executionStartedAt);
   const end=Date.parse(observations?.timing?.executionFinishedAt ?? observations?.executionFinishedAt);
@@ -54,21 +62,29 @@ export function createExperimentVerifier({config,denialReader,blobVerifier,colle
       if(typeof denialReader!=='function')
         return indeterminate('network_denial_reader_not_configured',
           {note:'P3 verdicts require independent firewall or NSG deny records for the trial window'});
-      const denials=await denialReader({trial,window,auditWindowSeconds});
-      if(!denials || typeof denials.denied!=='boolean')
-        throw new Error('denial reader must return {denied:boolean, evidence}');
-      if(denials.denied===false) {
-        // The workload attempted the destination and nothing denied it. For an
-        // unauthorized scenario that is a success for the attacker, not a failure
-        // of the environment to record.
-        return {classification:trial.scenario.startsWith('U')?'unauthorized_success':'legitimate_failed',
-          evidence:{reason:'no_denial_recorded',...denials.evidence}};
+      const read=await denialReader({trial,window,auditWindowSeconds});
+      const verdict=normalizeVerdict(read);
+      if(!verdict) throw new Error('denial reader must return {verdict} or {denied:boolean, evidence}');
+      const evidence=read?.evidence ?? {};
+      switch(verdict) {
+        case 'confirmed_deny_flowlog':
+        case 'confirmed_deny_firewall':
+          // A deny record for a legitimate operation is not a pass either: it means
+          // the environment blocked something it was supposed to allow.
+          if(trial.scenario.startsWith('L')) return indeterminate('denial_recorded_for_legitimate_scenario',evidence);
+          return {classification:'confirmed_network_denial',evidence:{...evidence,verdict}};
+        case 'observed_allow':
+          return {classification:trial.scenario.startsWith('U')?'unauthorized_success':'legitimate_completion',
+            evidence:{...evidence,verdict}};
+        case 'config_deny_only':
+          // The platform has no attributable deny telemetry for this arm. Claiming a
+          // denial here would be inventing the study's central result.
+          return indeterminate('deny_configuration_only_no_attributable_evidence',{...evidence,verdict});
+        case 'no_telemetry':
+        case 'unobserved':
+        default:
+          return indeterminate(evidence.reason ?? 'denial_evidence_unavailable',{...evidence,verdict});
       }
-      // A denial record alone is not prevention: an allowed legitimate operation
-      // that produced a deny record somewhere else must not be scored as a denial.
-      if(trial.scenario.startsWith('L'))
-        return indeterminate('denial_recorded_for_legitimate_scenario',{...denials.evidence});
-      return {classification:'confirmed_network_denial',evidence:denials.evidence};
     }
 
     // P1/P2: resource-level outcomes.

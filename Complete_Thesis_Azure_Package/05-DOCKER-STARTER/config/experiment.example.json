@@ -19,7 +19,7 @@
     },
     "azure_custom_sessions_hyperv": {
       "kind": "session",
-      "managementEndpoint": "https://REPLACE-POOL.REPLACE-REGION.azurecontainerapps.io",
+      "managementEndpoint": "https://thesis-diag-pool.REPLACE-ENVIRONMENT-ID.eastus.azurecontainerapps.io",
       "poolName": "thesis-diag-pool",
       "region": "eastus",
       "sessionRegistryUrl": "https://REPLACE-REGISTRY.blob.core.windows.net/session-map",

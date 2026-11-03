@@ -22,7 +22,7 @@ function baseConfig(){
     deployments:{
       azure_vm:{kind:'http',agentUrl:'https://vm.example',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
       azure_functions_flex:{kind:'http',agentUrl:'https://fn.example/api',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
-      azure_custom_sessions_hyperv:{kind:'session',managementEndpoint:'https://pool.eastus.azurecontainerapps.io',
+      azure_custom_sessions_hyperv:{kind:'session',managementEndpoint:'https://thesissessionpool.envabc123.eastus.azurecontainerapps.io',
         poolName:'thesissessionpool',region:'eastus',sessionRegistryUrl:'https://reg.blob.core.windows.net/map',
         fixtureBlobEndpoint:'https://fixture.blob.core.windows.net'}
     },
