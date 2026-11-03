@@ -207,9 +207,13 @@ Create a small Linux VM, preferably with SSH access limited to your public IP; d
 
 ```bash
 az vm list-skus --location "$LOCATION" --resource-type virtualMachines -o table
+# Standard_B2s is NotAvailableForSubscription in every region this project checked
+# (six regions including eastus), so the templates ship Standard_F1as_v7 instead:
+# one vCPU, 4 GiB, listed without a restriction and inside the reported core quota.
+# Re-run the SKU query above and substitute whatever your region actually offers.
 az vm create \
   --resource-group "$RG" --name "$VM" \
-  --image Ubuntu2204 --size Standard_B2s \
+  --image Ubuntu2204 --size Standard_F1as_v7 \
   --admin-username "$ADMIN" --generate-ssh-keys \
   --public-ip-sku Standard
 az vm show -d -g "$RG" -n "$VM" --query publicIps -o tsv

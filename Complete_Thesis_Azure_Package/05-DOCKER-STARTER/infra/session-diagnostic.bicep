@@ -32,7 +32,9 @@ resource pool 'Microsoft.App/sessionPools@2026-01-01' = {
     environmentId: environmentId
     poolManagementType: 'Dynamic'
     containerType: 'CustomContainer'
-    scaleConfiguration: { maxConcurrentSessions: 1, readySessionInstances: 1 }
+    // Azure requires readySessionInstances > 0 and < maxConcurrentSessions, so
+    // max 1 / ready 1 is rejected. 2/1 is the smallest shape that satisfies both.
+    scaleConfiguration: { maxConcurrentSessions: 2, readySessionInstances: 1 }
     dynamicPoolConfiguration: { lifecycleConfiguration: { lifecycleType: 'Timed', cooldownPeriodInSeconds: 300 } }
     customContainerTemplate: {
       registryCredentials: { server: registryServer, identity: pullIdentityId }

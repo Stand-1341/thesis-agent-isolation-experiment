@@ -1,6 +1,6 @@
 # Azure-only thesis: Docker-first compatibility starter
 
-**Status: starter / local simulation, not measured thesis results.** Based on Chapter 3 of *Which Cloud Deployment Architecture Best Contains Compromised AI Agents*. It deliberately contains no real credentials, target scanning, cloud attacks, or arbitrary shell execution. The baseline remains deterministic. A controller-side Azure GPT-5 mini Responses API client has now been added, but its tools/prompts are not integrated into the runner and it has not been deployed or called.
+**Status: starter / local simulation, not measured thesis results.** Based on Chapter 3 of *Which Cloud Deployment Architecture Best Contains Compromised AI Agents*. It deliberately contains no real credentials, target scanning, cloud attacks, or arbitrary shell execution. The baseline remains deterministic. A controller-side Azure GPT-5 mini Responses API client has now been added, but its tools and prompts are not integrated into the runner. It has been called only for setup checks: earlier entries in `EXPERIMENT-STATUS.md` record setup-only Responses calls returning READY. No measured trial has used it, which is the claim that matters here.
 
 ## What you get
 
@@ -91,8 +91,12 @@ Provision a small Ubuntu VM and Docker Engine, using a locked-down NSG / SSH acc
 # Replace with your ACR hostname. Secrets come from a mode-600 env file, never
 # from -e VAR=value: values passed that way are readable in `docker inspect` and
 # in /proc/<pid>/cmdline on the VM for the lifetime of the container.
-install -m 600 /dev/null /etc/thesis-agent.env
-$EDITOR /etc/thesis-agent.env   # RESEARCH_URL=..., COLLECTOR_URL=..., WORKLOAD_TOKEN=..., TRIAL_REQUEST_KEY=...
+sudo install -d -m 750 /etc/thesis-agent
+sudo install -m 600 /dev/null /etc/thesis-agent/agent.env
+sudoedit /etc/thesis-agent/agent.env   # RESEARCH_URL=..., COLLECTOR_URL=..., WORKLOAD_TOKEN=..., TRIAL_REQUEST_KEY=...
+# The path matters: infra/vm-agent.service reads EnvironmentFile=/etc/thesis-agent/agent.env.
+# A file at /etc/thesis-agent.env is never loaded, and the agent then exits at startup
+# because TRIAL_REQUEST_KEY and the service URLs are required.
 docker pull YOUR_ACR.azurecr.io/thesis-agent:v1
 docker run -d --name thesis-agent --restart unless-stopped \
   --read-only --cap-drop ALL --security-opt no-new-privileges \
@@ -133,11 +137,15 @@ az containerapp sessionpool create --name thesis-sessions --resource-group "$RG"
   --environment thesis-ca-env --location "$LOCATION" \
   --container-type CustomContainer --image "$ACR.azurecr.io/thesis-agent:v1" \
   --cpu 0.5 --memory 1Gi --target-port 8080 \
-  --max-sessions 1 --ready-sessions 0 --cooldown-period 300 \
+  --max-sessions 2 --ready-sessions 1 --cooldown-period 300 \
   --network-status EgressEnabled \
   --registry-server "$ACR.azurecr.io" --registry-identity "YOUR_MANAGED_IDENTITY_RESOURCE_ID" \
   --mi-user-assigned "YOUR_MANAGED_IDENTITY_RESOURCE_ID"
 ```
+
+Azure rejects `readySessionInstances` of zero, and requires it to be smaller than
+`maxConcurrentSessions` — so `--max-sessions 1 --ready-sessions 0` cannot be created
+(`SessionPoolInvalidReadySessionInstances`). The smallest valid shape is max 2 / ready 1.
 
 In real deployment, provide secure per-profile agent environment values and use the authenticated session-pool management endpoint to route `POST /run` requests with session identifiers. Session-pool management endpoint calls require Azure Entra auth and appropriate roles. Do **not** route test traffic through an open unauthenticated public endpoint.
 
