@@ -33,7 +33,13 @@ test('validates all cells before execution and stops after an indeterminate resu
 test('loads the supplied matrix only when its complete byte digest matches',async()=>{
   const path=fileURLToPath(new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url));
   const python='import csv,json,sys; f=open(sys.argv[1],encoding="utf-8-sig",newline=""); print(json.dumps(list(csv.DictReader(f))))';
-  const result=spawnSync('python',['-c',python,path],{encoding:'utf8'});
+  // Stock Debian/Ubuntu ships python3 only; a hardcoded 'python' made this structural
+  // check fail before it ever reached the digest assertion. Probe for an interpreter.
+  const interpreter=['python3','python','py'].find(bin=>{
+    try {return spawnSync(bin,['-c','import csv,json'],{encoding:'utf8'}).status===0;} catch {return false;}
+  });
+  assert.ok(interpreter,'python3 is required to cross-check the matrix structure');
+  const result=spawnSync(interpreter,['-c',python,path],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
   assert.equal(validateSchedule(JSON.parse(result.stdout)).rows,450);
   const bytes=readFileSync(path);

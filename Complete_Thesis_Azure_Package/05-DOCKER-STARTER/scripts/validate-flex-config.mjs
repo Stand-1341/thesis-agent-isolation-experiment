@@ -4,9 +4,18 @@ function publicIpv4Cidr(value) {
   if(typeof value!=='string' || !value.endsWith('/32')) return false;
   const ip=value.slice(0,-3);
   if(net.isIP(ip)!==4) return false;
-  const [a,b]=ip.split('.').map(Number);
+  const [a,b,c]=ip.split('.').map(Number);
+  // Excludes private, loopback, link-local and special-purpose space, including the
+  // documentation and benchmarking ranges (192.0.2.0/24, 198.51.100.0/24,
+  // 203.0.113.0/24, 198.18.0.0/15) and the IETF/6to4 reservations. Accepting one of
+  // those as the "trusted controller" address produced an ingress allow rule that the
+  // operator's real address could never match, locking the controller out of its own app.
   return a!==0 && a!==10 && a!==127 && a<224 && !(a===169 && b===254) &&
-    !(a===172 && b>=16 && b<=31) && !(a===192 && b===168) && !(a===100 && b>=64 && b<=127);
+    !(a===172 && b>=16 && b<=31) && !(a===192 && b===168) && !(a===100 && b>=64 && b<=127) &&
+    !(a===192 && b===0 && (c===0 || c===2)) &&
+    !(a===192 && b===88 && c===99) &&
+    !(a===198 && (b===18 || b===19 || (b===51 && c===100))) &&
+    !(a===203 && b===0 && c===113);
 }
 function safeHttps(value) {
   try {const u=new URL(value);return u.protocol==='https:' && !u.username && !u.password && !u.search && !u.hash;}

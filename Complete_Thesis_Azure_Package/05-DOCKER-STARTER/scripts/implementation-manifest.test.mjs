@@ -9,8 +9,8 @@ test('detects changed and newly added execution files',async()=>{
   const root=await mkdtemp(join(tmpdir(),'manifest-'));
   const base=join(root,'05-DOCKER-STARTER');
   try {
-    for(const dir of ['config','scripts','src','dist','infra']) await mkdir(join(base,dir),{recursive:true});
-    for(const name of ['package.json','package-lock.json','compose.yaml','Dockerfile.node','Dockerfile.functions','Dockerfile.header-audit','Dockerfile.session-diagnostic-job']) await writeFile(join(base,name),name);
+    for(const dir of ['config','scripts','functions','src','dist','infra']) await mkdir(join(base,dir),{recursive:true});
+    for(const name of ['package.json','package-lock.json','compose.yaml','Dockerfile.node','Dockerfile.functions','Dockerfile.header-audit','Dockerfile.managed-audit-probe','Dockerfile.session-diagnostic-job']) await writeFile(join(base,name),name);
     await writeFile(join(base,'scripts','adapter.mjs'),'original');
     const frozen=await implementationManifest(root);
     assert.equal(await verifyImplementationManifest(frozen.sha256,root),frozen.sha256);

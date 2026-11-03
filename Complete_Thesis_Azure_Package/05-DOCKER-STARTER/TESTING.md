@@ -2,9 +2,11 @@
 
 ## Local source checks
 
-- Node.js `node --test scripts/*.test.mjs`: **80 passed, 0 failed**. This
-  includes synthetic Azure-audit/session checks; these are not Azure end-to-end
-  results.
+- Node.js `node --test scripts/*.test.mjs` (also `npm test`): **88 passed, 0 failed**.
+  This includes synthetic Azure-audit/session checks; these are not Azure end-to-end
+  results. The suite is hermetic: it reads the frozen matrix from git, not from a
+  generated `results/` file, and binds ephemeral ports, so it passes on a clean clone
+  and on a machine with other services running.
 - `npm run build`: **passed**.
 - `python scripts/validate_supplied_plan.py`: **passed** for 450 planned rows
   (360 unauthorized and 90 legitimate). This validates structure and digest;

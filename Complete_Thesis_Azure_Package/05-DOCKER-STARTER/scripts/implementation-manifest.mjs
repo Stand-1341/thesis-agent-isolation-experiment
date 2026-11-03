@@ -19,10 +19,15 @@ export async function implementationManifest(packageRoot=defaultRoot) {
   const files=(await Promise.all([
     filesUnder(`${root}/config`,()=>true),
     filesUnder(`${root}/scripts`,name=>/\.(?:mjs|ps1|py)$/.test(name) && !/\.test\.mjs$/.test(name) && !/\/test_[^/]*\.py$/.test(name)),
+    // The Functions adapter is a deployment target for the same trials. Leaving it
+    // out let the implementation digest pass while functions/index.mjs, host.json or
+    // functions/package.json had changed — the integrity gate could not see the code
+    // that runs the azure_functions_flex arm.
+    filesUnder(`${root}/functions`,name=>/\.(?:mjs|js|json)$/.test(name)),
     filesUnder(`${root}/src`,name=>/\.(?:ts|mts)$/.test(name)),
     filesUnder(`${root}/dist`,name=>/\.(?:js|mjs)$/.test(name)),
     filesUnder(`${root}/infra`,name=>/\.(?:bicep|sh|service|template)$/.test(name))
-  ])).flat().concat(['package.json','package-lock.json','compose.yaml','Dockerfile.node','Dockerfile.functions','Dockerfile.header-audit','Dockerfile.session-diagnostic-job'].map(name=>`${root}/${name}`)).sort();
+  ])).flat().concat(['package.json','package-lock.json','compose.yaml','Dockerfile.node','Dockerfile.functions','Dockerfile.header-audit','Dockerfile.managed-audit-probe','Dockerfile.session-diagnostic-job'].map(name=>`${root}/${name}`)).sort();
   const hashes=Object.fromEntries(await Promise.all(files.map(async path=>[path,digest(await readFile(resolve(packageRoot,path)))])));
   return {hashes,sha256:digest(Buffer.from(JSON.stringify(hashes),'utf8'))};
 }

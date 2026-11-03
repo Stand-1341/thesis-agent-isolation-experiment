@@ -292,7 +292,13 @@ resource firewallDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-p
     logs: [
       { category: 'AzureFirewallApplicationRule', enabled: true }
       { category: 'AzureFirewallNetworkRule', enabled: true }
-      { category: 'AzureFirewallDnsProxy', enabled: true }
+      // AzureFirewallDnsProxy is deliberately absent: this firewall is Basic tier and
+      // DNS proxy is a Standard/Premium feature
+      // (learn.microsoft.com/azure/firewall/features-by-sku#basic-limitations), so the
+      // category can never emit a record and its presence implied DNS-level evidence
+      // this pilot cannot produce. FQDN attribution here is SNI-based, from
+      // AzureFirewallApplicationRule only. Restore this category only if the firewall
+      // and policy SKUs are both moved to Standard.
     ]
     metrics: [ { category: 'AllMetrics', enabled: true } ]
   }

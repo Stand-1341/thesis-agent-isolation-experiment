@@ -275,8 +275,11 @@ The example Dockerfile above is for a separate from-source implementation; **it 
 
 ```bash
 az extension add --name containerapp --upgrade
+# Premium is required: Private Link (the private endpoint that keeps session image
+# pulls on the VNet) is not available on the Basic or Standard tiers. Use Basic
+# only for a throwaway local pilot that never needs a private endpoint.
 az acr create --resource-group "$RG" --name "$ACR" \
-  --sku Basic --location "$LOCATION"
+  --sku Premium --location "$LOCATION"
 # Run from 05-DOCKER-STARTER/ (the Dockerfile and compiled dist/ are included):
 az acr build --registry "$ACR" --image thesis-agent:trial-v1 --file Dockerfile.node .
 # Optional separate Azure Functions starter image:

@@ -5,7 +5,11 @@ ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
     AzureFunctionsJobHost__Logging__Console__IsEnabled=true
 COPY functions/host.json /home/site/wwwroot/host.json
 COPY functions/package.json /home/site/wwwroot/package.json
+COPY functions/package-lock.json /home/site/wwwroot/package-lock.json
 COPY functions/index.mjs /home/site/wwwroot/index.mjs
 COPY dist /home/site/wwwroot/dist
 WORKDIR /home/site/wwwroot
-RUN npm install --omit=dev --no-audit --no-fund
+# npm ci, not npm install: the deployment artifact must be built from the
+# committed lockfile, otherwise every build resolves different dependency
+# versions and the thesis cannot pin what actually ran.
+RUN npm ci --omit=dev --no-audit --no-fund

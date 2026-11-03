@@ -28,10 +28,20 @@ resource hostStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     supportsHttpsTrafficOnly: true
     minimumTlsVersion: 'TLS1_2'
     publicNetworkAccess: 'Enabled'
+    // Flex host/deployment traffic originates from the platform, outside the
+    // integration subnet, so a subnet-scoped virtualNetworkRule cannot authorize it
+    // and a Deny default would strand the app. This mirrors the published Flex
+    // Consumption reference sample
+    // (github.com/Azure-Samples/azure-functions-flex-consumption-samples, IaC/bicep/main.bicep):
+    // defaultAction Allow with the AzureServices bypass, shared keys off, public blob
+    // access off, identity-only authentication. Reaching this account from the
+    // workload network is still denied by the workload NSG. To close public access
+    // entirely, add private endpoints for blob/queue/table in the
+    // evidence-private-endpoints subnet plus their private DNS zones — that is an
+    // additional billable resource set and is not deployed here.
     networkAcls: {
-      defaultAction: 'Deny'
-      bypass: 'None'
-      virtualNetworkRules: [{ id: integrationSubnetId, action: 'Allow' }]
+      defaultAction: 'Allow'
+      bypass: 'AzureServices'
     }
   }
 }

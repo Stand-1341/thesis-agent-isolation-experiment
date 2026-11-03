@@ -20,6 +20,16 @@ resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
       logAnalyticsConfiguration: { customerId: logCustomerId, sharedKey: workspace.listKeys().primarySharedKey }
     }
     vnetConfiguration: { infrastructureSubnetId: infrastructureSubnetId, internal: false }
+    // BLOCKER, not a finished configuration: custom container session pools require a
+    // workload-profiles-enabled environment, i.e. at least one Dedicated profile such
+    // as { name: 'e16', workloadProfileType: 'E16' }. A Consumption-only environment
+    // cannot host the CustomContainer pools that session-workload-pilot.bicep and
+    // session-diagnostic.bicep create, and the subnet here is delegated to
+    // Microsoft.App/environments, which the Consumption-only shape does not want.
+    // A Dedicated E16 profile is 16 vCPU / 128 GiB of reserved, billable capacity and
+    // needs its own quota, so it is NOT added here silently — that is a budget and
+    // quota decision for the author. Add it at environment creation; workload profiles
+    // can only be introduced on an environment that supports them from the start.
     workloadProfiles: [{ name: 'Consumption', workloadProfileType: 'Consumption' }]
   }
 }

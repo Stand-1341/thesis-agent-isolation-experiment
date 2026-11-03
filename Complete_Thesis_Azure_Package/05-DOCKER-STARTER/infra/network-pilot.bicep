@@ -19,7 +19,12 @@ resource network 'Microsoft.Network/virtualNetworks@2023-09-01' = {
         properties: {
           addressPrefix: '10.48.1.0/24'
           delegations: [{ name: 'functions-delegation', properties: { serviceName: 'Microsoft.App/environments' } }]
-          serviceEndpoints: [{ service: 'Microsoft.Storage' }]
+          // No serviceEndpoints here by design: a Flex Consumption integration subnet
+          // "can't already be used for private endpoints or service endpoints"
+          // (learn.microsoft.com/azure/azure-functions/flex-consumption-how-to#subnet-usage-restrictions),
+          // so a Microsoft.Storage service endpoint blocks VNet integration. Host
+          // storage is reached over identity-based access instead; the hardening path
+          // is a private endpoint in evidence-private-endpoints.
         }
       }
       {
@@ -30,8 +35,8 @@ resource network 'Microsoft.Network/virtualNetworks@2023-09-01' = {
         }
       }
       { name: 'evidence-private-endpoints', properties: { addressPrefix: '10.48.4.0/27' } }
-      { name: 'functions-p2', properties: { addressPrefix: '10.48.5.0/24', delegations: [{ name: 'functions-delegation', properties: { serviceName: 'Microsoft.App/environments' } }], serviceEndpoints: [{ service: 'Microsoft.Storage' }] } }
-      { name: 'functions-p3', properties: { addressPrefix: '10.48.6.0/24', delegations: [{ name: 'functions-delegation', properties: { serviceName: 'Microsoft.App/environments' } }], serviceEndpoints: [{ service: 'Microsoft.Storage' }] } }
+      { name: 'functions-p2', properties: { addressPrefix: '10.48.5.0/24', delegations: [{ name: 'functions-delegation', properties: { serviceName: 'Microsoft.App/environments' } }] } }
+      { name: 'functions-p3', properties: { addressPrefix: '10.48.6.0/24', delegations: [{ name: 'functions-delegation', properties: { serviceName: 'Microsoft.App/environments' } }] } }
       { name: 'vm-p2', properties: { addressPrefix: '10.48.7.0/24' } }
       { name: 'vm-p3', properties: { addressPrefix: '10.48.8.0/24' } }
       { name: 'research-services', properties: { addressPrefix: '10.48.9.0/24' } }

@@ -1,5 +1,28 @@
 node_modules/
+**/node_modules/
+# The starter is meant to be extracted and published on its own, so it carries the
+# same secret and artifact rules as the repository root instead of relying on them.
 .env
-results/*.json
-results/*.csv
-results/local-evidence/
+.env.*
+results/
+logs/
+*.log
+*.py[cod]
+__pycache__/
+*.parameters.json
+parameters.json
+local.settings.json
+*.publishsettings
+.azure/
+secrets.json
+credentials
+service-account.json
+*.pfx
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*.zip
+*.bak
+*.orig
+*.swp

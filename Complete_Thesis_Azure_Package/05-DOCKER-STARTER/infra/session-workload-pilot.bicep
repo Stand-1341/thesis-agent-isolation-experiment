@@ -2,6 +2,9 @@
 // The pool must use a separately tested egress policy and safe session lifecycle.
 // Its pull identity is NOT a session executor and must be unavailable to code.
 param location string = resourceGroup().location
+@minLength(3)
+@maxLength(63)
+@description('3-63 characters. The published swagger for Microsoft.App/sessionPools declares the pattern ^[a-z][a-z0-9]*$, which a hyphenated name violates, and bicep emits BCP416 for a literal such as thesis-session-pool. That pattern is not enforced in practice: this pilot created the hyphenated pool thesis-diag-pool successfully (EXPERIMENT-STATUS.md). Length is checked here; the pattern is left to the service.')
 param poolName string
 param environmentId string
 param pullIdentityId string

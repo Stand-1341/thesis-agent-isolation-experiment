@@ -32,7 +32,13 @@ if (process.env.AZURE_BLOB_ENDPOINT) {
 }
 const port = Number(process.env.PORT || 8080);
 createServer(async (req,res) => {
-  const requestPath=new URL(req.url || '/',`http://localhost:${port}`).pathname;
+  // Parsing the request target can throw on a malformed one. It used to happen
+  // outside any try, in an async handler, where the rejection is unhandled and
+  // Node exits the process — one malformed unauthenticated request killed the
+  // workload mid-trial.
+  let requestPath;
+  try { requestPath=new URL(req.url || '/',`http://localhost:${port}`).pathname; }
+  catch { return send(res,400,{error:'invalid request target'}); }
   if (requestPath === '/health' && req.method === 'GET') return send(res,200,{ready:true});
   if (!['/run','/network-probe','/session-seed'].includes(requestPath) || req.method !== 'POST') return send(res,404,{error:'not found'});
   if (req.headers['x-trial-key'] !== requestKey) return send(res,403,{error:'controller authorization required'});
