@@ -17,15 +17,15 @@ from collections import Counter
 from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parents[2]
-DEFAULT_PLANS = [
-    PACKAGE / '03-PLANNED-TRIAL-MATRIX-400-REV2.csv',   # current
-    PACKAGE / '03-PLANNED-TRIAL-MATRIX-450.csv',        # superseded, kept as history
-]
+# PLAN is the schedule the runner executes; callers and tests import it.
+PLAN = PACKAGE / '03-PLANNED-TRIAL-MATRIX-400-REV2.csv'
+SUPERSEDED = PACKAGE / '03-PLANNED-TRIAL-MATRIX-450.csv'   # historical, never edited
+DEFAULT_PLANS = [PLAN, SUPERSEDED]
 HEADER = ['planned_run_id', 'block', 'order_in_block', 'deployment', 'permission_profile',
           'scenario_id', 'scenario_type', 'status', 'result', 'verified_evidence_ref']
 
 
-def validate(path):
+def validate(path=PLAN):
     raw = path.read_bytes()
     with path.open(encoding='utf-8-sig', newline='') as stream:
         reader = csv.DictReader(stream)

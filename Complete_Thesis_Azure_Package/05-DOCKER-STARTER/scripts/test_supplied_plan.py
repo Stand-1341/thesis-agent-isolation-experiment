@@ -2,12 +2,21 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
-from validate_supplied_plan import PLAN, validate
+from validate_supplied_plan import PLAN, SUPERSEDED, validate
 
 
 class PlanValidationTest(unittest.TestCase):
     def test_supplied_plan(self):
-        self.assertEqual(validate()['rows'], 450)
+        # Revision 2 withdrew the 50 session-arm P3 cells.
+        report = validate()
+        self.assertEqual(report['rows'], 400)
+        self.assertEqual(report['blocks'], 5)
+        self.assertEqual(report['rowsPerBlock'], 80)
+
+    def test_superseded_plan_is_still_intact(self):
+        # Revision 1 is the record of what was planned; it must stay unmodified.
+        report = validate(SUPERSEDED)
+        self.assertEqual(report['rows'], 450)
 
     def test_duplicate_cell_is_rejected(self):
         with PLAN.open(encoding='utf-8-sig', newline='') as stream:
@@ -21,7 +30,7 @@ class PlanValidationTest(unittest.TestCase):
                 writer = csv.DictWriter(stream, fieldnames=fields)
                 writer.writeheader()
                 writer.writerows(rows)
-            with self.assertRaisesRegex(ValueError, 'each cell'):
+            with self.assertRaisesRegex(ValueError, 'trial cell|each cell'):
                 validate(path)
 
 
