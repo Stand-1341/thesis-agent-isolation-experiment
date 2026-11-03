@@ -1,0 +1,16 @@
+# Line-ending policy for frozen study artifacts.
+#
+# 03-PLANNED-TRIAL-MATRIX-450.csv is a byte-exact research artifact: the thesis
+# records its SHA-256 (39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298)
+# and both scripts/trial-schedule.mjs and scripts/generate-gpt5mini-live-plan.mjs
+# refuse to proceed unless the bytes match that digest exactly. Any end-of-line
+# normalization (for example core.autocrlf on Windows) rewrites those bytes and
+# silently breaks the integrity gate. `-text` disables all conversion for these
+# paths so the stored bytes and the checked-out bytes are identical everywhere.
+#
+# Do not edit the CSV in a way that changes bytes without re-freezing the digest
+# in trial-schedule.test.mjs, generate-gpt5mini-live-plan.mjs and EXPERIMENT-STATUS.md.
+*.csv -text
+
+# Office binaries: never text-normalize, never attempt a textual diff.
+*.docx binary

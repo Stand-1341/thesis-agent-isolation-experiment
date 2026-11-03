@@ -1,0 +1,158 @@
+name: CI
+
+# Local-quality gate only. This workflow never authenticates to Azure and never
+# deploys anything. Deployment stays a manual, separately approved step.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  STARTER_DIR: Complete_Thesis_Azure_Package/05-DOCKER-STARTER
+  # Frozen SHA-256 of the supplied 450-row study matrix. Recorded in
+  # EXPERIMENT-STATUS.md, trial-schedule.test.mjs and generate-gpt5mini-live-plan.mjs.
+  # Update all four together or not at all.
+  FROZEN_PLAN_SHA256: 39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298
+
+jobs:
+  build-and-test:
+    name: build + test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22 is what the Dockerfiles and the Functions image pin; 24 proves the
+        # source still builds on the next LTS.
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: |
+            ${{ env.STARTER_DIR }}/package-lock.json
+            ${{ env.STARTER_DIR }}/functions/package-lock.json
+
+      - name: Install
+        working-directory: ${{ env.STARTER_DIR }}
+        run: npm ci
+
+      - name: Build
+        working-directory: ${{ env.STARTER_DIR }}
+        run: npm run build
+
+      - name: Committed dist/ is up to date
+        run: |
+          if [ -n "$(git status --porcelain -- "$STARTER_DIR/dist")" ]; then
+            echo "::error::dist/ is out of date with src/; run 'npm run build' and commit the result."
+            git status --porcelain -- "$STARTER_DIR/dist"
+            exit 1
+          fi
+
+      - name: Test
+        working-directory: ${{ env.STARTER_DIR }}
+        run: npm test
+
+      - name: Functions dependency install is consistent with its lockfile
+        working-directory: ${{ env.STARTER_DIR }}/functions
+        run: npm ci --dry-run
+
+  study-artifacts:
+    name: frozen study artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # Guards against the end-of-line normalization regression that silently
+      # changed the matrix bytes and broke the frozen digest on Linux checkouts.
+      - name: Frozen plan digest
+        run: |
+          actual="$(sha256sum Complete_Thesis_Azure_Package/03-PLANNED-TRIAL-MATRIX-450.csv | cut -d' ' -f1)"
+          echo "expected: $FROZEN_PLAN_SHA256"
+          echo "actual  : $actual"
+          if [ "$actual" != "$FROZEN_PLAN_SHA256" ]; then
+            echo "::error::03-PLANNED-TRIAL-MATRIX-450.csv no longer matches the frozen digest. Byte-exact artifact: do not reformat, re-save, or let git normalize it."
+            exit 1
+          fi
+
+      - name: Supplied plan validation
+        working-directory: ${{ env.STARTER_DIR }}
+        run: |
+          python3 scripts/validate_supplied_plan.py
+          python3 scripts/test_supplied_plan.py
+
+  bicep:
+    name: bicep compile + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Bicep CLI
+        run: |
+          curl -sSLo /usr/local/bin/bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x /usr/local/bin/bicep
+          bicep --version
+
+      - name: Compile every template
+        working-directory: ${{ env.STARTER_DIR }}/infra
+        run: |
+          fail=0
+          shopt -s nullglob
+          for f in *.bicep; do
+            out="/tmp/bicep-out/${f%.bicep}.json"
+            mkdir -p /tmp/bicep-out
+            if bicep build "$f" --outfile "$out"; then
+              echo "ok   $f"
+            else
+              echo "::error file=${{ env.STARTER_DIR }}/infra/$f::bicep build failed"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Lint every template
+        working-directory: ${{ env.STARTER_DIR }}/infra
+        run: |
+          fail=0
+          shopt -s nullglob
+          for f in *.bicep; do
+            if ! bicep lint "$f" --diagnostics-format default; then
+              echo "::error file=${{ env.STARTER_DIR }}/infra/$f::bicep lint reported problems"
+              fail=1
+            fi
+          done
+          exit $fail
+
+  containers:
+    name: docker build (${{ matrix.dockerfile }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile:
+          - Dockerfile.node
+          - Dockerfile.functions
+          - Dockerfile.header-audit
+          - Dockerfile.managed-audit-probe
+          - Dockerfile.session-diagnostic-job
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build ${{ matrix.dockerfile }}
+        working-directory: ${{ env.STARTER_DIR }}
+        run: docker build -f "${{ matrix.dockerfile }}" -t "thesis-pilot:${GITHUB_SHA::12}" .

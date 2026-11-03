@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"for(const f of ['network-probe.mjs','azure-blob-workload.mjs','azure-managed-token.mjs','azure-delegated-token.mjs','azure-session-seed.mjs']) require('node:fs').copyFileSync('scripts/'+f,'dist/'+f)\"",
+    "test": "node --test \"scripts/*.test.mjs\"",
+    "test:watch": "node --test --watch \"scripts/*.test.mjs\"",
+    "verify": "npm run build && npm test",
     "start:agent": "node dist/agent.js",
     "start:resource": "node dist/resource.js",
     "start:collector": "node dist/collector.js",
