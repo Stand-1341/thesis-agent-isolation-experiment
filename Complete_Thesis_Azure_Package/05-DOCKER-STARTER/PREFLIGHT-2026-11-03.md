@@ -1,6 +1,6 @@
 # Deployment preflight report — 2026-11-03
 
-## Latest live snapshot — 2026-11-03 10:09 UTC
+## Latest live snapshot — 2026-11-03 10:14 UTC
 
 **No cloud trial has run, and the experiment remains blocked on credentials.**
 The private controller VM is running at `10.48.11.4`. Its Docker inventory was
@@ -14,8 +14,11 @@ digest is
 `sha256:2ab59fa1f8f994bea199b51f6cff1ca8da7d5230b994c8501de842a2ac7c6b9f`.
 The image entrypoint is fixed to the non-counted Azure Functions P1 pilot
 launcher; it loads credentials from Key Vault via managed identity and selects
-the frozen P1 route only. The launcher has not been run against Azure because
-the required secrets have not been provisioned.
+the frozen P1 route only. I started one `--limit 1` smoke attempt on the VM.
+The controller identity successfully reached Key Vault, but the launcher exited
+with code 2 because `functions-p1-controller-key` returned HTTP 404. It stopped
+before claiming any row. The mounted evidence directory remained empty; no
+scenario or trial ran, and the container is exited.
 
 The Azure CLI identity is signed in and can push/pull ACR images, but the
 current user does not have Key Vault secret metadata access (`ForbiddenByRbac`).
