@@ -104,9 +104,11 @@ jobs:
 
       - name: Install Bicep CLI
         run: |
-          curl -sSLo /usr/local/bin/bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
-          chmod +x /usr/local/bin/bicep
-          bicep --version
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSLo "$RUNNER_TEMP/bin/bicep" https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x "$RUNNER_TEMP/bin/bicep"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/bicep" --version
 
       - name: Compile every template
         working-directory: ${{ env.STARTER_DIR }}/infra
