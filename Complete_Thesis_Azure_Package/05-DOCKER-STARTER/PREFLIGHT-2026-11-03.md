@@ -1,5 +1,33 @@
 # Deployment preflight report — 2026-11-03
 
+## Latest live snapshot — 2026-11-03 10:09 UTC
+
+**No cloud trial has run, and the experiment remains blocked on credentials.**
+The private controller VM is running at `10.48.11.4`. Its Docker inventory was
+empty before the new launcher image was pulled, and no runner was started. The
+local package suite now passes **200/200** tests, including coverage for
+deployment-specific independent verifier endpoints and the Key Vault launcher.
+
+Image `thesisacr74a95224.azurecr.io/thesis-controller-pilot:functions-p1-kv-launcher-20261103`
+was built, pushed to the private ACR, and pulled onto the controller VM. Its
+digest is
+`sha256:2ab59fa1f8f994bea199b51f6cff1ca8da7d5230b994c8501de842a2ac7c6b9f`.
+The image entrypoint is fixed to the non-counted Azure Functions P1 pilot
+launcher; it loads credentials from Key Vault via managed identity and selects
+the frozen P1 route only. The launcher has not been run against Azure because
+the required secrets have not been provisioned.
+
+The Azure CLI identity is signed in and can push/pull ACR images, but the
+current user does not have Key Vault secret metadata access (`ForbiddenByRbac`).
+Earlier inspection found the vault empty. The required six values and secure
+operator provisioning steps are listed in `infra/CONTROLLER-PILOT.md`. An
+automatic review rejected transferring existing Function settings through the
+local shell, and no secret values were retrieved or written. After the vault
+is populated, a one-row pilot smoke can start. The full 400-row study remains
+blocked by missing validated VM/Functions/session route profiles, P3 denial
+evidence, independent evidence custody, and readiness gates. The session pool
+is diagnostic-only and has no VNet; live resources continue to incur charges.
+
 ## Latest live snapshot — 2026-11-03 09:55 UTC
 
 **Still blocked; no experiment trials are running.** The Azure CLI is signed

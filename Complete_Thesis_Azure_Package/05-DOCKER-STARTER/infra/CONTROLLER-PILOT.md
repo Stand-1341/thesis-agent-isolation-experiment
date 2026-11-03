@@ -22,11 +22,13 @@ readiness.
 The ACR pull identity is attached. The existing AcrPull assignment is
 preprovisioned by the diagnostic foundation and this template leaves it
 unchanged. The private controller VM has been deployed at `10.48.11.4` with
-no public IP. Image `thesis-controller-pilot:1adac43` has been pushed to the
-existing private ACR. Docker 29.1.3 and Azure CLI 2.92.0 are installed on the
-VM. Managed-identity login, image pull, and a container dry-run are still
-pending verification; a successful installation alone is not a validated
-execution path.
+no public IP. Initial image `thesis-controller-pilot:1adac43` and updated image
+`thesis-controller-pilot:functions-p1-kv-launcher-20261103` have been pushed
+to the existing private ACR. The updated image was pulled onto the VM with
+digest `sha256:2ab59fa1f8f994bea199b51f6cff1ca8da7d5230b994c8501de842a2ac7c6b9f`.
+Docker 29.1.3 and Azure CLI 2.92.0 are installed on the VM. Managed-identity
+login, image pull, CLI help, and a structural dry-run succeeded, but no cloud
+scenario has been executed.
 
 The firewall application rule accepts only the FQDNs passed in
 `allowedApplicationFqdns`. ACR and Blob private endpoints use their exact
@@ -93,6 +95,26 @@ to the private-endpoint IPs caused repeated TCP timeouts, so they were replaced
 by exact ACR/Blob application FQDN rules to use firewall SNAT for symmetric
 replies. The corrected ACR endpoint returned HTTP 401 as expected, and the
 controller then completed managed-identity sign-in, ACR login, image pull, CLI
-help, and a structural dry-run. The Key Vault is present but empty. Effective
-study-route isolation, attributable P3 denial evidence, and measured readiness
-remain unvalidated.
+help, and a structural dry-run. The Key Vault is present but empty. Before
+running the image launcher, an operator must provision six secrets in
+`thesisexpkv20261103` using the matching values from the existing private Azure
+configuration: `functions-p1-controller-key` (Functions app setting
+`TRIAL_REQUEST_KEY`), `functions-p1-function-key` (the deployed `thesisRun`
+function key), `resource-admin-key` (research host `ADMIN_TOKEN`),
+`collector-admin-key` (collector host `ADMIN_TOKEN`),
+`functions-p1-resource-verifier-key` (research host `VERIFIER_TOKEN`), and
+`functions-p1-collector-verifier-key` (collector host `VERIFIER_TOKEN`). Do
+this through an authenticated Azure Portal session or another approved secure
+operator path. Do not put secret values in Git, command history, task logs, or
+chat. The controller identity already has Key Vault Secrets User and the
+launcher fetches values in memory through managed identity; it prints no
+secret contents. A missing or inaccessible secret stops the launcher before
+any trial is claimed.
+
+With the secrets provisioned, run the container with no arguments to select
+only the ten frozen Azure Functions P1 pilot rows, one at a time, in non-counted
+pilot mode. `--limit 1` is available for the first single-row smoke. Do not
+override the launcher config, route, profile, or mode. The pilot remains
+incomplete for unsupported P3, and a successful P1 pilot does not establish
+full-study readiness. Effective study-route isolation, attributable P3 denial
+evidence, and measured readiness remain unvalidated.

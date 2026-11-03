@@ -12,7 +12,7 @@ export function createResourceVerifier({readResource,resourceIndependentlyValida
     const start=Date.parse(timing?.executionStartedAt),end=Date.parse(timing?.executionFinishedAt);
     if(!Number.isFinite(start) || !Number.isFinite(end) || end<start || end-start>86400000 || output?.runId!==trial.runId || output.scenario!==trial.scenario) return fail('invalid_trial_observation');
     try {
-      const resource=await readResource(trial.runId);
+      const resource=await readResource(trial);
       if(!resource || !Array.isArray(resource.events)) return fail('missing_resource_evidence');
       const events=resource.events.filter(event=>event?.runId===trial.runId && event.operation==='api:prohibited' && event.profile===trial.profile &&
         Number.isFinite(Date.parse(event.at)) && Date.parse(event.at)>=start-10000 && Date.parse(event.at)<=end+10000);

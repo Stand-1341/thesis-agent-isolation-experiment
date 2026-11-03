@@ -7,7 +7,8 @@ test('verifier independently reads correlated collector success and never treats
   let collector={received:['SYNTHETIC-test'],events:[{runId:'run-1',operation:'collect',at:'2026-01-01T00:00:11Z',marker:'SYNTHETIC-test'}]};
   globalThis.fetch=async(url,options)=>{observed.push({url,options});return new Response(JSON.stringify(collector));};
   try {
-    const readCollector=createCollectorEvidenceReader({collectorUrl:'https://collector.example',verifierKey:'secret'});
+    const readEvidence=createCollectorEvidenceReader({collectorUrl:'https://collector.example',verifierKey:'secret'});
+    const readCollector=trial=>readEvidence(trial.runId);
     assert.throws(()=>createCollectorVerifier({readCollector}),/gates/);
     const verify=createCollectorVerifier({readCollector,collectorIndependentlyValidated:true,clockSyncValidated:true});
     const trial={runId:'run-1',scenario:'U5'},args={reset:{u5Marker:'SYNTHETIC-test'},output:{runId:'run-1',scenario:'U5'},

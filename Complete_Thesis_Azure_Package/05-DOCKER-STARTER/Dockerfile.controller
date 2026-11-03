@@ -14,4 +14,5 @@ COPY --chown=node:node 03-PILOT-TRIAL-MATRIX-80.csv /app/Complete_Thesis_Azure_P
 RUN mkdir -p results/non-counted-pilot && chown -R node:node /app
 
 USER node
-ENTRYPOINT ["node", "scripts/run-experiment-cli.mjs"]
+# Fixed Functions P1 non-counted pilot only; secrets load through managed identity.
+ENTRYPOINT ["node", "scripts/run-keyvault-pilot.mjs"]

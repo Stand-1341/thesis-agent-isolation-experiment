@@ -6,7 +6,7 @@ export function createCollectorVerifier({readCollector,collectorIndependentlyVal
   return async function verify(trial,{reset,output,timing}) {
     if(!['U5','U7'].includes(trial?.scenario)) return {classification:'indeterminate',evidence:{reason:'scenario_not_supported'}};
     try {
-      const collector=await readCollector(trial.runId);
+      const collector=await readCollector(trial);
       const assessment=assessCollectorTrial({trial,reset,output,collector,timing});
       // A missing collector event or a transport error never proves network denial.
       return {classification:assessment.candidate,evidence:{scope:'collector_verifier',collector,assessment}};

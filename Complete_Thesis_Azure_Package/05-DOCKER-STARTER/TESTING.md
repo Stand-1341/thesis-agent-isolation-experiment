@@ -111,8 +111,12 @@ pool, storage, registry, and logging resources can continue to incur charges.
   `infra/research-host-pilot.bicep` compile. The new
   `infra/controller-vm-pilot.bicep` also compiles and is deployed. The private
   controller VM is running at `10.48.11.4` with no public IP.
-- The controller image was pushed to the private ACR as
-  `thesis-controller-pilot:1adac43`. Docker 29.1.3 and Azure CLI 2.92.0 are
+- The initial controller image was pushed to the private ACR as
+  `thesis-controller-pilot:1adac43`. The updated Key Vault launcher image was
+  pushed and pulled to the controller VM as
+  `thesis-controller-pilot:functions-p1-kv-launcher-20261103` (digest
+  `sha256:2ab59fa1f8f994bea199b51f6cff1ca8da7d5230b994c8501de842a2ac7c6b9f`).
+  Docker 29.1.3 and Azure CLI 2.92.0 are
   installed on the VM. Managed-identity sign-in, `az acr login`, image pull,
   CLI help, and the structural non-counted pilot dry-run succeeded. The dry-run
   reports 80 planned rows, 64 measurable by scope rules, 12 N/A, 4 unsupported
@@ -120,10 +124,13 @@ pool, storage, registry, and logging resources can continue to incur charges.
   unchecked, and all four readiness gates unverified. It invoked no trial
   route.
 - Key Vault `thesisexpkv20261103` is deployed with firewall-IP access and a
-  controller Secrets User assignment, but contains no secrets or runtime
-  loader. The automatic review rejected a local handoff of existing Functions
-  secret settings into the vault; no values were retrieved or written. Secure
-  credential provisioning and Key Vault-to-runner wiring are still required.
+  controller Secrets User assignment. `scripts/run-keyvault-pilot.mjs` loads
+  six required values through the controller managed identity and starts only
+  the non-counted Azure Functions P1 pilot. The vault is empty, so no cloud
+  scenario can start until an operator provisions the secrets described in
+  `infra/CONTROLLER-PILOT.md`. An automatic review rejected copying existing
+  Functions secret settings through the local shell; no values were retrieved
+  or written. No trial has been executed.
 - Docker builds passed for both `Dockerfile.node` and
   `Dockerfile.functions`. Each built image parsed the CA and reported the
   expected CA fingerprint.

@@ -76,6 +76,13 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
 
   const workspaceId=reader(env,missing,'THESIS_LOG_ANALYTICS_WORKSPACE_ID');
   if(workspaceId && !GUID.test(workspaceId)) throw new Error('THESIS_LOG_ANALYTICS_WORKSPACE_ID must be a workspace GUID');
+  const fixtureBlobEndpoint=reader(env,missing,'THESIS_FIXTURE_BLOB_ENDPOINT');
+  if(fixtureBlobEndpoint) {
+    let parsed;
+    try { parsed=new URL(fixtureBlobEndpoint); } catch { throw new Error('THESIS_FIXTURE_BLOB_ENDPOINT must be an HTTPS URL'); }
+    if(parsed.protocol!=='https:' || parsed.username || parsed.password || parsed.search || parsed.hash)
+      throw new Error('THESIS_FIXTURE_BLOB_ENDPOINT must be an HTTPS URL without credentials, query or fragment');
+  }
   const destinationIp=needsVmDenial||needsFlexDenial?ip(env,missing,'THESIS_DENIAL_DESTINATION_IP'):undefined;
   const vmSource=overrides.azure_vm?.sourceIp ?? ip(env,missing,'THESIS_VM_SOURCE_IP',{optional:true});
   // Scoping the VM arm's flow-log query on the VM's IP would return nothing for
@@ -151,24 +158,26 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
 
   // ---- resource and collector verdicts -----------------------------------
   const deploymentOf=trial=>config.deployments[trial?.deployment];
-  const verifierKeyFor=trial=>{
-    const key=env[`THESIS_${trial.deployment.toUpperCase()}_VERIFIER_KEY`];
-    if(!key) throw new Error(`missing THESIS_${trial.deployment.toUpperCase()}_VERIFIER_KEY`);
+  const verifierKeyFor=(trial,service)=>{
+    const prefix=`THESIS_${trial.deployment.toUpperCase()}`;
+    const serviceKey=env[`${prefix}_${service.toUpperCase()}_VERIFIER_KEY`];
+    const sharedKey=env[`${prefix}_VERIFIER_KEY`];
+    const key=serviceKey||sharedKey;
+    if(!key) throw new Error(`missing ${prefix}_${service.toUpperCase()}_VERIFIER_KEY`);
     return key;
   };
   const collectorVerifier=createCollectorVerifier({
     readCollector:async trial=>createCollectorEvidenceReader({collectorUrl:deploymentOf(trial)?.collectorUrl,
-      verifierKey:verifierKeyFor(trial)})(trial),
+      verifierKey:verifierKeyFor(trial,'collector')})(trial.runId),
     collectorIndependentlyValidated:flag(env,'THESIS_COLLECTOR_INDEPENDENTLY_VALIDATED'),
     clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED'),pilotMode});
   const resourceVerifier=createResourceVerifier({
     readResource:async trial=>createResourceEvidenceReader({resourceUrl:deploymentOf(trial)?.resourceUrl,
-      verifierKey:verifierKeyFor(trial)})(trial),
+      verifierKey:verifierKeyFor(trial,'resource')})(trial.runId),
     resourceIndependentlyValidated:flag(env,'THESIS_RESOURCE_INDEPENDENTLY_VALIDATED'),
     clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED'),pilotMode});
 
   // ---- Blob-backed scenarios ---------------------------------------------
-  const blobDeployment=config.deployments.azure_vm;
   const blobVerifier=createAzureBlobVerifier({
     readAudit:createStorageAuditReader({workspaceId,getToken:getLogsToken}),
     principalForTrial:trial=>{
@@ -176,7 +185,7 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
       if(!route) throw new Error('no configured principal for this trial');
       return route.principalObjectId;
     },
-    blobEndpoint:blobDeployment.fixtureBlobEndpoint,
+    blobEndpoint:fixtureBlobEndpoint,
     blobResourceId:reader(env,missing,'THESIS_BLOB_RESOURCE_ID'),
     workspaceId,
     runAuthorizationControl:undefined,
