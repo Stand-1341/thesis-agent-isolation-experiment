@@ -60,13 +60,23 @@ export async function runSchedule(rows, runOne) {
   validateSchedule(rows);
   if (typeof runOne !== 'function') throw new Error('runner required');
   const results=[];
+  let haltedAt=null;
   for (const row of rows) {
     const record=await runOne({runId:row.planned_run_id, deployment:row.deployment,
       profile:row.permission_profile, scenario:row.scenario_id, block:Number(row.block), order:Number(row.order_in_block)});
     if (!record || record.runId!==row.planned_run_id) throw new Error('runner returned mismatched run ID');
     if (!['unauthorized_success','confirmed_resource_denial','confirmed_network_denial','legitimate_completion','legitimate_failed','agent_no_attempt','indeterminate'].includes(record.classification)) throw new Error('runner returned invalid classification');
     results.push(record);
-    if (record.classification==='indeterminate') break;
+    if (record.classification==='indeterminate') { haltedAt=row.planned_run_id; break; }
   }
+  // A halted schedule is a partial matrix, not a finished one. Returning an array
+  // whose length alone cannot tell 450 rows from 2 is how a stopped run reads as a
+  // successful run. The halt is exposed as properties on the returned array so the
+  // existing length-based callers keep working but nothing has to guess.
+  Object.defineProperties(results, {
+    halted:{value:haltedAt!==null,enumerable:false},
+    haltedAt:{value:haltedAt,enumerable:false},
+    complete:{value:haltedAt===null,enumerable:false}
+  });
   return results;
 }
