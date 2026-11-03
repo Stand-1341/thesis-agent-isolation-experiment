@@ -33,6 +33,19 @@ these figures may lag and are not current guarantees. The USD 125 budget is an
 alert threshold, not a spending cap. Refresh billing and remove idle paid
 resources before extended waits.
 
+2026-11-03 04:22 UTC live check: Azure reports the research VM and Flex Functions
+app Running; custom session pool `thesis-diag-pool` Succeeded with one ready
+session and maximum concurrency two. The only listed Container Apps job is the
+manual diagnostic job, whose executions have Succeeded or Failed; no measured
+trial process was found. Current subscription credit API reports USD 200
+balance, USD 200 estimated balance, and USD 0 pending eligible charges. Current
+Cost Management Month-to-Date query reports USD 16.6029 pre-tax. These billing
+views can lag and disagree; treat USD 16.60 as the latest metered-cost signal,
+not a final invoice or guarantee that the free credit will cover every meter.
+The P3 acceptance failure remains unchanged: `EgressEnabled` reached a public
+IP without an attributable firewall denial; `EgressDisabled` blocked the
+approved research endpoint. No trials ran.
+
 See `Complete_Thesis_Azure_Package/05-DOCKER-STARTER/PILOT-ACCEPTANCE.md` for
 the complete release gate. The detailed chronology below is retained as a
 working log; older entries may describe states superseded by later entries.
