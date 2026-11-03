@@ -1,6 +1,6 @@
 targetScope = 'resourceGroup'
 
-@description('Private pilot secret store. Use the exact existing vault name.')
+@description('Firewall-restricted pilot secret store. Use the exact existing vault name.')
 param vaultName string = 'thesisexpkv20261103'
 @description('Controller identity that reads only the pilot secrets at runtime.')
 param controllerIdentityName string = 'id-thesis-fixture-controller'

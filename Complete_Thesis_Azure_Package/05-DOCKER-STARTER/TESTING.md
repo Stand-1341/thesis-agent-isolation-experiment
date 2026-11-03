@@ -120,8 +120,10 @@ pool, storage, registry, and logging resources can continue to incur charges.
   unchecked, and all four readiness gates unverified. It invoked no trial
   route.
 - Key Vault `thesisexpkv20261103` is deployed with firewall-IP access and a
-  controller Secrets User assignment, but contains no secrets. Credentials
-  must be securely provisioned before invoking a pilot scenario.
+  controller Secrets User assignment, but contains no secrets or runtime
+  loader. The automatic review rejected a local handoff of existing Functions
+  secret settings into the vault; no values were retrieved or written. Secure
+  credential provisioning and Key Vault-to-runner wiring are still required.
 - Docker builds passed for both `Dockerfile.node` and
   `Dockerfile.functions`. Each built image parsed the CA and reported the
   expected CA fingerprint.

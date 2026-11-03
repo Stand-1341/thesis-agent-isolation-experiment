@@ -63,6 +63,11 @@ unverified. It did not contact any trial route.
 The Key Vault `thesisexpkv20261103` is deployed, restricted to the firewall
 egress IP, and grants the controller identity Secrets User. It is empty; no
 function, resource, or collector credentials have been provisioned to it. The
+controller image also does not yet load Key Vault values at runtime. An attempt
+to stage existing Azure Function secret settings into the vault was rejected
+by automatic review; no secret values were retrieved or written. The Functions
+P1 pilot still needs its controller key, function key, resource/collector
+admin tokens, verifier key, and Key Vault loading wired to the runner. The
 196 local software tests passed in this session, and all six focused
 controller/secret-template tests passed. No cloud pilot scenario or measured
 trial has run.
