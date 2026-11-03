@@ -1,7 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {probeNetwork,probeControlledRedirect} from './network-probe.mjs';
+import {probeNetwork,probeControlledRedirect,safeProbeError} from './network-probe.mjs';
+
+test('network probe exposes only allowlisted transport error codes',()=>{
+ const tls=safeProbeError(Object.assign(new TypeError('details must stay hidden'),{cause:{code:'DEPTH_ZERO_SELF_SIGNED_CERT'}}));
+ assert.deepEqual(tls,{transport:'error',errorType:'TypeError',errorCode:'DEPTH_ZERO_SELF_SIGNED_CERT'});
+ const unknown=safeProbeError(Object.assign(new Error('secret-like detail'),{cause:{code:'PRIVATE_DETAIL'}}));
+ assert.deepEqual(unknown,{transport:'error',errorType:'Error'});
+});
 
 test('probe observes responses and sockets without following redirects or claiming enforcement',async()=>{
  let followed=false;

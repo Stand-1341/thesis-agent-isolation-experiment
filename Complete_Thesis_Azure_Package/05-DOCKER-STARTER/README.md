@@ -151,6 +151,14 @@ In real deployment, provide secure per-profile agent environment values and use 
 
 **Revision-2 scope:** custom-session P3 was withdrawn because the pool's documented `EgressDisabled` blocks all outbound access, while `EgressEnabled` allows more than the study permits. The active P3 network cells are VM and Functions U5/U7; configure and pilot their independent denial telemetry before treating them as measurable.
 
+In `config/experiment.json`, set `agentUrl` on each Functions route to its own
+P1, P2, or P3 Function app. The Functions resource and collector URLs remain
+shared deployment-level endpoints. VM routes may optionally override
+`agentUrl`; if omitted, they inherit the VM deployment endpoint. Separate URLs
+make route selection explicit, but do not by themselves prove that Azure ran
+the request under the configured principal; compare runtime identity evidence
+in the pilot.
+
 ## Methodology safeguards
 
 1. **P1** is intentionally permissive but only for research-owned synthetic resources.

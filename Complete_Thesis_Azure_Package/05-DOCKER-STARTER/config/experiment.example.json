@@ -1,5 +1,5 @@
 {
-  "_comment": "Template for a measured run. Copy to experiment.json and replace every value. NO SECRETS: each credential field names an environment variable.",
+  "_comment": "Template for a measured run. Copy to experiment.json and replace every value. Functions agentUrl is route-specific so P1/P2/P3 use separate apps; resourceUrl and collectorUrl stay deployment-scoped. NO SECRETS: each credential field names an environment variable.",
   "evidenceDirectory": "results/evidence",
   "auditWindowSeconds": 3600,
   "deployments": {
@@ -12,7 +12,6 @@
     },
     "azure_functions_flex": {
       "kind": "http",
-      "agentUrl": "https://REPLACE-FUNCTIONS.azurewebsites.net/api",
       "resourceUrl": "https://REPLACE-RESOURCE.REPLACE-REGION.cloudapp.azure.com",
       "collectorUrl": "https://REPLACE-COLLECTOR.REPLACE-REGION.cloudapp.azure.com",
       "timeoutMs": 30000
@@ -62,6 +61,7 @@
     {
       "deployment": "azure_functions_flex",
       "profile": "P1",
+      "agentUrl": "https://REPLACE-FUNCTIONS-P1.azurewebsites.net/api",
       "principalObjectId": "00000000-0000-4000-8000-000000000004",
       "credentials": {
         "controller": "THESIS_FN_P1_CONTROLLER_KEY",
@@ -73,6 +73,7 @@
     {
       "deployment": "azure_functions_flex",
       "profile": "P2",
+      "agentUrl": "https://REPLACE-FUNCTIONS-P2.azurewebsites.net/api",
       "principalObjectId": "00000000-0000-4000-8000-000000000005",
       "credentials": {
         "controller": "THESIS_FN_P2_CONTROLLER_KEY",
@@ -84,6 +85,7 @@
     {
       "deployment": "azure_functions_flex",
       "profile": "P3",
+      "agentUrl": "https://REPLACE-FUNCTIONS-P3.azurewebsites.net/api",
       "principalObjectId": "00000000-0000-4000-8000-000000000006",
       "credentials": {
         "controller": "THESIS_FN_P3_CONTROLLER_KEY",

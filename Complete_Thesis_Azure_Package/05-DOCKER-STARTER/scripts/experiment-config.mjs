@@ -68,8 +68,10 @@ export function validateExperimentConfig(raw) {
     const entry=requireObject(config.deployments?.[name],`deployments.${name}`);
     if(!KINDS.includes(entry.kind)) throw new Error(`deployments.${name}.kind must be one of ${KINDS.join(', ')}`);
     if(entry.kind==='http') {
+      const agentUrl=entry.agentUrl===undefined?undefined:httpsUrl(entry.agentUrl,`deployments.${name}.agentUrl`);
+      if(name==='azure_vm' && !agentUrl) throw new Error(`deployments.${name}.agentUrl is required`);
       deployments[name]={kind:'http',
-        agentUrl:httpsUrl(entry.agentUrl,`deployments.${name}.agentUrl`),
+        ...(agentUrl?{agentUrl}:{}),
         resourceUrl:httpsUrl(entry.resourceUrl,`deployments.${name}.resourceUrl`),
         collectorUrl:httpsUrl(entry.collectorUrl,`deployments.${name}.collectorUrl`),
         ...(Number.isInteger(entry.timeoutMs)?{timeoutMs:entry.timeoutMs}:{})};
@@ -111,12 +113,20 @@ export function validateExperimentConfig(raw) {
     if(principals.has(principal)) throw new Error(`routes[${index}].principalObjectId is reused across routes`);
     principals.add(principal);
     const kind=deployments[route.deployment].kind;
+    let agentUrl;
+    if(kind==='http') {
+      if(route.deployment==='azure_functions_flex' && route.agentUrl===undefined)
+        throw new Error(`routes[${index}].agentUrl is required for ${route.deployment}`);
+      agentUrl=route.agentUrl===undefined?deployments[route.deployment].agentUrl:httpsUrl(route.agentUrl,`routes[${index}].agentUrl`);
+      if(!agentUrl) throw new Error(`routes[${index}].agentUrl is required for ${route.deployment}`);
+    } else if(route.agentUrl!==undefined) throw new Error(`routes[${index}].agentUrl is only valid for HTTP deployments`);
     const credentials=requireObject(route.credentials,`routes[${index}].credentials`);
     const resolved={};
     for(const name of CREDENTIAL_KEYS[kind]) resolved[name]=credentialRef(credentials[name],`routes[${index}].credentials.${name}`);
     if(kind==='http' && credentials.functionKey!==undefined)
       resolved.functionKey=credentialRef(credentials.functionKey,`routes[${index}].credentials.functionKey`);
-    routes.push({deployment:route.deployment,profile:route.profile,principalObjectId:route.principalObjectId,credentials:resolved});
+    routes.push({deployment:route.deployment,profile:route.profile,principalObjectId:route.principalObjectId,
+      ...(kind==='http'?{agentUrl}:{}),credentials:resolved});
   }
   for(const key of EXPERIMENT_ROUTES)
     if(!seen.has(key)) throw new Error(`missing route ${key}`);

@@ -40,7 +40,7 @@ export function buildRoutes(config, deps={}, {routeKeys}={}) {
         continue;
       }
       routes[key]={principalObjectId:route.principalObjectId,adapter:createHttpPilotAdapter({
-        agentUrl:deployment.agentUrl,resourceUrl:deployment.resourceUrl,collectorUrl:deployment.collectorUrl,
+        agentUrl:route.agentUrl ?? deployment.agentUrl,resourceUrl:deployment.resourceUrl,collectorUrl:deployment.collectorUrl,
         resourceAdminToken:route.credentials.resourceAdmin,collectorAdminToken:route.credentials.collectorAdmin,
         controllerToken:route.credentials.controller,
         ...(route.credentials.functionKey===undefined?{}:{functionKey:route.credentials.functionKey}),
@@ -97,7 +97,7 @@ export function describeRoutes(config, {routeKeys}={}) {
     const deployment=config.deployments[route.deployment];
     return {route:key,kind:deployment.kind,
       principalObjectId:route.principalObjectId,
-      target:deployment.kind==='http'?deployment.agentUrl:`${deployment.poolName} (${deployment.region})`,
+      target:deployment.kind==='http'?(route.agentUrl ?? deployment.agentUrl):`${deployment.poolName} (${deployment.region})`,
       credentialVariables:Object.values(route.credentials).sort()};
   }).filter(Boolean).sort((a,b)=>a.route<b.route?-1:1);
 }

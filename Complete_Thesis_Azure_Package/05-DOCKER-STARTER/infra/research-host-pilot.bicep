@@ -6,9 +6,14 @@ param location string = resourceGroup().location
 param hostName string
 @description('Dedicated research-services subnet resource ID.')
 param subnetId string
-@description('Exact trusted workload subnet CIDRs, supplied after network review.')
+@description('Exact source subnet CIDRs permitted to reach the research service on TCP/443. Include every active VM, Functions, and session route source subnet, including P1/P2/P3. Supply explicit values after network review; do not use broad VNet CIDRs.')
 @minLength(1)
-param workloadSourcePrefixes array
+@maxLength(100)
+param researchSourcePrefixes array
+@description('Exact P1/P2-only source subnet CIDRs permitted to reach the collector on TCP/8443. Include VM P1/P2, Functions P1/P2, and session P1/P2 subnets. Exclude every P3 subnet. Supply explicit values after network review; do not use broad VNet CIDRs.')
+@minLength(1)
+@maxLength(100)
+param collectorSourcePrefixes array
 @description('Exact operator/controller CIDRs with a working private route; not workload CIDRs.')
 @minLength(1)
 param operatorSourcePrefixes array
@@ -22,8 +27,8 @@ resource hostNsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
   location: location
   properties: {
     securityRules: [
-      { name: 'research-https', properties: { priority: 100, direction: 'Inbound', access: 'Allow', protocol: 'Tcp', sourceAddressPrefixes: workloadSourcePrefixes, sourcePortRange: '*', destinationAddressPrefix: '*', destinationPortRange: '443' } }
-      { name: 'collector-https', properties: { priority: 110, direction: 'Inbound', access: 'Allow', protocol: 'Tcp', sourceAddressPrefixes: workloadSourcePrefixes, sourcePortRange: '*', destinationAddressPrefix: '*', destinationPortRange: '8443' } }
+      { name: 'research-https', properties: { priority: 100, direction: 'Inbound', access: 'Allow', protocol: 'Tcp', sourceAddressPrefixes: researchSourcePrefixes, sourcePortRange: '*', destinationAddressPrefix: '*', destinationPortRange: '443' } }
+      { name: 'collector-https', properties: { priority: 110, direction: 'Inbound', access: 'Allow', protocol: 'Tcp', sourceAddressPrefixes: collectorSourcePrefixes, sourcePortRange: '*', destinationAddressPrefix: '*', destinationPortRange: '8443' } }
       { name: 'operator-services', properties: { priority: 120, direction: 'Inbound', access: 'Allow', protocol: 'Tcp', sourceAddressPrefixes: operatorSourcePrefixes, sourcePortRange: '*', destinationAddressPrefix: '*', destinationPortRanges: ['22', '443', '8443'] } }
       { name: 'deny-other-inbound', properties: { priority: 4000, direction: 'Inbound', access: 'Deny', protocol: '*', sourceAddressPrefix: '*', sourcePortRange: '*', destinationAddressPrefix: '*', destinationPortRange: '*' } }
     ]

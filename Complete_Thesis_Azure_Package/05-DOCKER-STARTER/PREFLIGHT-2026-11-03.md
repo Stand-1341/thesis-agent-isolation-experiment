@@ -49,3 +49,22 @@ After fixing a Windows file-URL bug in a new CLI test, the current local build a
 5. Rerun preflight with the real config and `deps-live.mjs`; review it before launching the measured schedule.
 
 No measured trial was run and no trial outcome is reported here.
+
+## Follow-up live diagnostic — 2026-11-03
+
+The existing diagnostic Functions app's VNet path was tested after this
+structural preflight. The first probe timed out because its dedicated subnet
+was absent from the research host's inbound NSG. After adding the subnet to the
+scoped service rules, TCP connected but TLS failed because the private CA was
+not trusted. The CA and server certificates were renewed, the public CA was
+bundled into the Node workloads, and the Functions diagnostic uses it
+explicitly while retaining certificate validation. The latest probe returned
+HTTP 200 from both research and collector and still concluded
+`indeterminate_without_independent_enforcer_evidence`.
+
+This tests connectivity for the single diagnostic app only. It does not supply
+the missing eight-route config or credentials, prove profile identity binding,
+prove P3 network enforcement, validate the independent verifiers, clear the
+readiness gates, or run any measured trial. Latest local verification is
+183/183 tests, both Node and Functions Docker images build, and the four new or
+updated Bicep templates compile.

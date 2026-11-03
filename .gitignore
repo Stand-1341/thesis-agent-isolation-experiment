@@ -27,3 +27,4 @@ node_modules/
 *.orig
 *.swp
 *~
+!Complete_Thesis_Azure_Package/05-DOCKER-STARTER/certs/thesis-pilot-ca.pem

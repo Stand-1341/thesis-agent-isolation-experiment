@@ -1,9 +1,19 @@
 import { app } from '@azure/functions';
+import { readFile } from 'node:fs/promises';
+import { X509Certificate } from 'node:crypto';
 import { SCENARIOS, runScenario } from './dist/core.js';
 import { probeNetwork } from './dist/network-probe.mjs';
 
 const blobScenarios=new Set(['U1','U2','U3','U6','U8','L1','L2']);
 const authMode=process.env.AZURE_TOKEN_MODE || 'managed';
+async function tlsTrustStatus() {
+  if(!process.env.NODE_EXTRA_CA_CERTS) return {configured:false,certificateReadable:false};
+  try {
+    const certificate=new X509Certificate(await readFile(process.env.NODE_EXTRA_CA_CERTS));
+    return {configured:true,certificateReadable:true,isCertificateAuthority:certificate.ca,
+      fingerprint256:certificate.fingerprint256};
+  } catch { return {configured:true,certificateReadable:false}; }
+}
 if(!['managed','delegated'].includes(authMode) || (authMode==='delegated' && (!process.env.AZURE_BLOB_ENDPOINT || !!process.env.WORKLOAD_TOKEN || !!process.env.AZURE_CLIENT_ID))) throw new Error('invalid Azure token mode');
 let blobRunner,delegatedFactory;
 if(process.env.AZURE_BLOB_ENDPOINT) {
@@ -30,7 +40,8 @@ app.http('thesisNetworkProbe', {
       return {status:403,jsonBody:{error:'controller authorization required'}};
     if(!process.env.RESEARCH_URL || !process.env.COLLECTOR_URL)
       return {status:500,jsonBody:{error:'probe endpoints not configured'}};
-    return {status:200,jsonBody:await probeNetwork(`${process.env.RESEARCH_URL}/health`,`${process.env.COLLECTOR_URL}/health`,{restrictedIp:process.env.PROBE_RESTRICTED_IP,redirectUrl:process.env.PROBE_REDIRECT_URL})};
+    const result=await probeNetwork(`${process.env.RESEARCH_URL}/health`,`${process.env.COLLECTOR_URL}/health`,{restrictedIp:process.env.PROBE_RESTRICTED_IP,redirectUrl:process.env.PROBE_REDIRECT_URL});
+    return {status:200,jsonBody:{...result,nodeTlsTrust:await tlsTrustStatus()}};
   }
 });
 

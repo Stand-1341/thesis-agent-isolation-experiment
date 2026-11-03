@@ -13,13 +13,14 @@ function config(){
   for(const key of EXPERIMENT_ROUTES) {
     const [deployment,profile]=key.split(':');
     routes.push({deployment,profile,principalObjectId:guid(n),
+      ...(deployment==='azure_functions_flex'?{agentUrl:`https://${profile.toLowerCase()}.fn.example/api`}:{}),
       credentials:{controller:`CTRL_KEY_${n}`,resourceAdmin:`RES_ADMIN_KEY_${n}`,collectorAdmin:`COL_ADMIN_KEY_${n}`,...(deployment==='azure_functions_flex'?{functionKey:`FN_KEY_${n}`}:{})}});
     n++;
   }
   return validateExperimentConfig({evidenceDirectory:'ev',auditWindowSeconds:300,
     deployments:{
       azure_vm:{kind:'http',agentUrl:'https://vm.example',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
-      azure_functions_flex:{kind:'http',agentUrl:'https://fn.example/api',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
+      azure_functions_flex:{kind:'http',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
       azure_custom_sessions_hyperv:{kind:'session',managementEndpoint:'https://thesissessionpool.envabc123.eastus.azurecontainerapps.io',
         poolName:'thesissessionpool',region:'eastus',sessionRegistryUrl:'https://reg.blob.core.windows.net/m',
         fixtureBlobEndpoint:'https://fx.blob.core.windows.net'}},
@@ -33,6 +34,20 @@ test('all eight revision-2 routes are built and accepted by the router',()=>{
   const router=createTrialAdapterRouter(routes);
   assert.match(router.principalObjectId({deployment:'azure_vm',profile:'P2'}),/^00000000-/);
   assert.equal(typeof router.execute, 'function');
+});
+
+test('Functions route adapters use their route-specific agent URL',()=>{
+  const cfg=config(),seen=[];
+  buildRoutes(cfg,{httpFactory:(route,deployment)=>{seen.push({key:`${route.deployment}:${route.profile}`,url:route.agentUrl,resourceUrl:deployment.resourceUrl});return {};},
+    sessionFactory:()=>({reset:async()=>{},execute:async()=>({}),collect:async()=>({})})});
+  const fn=seen.filter(item=>item.key.startsWith('azure_functions_flex:'));
+  assert.deepEqual(fn.map(item=>item.url),['https://p1.fn.example/api','https://p2.fn.example/api','https://p3.fn.example/api']);
+  assert.ok(fn.every(item=>item.resourceUrl==='https://res.example'));
+});
+
+test('route descriptions show per-profile Functions targets',()=>{
+  const targets=describeRoutes(config()).filter(entry=>entry.route.startsWith('azure_functions_flex:')).map(entry=>entry.target);
+  assert.deepEqual(targets,['https://p1.fn.example/api','https://p2.fn.example/api','https://p3.fn.example/api']);
 });
 
 test('a session route without a factory fails instead of silently degrading',()=>{

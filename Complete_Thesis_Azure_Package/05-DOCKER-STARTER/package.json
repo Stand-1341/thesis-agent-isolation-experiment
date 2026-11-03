@@ -14,7 +14,8 @@
     "smoke": "node scripts/local-smoke.mjs",
     "plan": "node scripts/plan.mjs",
     "run:experiment": "node scripts/run-experiment-cli.mjs",
-    "check:deploy": "node scripts/run-experiment-cli.mjs --config config/experiment.example.json --dry-run"
+    "check:deploy": "node scripts/run-experiment-cli.mjs --config config/experiment.example.json --dry-run",
+    "smoke:live": "node scripts/live-deployment-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

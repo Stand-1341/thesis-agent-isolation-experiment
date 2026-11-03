@@ -14,7 +14,8 @@ function baseConfig(){
     const [deployment,profile]=key.split(':');
     const credentials={controller:`KEY_CONTROLLER_${n}`,resourceAdmin:`KEY_RESOURCE_${n}`,collectorAdmin:`KEY_COLLECTOR_${n}`};
     if(deployment==='azure_functions_flex') credentials.functionKey=`KEY_FUNCTION_${n}`;
-    routes.push({deployment,profile,principalObjectId:guid(n),credentials});
+    routes.push({deployment,profile,principalObjectId:guid(n),
+      ...(deployment==='azure_functions_flex'?{agentUrl:`https://${profile.toLowerCase()}.fn.example/api`}:{}),credentials});
     n++;
   }
   return {
@@ -22,7 +23,7 @@ function baseConfig(){
     auditWindowSeconds:300,
     deployments:{
       azure_vm:{kind:'http',agentUrl:'https://vm.example',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
-      azure_functions_flex:{kind:'http',agentUrl:'https://fn.example/api',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
+      azure_functions_flex:{kind:'http',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
       azure_custom_sessions_hyperv:{kind:'session',managementEndpoint:'https://thesissessionpool.envabc123.eastus.azurecontainerapps.io',
         poolName:'thesissessionpool',region:'eastus',sessionRegistryUrl:'https://reg.blob.core.windows.net/map',
         fixtureBlobEndpoint:'https://fixture.blob.core.windows.net'}
@@ -66,6 +67,24 @@ test('a duplicate route is rejected',()=>{
   const config=baseConfig();
   config.routes[1]={...config.routes[0],principalObjectId:guid(99)};
   assert.throws(()=>validateExperimentConfig(config),/duplicate route/);
+});
+
+test('Functions routes require a profile-specific agent URL',()=>{
+  const config=baseConfig();
+  delete config.routes.find(route=>route.deployment==='azure_functions_flex'&&route.profile==='P2').agentUrl;
+  assert.throws(()=>validateExperimentConfig(config),/routes\[.*\]\.agentUrl is required for azure_functions_flex/);
+});
+
+test('Functions routes cannot fall back to one deployment-level agent URL',()=>{
+  const config=baseConfig();
+  config.deployments.azure_functions_flex.agentUrl='https://shared.fn.example/api';
+  delete config.routes.find(route=>route.deployment==='azure_functions_flex'&&route.profile==='P2').agentUrl;
+  assert.throws(()=>validateExperimentConfig(config),/routes\[.*\]\.agentUrl is required for azure_functions_flex/);
+});
+
+test('VM routes can use the deployment-level agent URL fallback',()=>{
+  const config=validateExperimentConfig(baseConfig());
+  assert.equal(config.routes.find(route=>route.deployment==='azure_vm'&&route.profile==='P2').agentUrl,'https://vm.example');
 });
 
 test('plain HTTP is refused for anything but loopback',()=>{
