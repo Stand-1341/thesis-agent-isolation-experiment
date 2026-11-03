@@ -104,12 +104,16 @@ function key), `resource-admin-key` (research host `ADMIN_TOKEN`),
 `collector-admin-key` (collector host `ADMIN_TOKEN`),
 `functions-p1-resource-verifier-key` (research host `VERIFIER_TOKEN`), and
 `functions-p1-collector-verifier-key` (collector host `VERIFIER_TOKEN`). Do
-this through an authenticated Azure Portal session or another approved secure
-operator path. Do not put secret values in Git, command history, task logs, or
-chat. The controller identity already has Key Vault Secrets User and the
-launcher fetches values in memory through managed identity; it prints no
-secret contents. A missing or inaccessible secret stops the launcher before
-any trial is claimed.
+use the hidden PowerShell prompts in `infra/provision-functions-p1-secrets.ps1`
+from this package directory. Run `./infra/provision-functions-p1-secrets.ps1`
+from the package root in the signed-in PowerShell session. The helper submits
+values directly to Key Vault and only prints the secret names. Do not put the
+values in Git, command history, task logs, or chat. The controller identity
+already has Key Vault Secrets User and the launcher fetches values in memory
+through managed identity; it prints no secret contents. A missing or
+inaccessible secret stops the launcher before any trial is claimed. After the
+helper reports success, tell the experiment operator without sending values;
+the temporary user role and client-address allowlist should then be removed.
 
 With the secrets provisioned, run the container with no arguments to select
 only the ten frozen Azure Functions P1 pilot rows, one at a time, in non-counted

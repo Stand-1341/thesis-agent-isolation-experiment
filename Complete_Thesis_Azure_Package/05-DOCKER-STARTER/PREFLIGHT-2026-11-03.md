@@ -24,11 +24,14 @@ The Azure CLI identity is signed in and can push/pull ACR images. The vault
 currently lists no secrets. To unblock secure operator entry, the signed-in
 user now has a temporary `Key Vault Secrets Officer` assignment scoped only to
 this vault, and the current client `/32` is temporarily allowlisted by the
-vault firewall. Remove both after provisioning. An automatic review rejected
-transferring existing Function settings through the local shell, and no secret
-values were retrieved or written. The required six values and secure operator
-provisioning steps are listed in `infra/CONTROLLER-PILOT.md`. After the vault
-is populated, a one-row pilot smoke can start. The full 400-row study remains
+vault firewall. The hidden-prompt helper
+`infra/provision-functions-p1-secrets.ps1` is ready for the account holder to
+enter the six values directly; it prints names only. Remove both temporary
+grants after provisioning. An automatic review rejected transferring existing
+Function settings through the local shell, and no secret values were retrieved
+or written. The required six values and secure operator steps are listed in
+`infra/CONTROLLER-PILOT.md`. After the vault is populated, a one-row pilot
+smoke can start. The full 400-row study remains
 blocked by missing validated VM/Functions/session route profiles, P3 denial
 evidence, independent evidence custody, and readiness gates. The session pool
 is diagnostic-only and has no VNet; live resources continue to incur charges.
