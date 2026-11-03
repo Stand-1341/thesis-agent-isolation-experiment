@@ -24,9 +24,10 @@ The Azure CLI identity is signed in and can push/pull ACR images. The vault
 currently lists no secrets. To unblock secure operator entry, the signed-in
 user now has a temporary `Key Vault Secrets Officer` assignment scoped only to
 this vault, and the current client `/32` is temporarily allowlisted by the
-vault firewall. The hidden-prompt helper
-`infra/provision-functions-p1-secrets.ps1` is ready for the account holder to
-enter the six values directly; it prints names only. Remove both temporary
+vault firewall. A hidden-prompt Node helper,
+`infra/provision-functions-p1-secrets.mjs`, is ready for the account holder to
+enter the six values directly. Run it with `node ./infra/provision-functions-p1-secrets.mjs`;
+it avoids PowerShell's disabled-script policy and prints names only. Remove both temporary
 grants after provisioning. An automatic review rejected transferring existing
 Function settings through the local shell, and no secret values were retrieved
 or written. The required six values and secure operator steps are listed in
