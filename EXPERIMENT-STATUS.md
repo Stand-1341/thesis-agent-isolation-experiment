@@ -21,8 +21,11 @@ That evidence does not validate all deployment/profile routes or prove
 independent evidence administration. U4/U5/U7 cloud coverage, U6/U8 Azure
 end-to-end validation, immutable/independently protected evidence, and the
 complete pilot remain open. The current config template has eight active
-revision-2 routes; no real `config/experiment.json` exists locally. The VM has
-private IPs only, and the Functions app query returned no default hostname.
+revision-2 routes; no real `config/experiment.json` exists locally. The VM is
+private-only with separate research/collector IPs. The Functions app is Running
+at its Azure hostname with three diagnostic functions, but only one
+system-assigned identity and 13 possible outbound IPs. The VM NSG has no custom
+outbound deny rules, so neither route currently proves P3 enforcement.
 
 The VM and one-ready ACA session pool were reported running/ready in the last
 verified snapshot, with zero allocated sessions and no measured-trial job

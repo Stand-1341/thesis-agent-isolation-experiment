@@ -14,7 +14,7 @@ The base preflight was run without `--deps`, so its network-capability source wa
 
 The example config has eight active revision-2 routes and names **23 route credential environment variables**. None were populated in the Codex process during inspection, and there is no local `config/experiment.json`. The values must be supplied securely by the operator; this report does not store them. The four readiness gates and seven live verifier pilot assertions remain unverified.
 
-Read-only Azure inspection confirmed the CLI is signed in to an enabled subscription. The research VM is running with private IPs only and no public IP/FQDN. The Functions app query returned no default host name and showed one system-assigned identity. These facts do not provide the required eight validated routes or independently verified evidence paths. Docker Engine is installed and running.
+Read-only Azure inspection confirmed the CLI is signed in to an enabled subscription. The research VM is running with private IPs only; its NIC has separate private research (`10.48.9.4`) and collector (`10.48.9.5`) addresses. The Functions app is Running at `thesis-flex-pilot-20261103.azurewebsites.net` and has three diagnostic functions, but only one system-assigned identity. Azure reports 13 possible Functions outbound IPs, while the live dependency currently accepts one source IP. The VM NSG has no custom outbound-deny rules. These resources do not provide eight validated workload identities/routes or independently verified P3 enforcement. Docker Engine is installed and running.
 
 ## Reproduce the structural preflight
 
@@ -44,7 +44,7 @@ After fixing a Windows file-URL bug in a new CLI test, the current local build a
 
 1. Supply a real eight-route configuration with eight distinct active workload principals and the 23 selected-route credentials, kept outside Git.
 2. Supply the live dependency inputs, including workspace ID, VM flow-log target, controlled denial destination, and Functions outbound source address. `deps-live.mjs` does not consume a subscription ID, so it is not required as an environment variable. Validate that each query returns complete, correctly attributed records; capability metadata alone is insufficient.
-3. Resolve live routes: the VM currently has no public endpoint, and the Functions app returned no default hostname. Provide supported controller-to-workload connectivity and validate each adapter.
+3. Resolve live routes: provide supported controller-to-VM connectivity, route-specific workload identities, and separate Functions profile identities. Confirm whether Functions egress is pinned through the firewall; support its observed source set or a stable NAT address, then validate each adapter.
 4. Run the non-counted pilot, prove the seven verifier assertions and four readiness gates with evidence, protect the evidence independently, and freeze the approved schedule and protocol.
 5. Rerun preflight with the real config and `deps-live.mjs`; review it before launching the measured schedule.
 

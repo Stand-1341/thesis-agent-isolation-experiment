@@ -5,7 +5,7 @@ param location string = resourceGroup().location
 param functionName string
 param planName string
 param hostStorageName string
-@description('Dedicated delegated Flex subnet with the Microsoft.Storage service endpoint.')
+@description('Dedicated delegated Flex integration subnet. It must not use service endpoints or private endpoints.')
 param integrationSubnetId string
 @description('Trusted controller public IPv4 CIDR; never a workload address.')
 param controllerIpCidr string
