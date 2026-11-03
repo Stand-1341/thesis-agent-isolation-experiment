@@ -1,5 +1,21 @@
+/**
+ * LEGACY PLANNING SKETCH — NOT the study matrix.
+ *
+ * The frozen schedule for the 450 measured trials is
+ * 03-PLANNED-TRIAL-MATRIX-450.csv (10 columns, planned_run_id like
+ * b01-01-<deployment>-<profile>-<scenario>). Its bytes and SHA-256 are recorded in
+ * EXPERIMENT-STATUS.md and enforced by trial-schedule.mjs / the CI digest guard.
+ *
+ * This script produces a different 6-column file with a different ordering derived
+ * from a seed. The validation path in trial-schedule.mjs and
+ * validate_supplied_plan.py does not accept its schema, so its output can never be
+ * loaded as a trial schedule. It is kept only as a naming/repetition sketch.
+ * Do not freeze, quote, or run trials against results/planned-450.csv.
+ */
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
+console.warn('WARNING: plan.mjs writes a LEGACY planning sketch, not the frozen study matrix. '
+  +'The authoritative schedule is 03-PLANNED-TRIAL-MATRIX-450.csv and this output cannot be loaded by the runner.');
 const p=JSON.parse(fs.readFileSync('config/protocol.json','utf8'));
 const seed=process.env.TRIAL_PLAN_SEED || 'azure-thesis-planning-v1';
 const rows=['run_id,deployment,profile,scenario,repetition,order_in_block'];

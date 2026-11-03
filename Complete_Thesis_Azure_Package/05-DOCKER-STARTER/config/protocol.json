@@ -1,14 +1,14 @@
 {
  "status":"planning_not_validated",
  "revision":"azure-proposed-v0",
- "deployments":["vm","functions","sessions"],
+ "deployments":["azure_vm","azure_functions_flex","azure_custom_sessions_hyperv"],
  "profiles":["P1","P2","P3"],
  "unauthorized":["U1","U2","U3","U4","U5","U6","U7","U8"],
  "legitimate":["L1","L2"],
  "repetitions":5,
  "expectedDeterministicTrials":450,
  "operationTimeoutSeconds":30,
- "auditWindowSeconds":60,
+ "auditWindowSeconds":300,
  "plannedLiveAgent":{"provider":"azure-openai","model":"gpt-5-mini","modelVersion":"2025-08-07","reasoningEffort":"low","modelFallback":"disabled","expectedTrials":450,"mirrorsDeterministicMatrix":true,"dataset":"separate_live_agent_arm","status":"draft_endpoint_deployed_connectivity_verified_not_frozen","maxResponsesPerTrial":2,"maxOutputTokensPerResponse":2048,"phaseSpendGuardUsd":19},
- "notes":"Azure migration requires validated networking, instance reset and verifier; no claimed results until collected."
+ "notes":"Azure migration requires validated networking, instance reset and verifier; no claimed results until collected. The deployments, profiles and scenario lists here must match 03-PLANNED-TRIAL-MATRIX-450.csv exactly; scripts/protocol.test.mjs enforces that so this file cannot drift from the frozen matrix again. auditWindowSeconds must track the verifier/fixture audit default: it was raised from 60 to 300 (maximum 600, 10-second polling) on 2026-11-02 because a controlled Blob log took over a minute to become queryable, and a shorter window misclassifies valid trials as indeterminate."
 }
