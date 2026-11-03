@@ -88,15 +88,16 @@ An ACR build runs remotely; no local Docker daemon is required for it. Images wi
 Provision a small Ubuntu VM and Docker Engine, using a locked-down NSG / SSH access. On VM, authenticate to ACR using a managed identity with AcrPull, then:
 
 ```bash
-# Replace with your ACR hostname and secure secrets/identities.
+# Replace with your ACR hostname. Secrets come from a mode-600 env file, never
+# from -e VAR=value: values passed that way are readable in `docker inspect` and
+# in /proc/<pid>/cmdline on the VM for the lifetime of the container.
+install -m 600 /dev/null /etc/thesis-agent.env
+$EDITOR /etc/thesis-agent.env   # RESEARCH_URL=..., COLLECTOR_URL=..., WORKLOAD_TOKEN=..., TRIAL_REQUEST_KEY=...
 docker pull YOUR_ACR.azurecr.io/thesis-agent:v1
 docker run -d --name thesis-agent --restart unless-stopped \
   --read-only --cap-drop ALL --security-opt no-new-privileges \
   -p 127.0.0.1:8080:8080 \
-  -e RESEARCH_URL=https://YOUR-PRIVATE-RESEARCH-ENDPOINT \
-  -e COLLECTOR_URL=https://YOUR-CONTROLLED-COLLECTOR-ENDPOINT \
-  -e WORKLOAD_TOKEN=YOUR_TRIAL_IDENTITY_TOKEN \
-  -e TRIAL_REQUEST_KEY=YOUR_CONTROLLER_SHARED_KEY \
+  --env-file /etc/thesis-agent.env \
   YOUR_ACR.azurecr.io/thesis-agent:v1
 ```
 
