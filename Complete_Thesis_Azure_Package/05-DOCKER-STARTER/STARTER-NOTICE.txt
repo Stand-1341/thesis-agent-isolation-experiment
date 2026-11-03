@@ -1,0 +1,12 @@
+# STARTER ONLY — NOT A COMPLETED EXPERIMENT
+
+This folder provides Docker build definitions, source code, precompiled JavaScript,
+Compose configuration, and local mock services. It is a **starter project**, not a
+prebuilt Docker image, production deployment, or verified Azure experiment.
+
+Local checks do not establish cloud isolation. Azure P3 selective egress, cloud
+identity and auditing must be implemented and independently verified first.
+The 450-row CSV is a planned trial schedule only; no cloud trials are recorded.
+Live Luna/Gemini model calls are not integrated into this starter.
+
+Start with README.md and TESTING.md. Never use local demo tokens in Azure.

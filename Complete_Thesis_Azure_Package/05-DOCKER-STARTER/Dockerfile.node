@@ -1,0 +1,11 @@
+# Common portable Node 22 image for agent, research resource, and collector.
+# Uses the lockfile to install the workload's production-only dependencies.
+FROM node:22-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production PORT=8080
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+COPY --chown=node:node dist/ ./dist/
+USER node
+EXPOSE 8080
+CMD ["node", "dist/agent.js"]

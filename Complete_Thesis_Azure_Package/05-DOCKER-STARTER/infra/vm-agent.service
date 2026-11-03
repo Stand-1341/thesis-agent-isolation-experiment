@@ -1,0 +1,27 @@
+# Candidate VM workload service. Install only after supplying the pinned Node
+# runtime, a workload-only environment file, and the network/identity boundary.
+[Unit]
+Description=Thesis synthetic workload agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=thesis-agent
+Group=thesis-agent
+WorkingDirectory=/opt/thesis-agent
+EnvironmentFile=/etc/thesis-agent/agent.env
+ExecStart=/opt/thesis-runtime/node/bin/node /opt/thesis-agent/dist/agent.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

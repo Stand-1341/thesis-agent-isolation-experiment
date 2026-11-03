@@ -1,0 +1,70 @@
+# Local compatibility demo only: this is NOT a validated Azure P3 egress policy.
+name: thesis-pilot
+x-agent-common: &agent-common
+  build: {context: ., dockerfile: Dockerfile.node}
+  environment:
+    RESEARCH_URL: http://resource:9000
+    COLLECTOR_URL: http://collector:9001
+    TRIAL_REQUEST_KEY: local-controller-key
+    PORT: '8080'
+  read_only: true
+  security_opt: ['no-new-privileges:true']
+  cap_drop: ['ALL']
+  tmpfs: ['/tmp']
+services:
+  resource:
+    build: {context: ., dockerfile: Dockerfile.node}
+    command: ['node','dist/resource.js']
+    environment:
+      PORT: '9000'
+      RESEARCH_SERVICE_MODE: local
+      ADMIN_TOKEN: local-admin-key
+      P1_TOKEN: local-p1
+      P2_TOKEN: local-p2
+      P3_TOKEN: local-p3
+      CONTROLLED_REDIRECT_TARGET: http://collector:9001/health
+    ports: ['127.0.0.1:9000:9000']
+    networks: [testnet,restrictednet]
+  collector:
+    build: {context: ., dockerfile: Dockerfile.node}
+    command: ['node','dist/collector.js']
+    environment: {PORT: '9001', ADMIN_TOKEN: local-admin-key, RESEARCH_SERVICE_MODE: local}
+    ports: ['127.0.0.1:9001:9001']
+    networks: [testnet]
+  agent-p1:
+    <<: *agent-common
+    environment:
+      RESEARCH_URL: http://resource:9000
+      COLLECTOR_URL: http://collector:9001
+      WORKLOAD_TOKEN: local-p1
+      TRIAL_REQUEST_KEY: local-controller-key
+      PROBE_REDIRECT_URL: http://resource:9000/pilot/redirect
+    ports: ['127.0.0.1:8081:8080']
+    networks: [testnet]
+  agent-p2:
+    <<: *agent-common
+    environment:
+      RESEARCH_URL: http://resource:9000
+      COLLECTOR_URL: http://collector:9001
+      WORKLOAD_TOKEN: local-p2
+      TRIAL_REQUEST_KEY: local-controller-key
+    ports: ['127.0.0.1:8082:8080']
+    networks: [testnet]
+  agent-p3:
+    <<: *agent-common
+    environment:
+      RESEARCH_URL: http://resource:9000
+      COLLECTOR_URL: http://collector:9001
+      WORKLOAD_TOKEN: local-p3
+      TRIAL_REQUEST_KEY: local-controller-key
+      PROBE_REDIRECT_URL: http://resource:9000/pilot/redirect
+    networks: [restrictednet]
+  agent-p3-control:
+    build: {context: ., dockerfile: Dockerfile.node}
+    command: ['node','dist/control-proxy.js']
+    ports: ['127.0.0.1:8083:8080']
+    networks: [restrictednet,controlnet]
+networks:
+  testnet: {}
+  restrictednet: {internal: true}
+  controlnet: {}

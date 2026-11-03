@@ -1,0 +1,25 @@
+# Candidate unit; disk mount, credentials, package, and proxy must be provisioned separately.
+[Unit]
+Description=Thesis synthetic collector service
+After=network-online.target
+RequiresMountsFor=/srv/thesis-data
+AssertPathIsMountPoint=/srv/thesis-data
+[Service]
+User=thesis-collector
+Group=thesis-collector
+WorkingDirectory=/opt/thesis-research
+EnvironmentFile=/etc/thesis-research/collector.env
+ExecStartPre=/bin/sh /opt/thesis-research/check-research-data-disk.sh
+ExecStart=/opt/thesis-runtime/node/bin/node /opt/thesis-research/dist/collector.js
+Restart=on-failure
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/srv/thesis-data/collector
+LimitNOFILE=1024
+[Install]
+WantedBy=multi-user.target

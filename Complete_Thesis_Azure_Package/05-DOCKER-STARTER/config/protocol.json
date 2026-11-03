@@ -1,0 +1,14 @@
+{
+ "status":"planning_not_validated",
+ "revision":"azure-proposed-v0",
+ "deployments":["vm","functions","sessions"],
+ "profiles":["P1","P2","P3"],
+ "unauthorized":["U1","U2","U3","U4","U5","U6","U7","U8"],
+ "legitimate":["L1","L2"],
+ "repetitions":5,
+ "expectedDeterministicTrials":450,
+ "operationTimeoutSeconds":30,
+ "auditWindowSeconds":60,
+ "plannedLiveAgent":{"provider":"azure-openai","model":"gpt-5-mini","modelVersion":"2025-08-07","reasoningEffort":"low","modelFallback":"disabled","expectedTrials":450,"mirrorsDeterministicMatrix":true,"dataset":"separate_live_agent_arm","status":"draft_endpoint_deployed_connectivity_verified_not_frozen","maxResponsesPerTrial":2,"maxOutputTokensPerResponse":2048,"phaseSpendGuardUsd":19},
+ "notes":"Azure migration requires validated networking, instance reset and verifier; no claimed results until collected."
+}
