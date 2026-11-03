@@ -12,7 +12,9 @@
     "start:resource": "node dist/resource.js",
     "start:collector": "node dist/collector.js",
     "smoke": "node scripts/local-smoke.mjs",
-    "plan": "node scripts/plan.mjs"
+    "plan": "node scripts/plan.mjs",
+    "run:experiment": "node scripts/run-experiment-cli.mjs",
+    "check:deploy": "node scripts/run-experiment-cli.mjs --config config/experiment.example.json --dry-run"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -1,6 +1,6 @@
 // Controller-side evidence storage. Keep this directory inaccessible to workloads.
-import {createHash} from 'node:crypto';
-import {mkdir, open, readFile} from 'node:fs/promises';
+import {createHash,randomBytes} from 'node:crypto';
+import {link,mkdir,open,readFile,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 
 const digest = text => createHash('sha256').update(text, 'utf8').digest('hex');
@@ -27,9 +27,21 @@ export async function saveEvidence(directory, record) {
   await mkdir(directory,{recursive:true});
   const path=join(directory,`${id}.json`);
   // Exclusive creation ensures retries cannot overwrite an existing observation.
-  const file=await open(path,'wx',0o600);
-  try { await file.writeFile(envelope,'utf8'); await file.sync(); }
-  finally { await file.close(); }
+  // Write to a private temporary name and hard-link it into place: a crash between
+  // open() and write() used to leave a 0-byte record that every later read failed to
+  // parse while every retry hit EEXIST. link() is atomic and still fails if the
+  // target exists, so the exclusivity guarantee is preserved.
+  const temporary=join(directory,`.${id}.${randomBytes(6).toString('hex')}.tmp`);
+  const file=await open(temporary,'wx',0o600);
+  try {
+    await file.writeFile(envelope,'utf8');
+    await file.sync();
+  } finally { await file.close(); }
+  try {
+    await link(temporary,path);
+  } finally {
+    await rm(temporary,{force:true});
+  }
   return path;
 }
 export async function readEvidence(path) {

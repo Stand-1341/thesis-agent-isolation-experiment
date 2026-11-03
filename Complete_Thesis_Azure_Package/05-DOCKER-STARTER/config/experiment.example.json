@@ -1,0 +1,114 @@
+{
+  "_comment": "Template for a measured run. Copy to experiment.json and replace every value. NO SECRETS: each credential field names an environment variable.",
+  "evidenceDirectory": "results/evidence",
+  "auditWindowSeconds": 300,
+  "deployments": {
+    "azure_vm": {
+      "kind": "http",
+      "agentUrl": "https://REPLACE-VM.REPLACE-REGION.cloudapp.azure.com",
+      "resourceUrl": "https://REPLACE-RESOURCE.REPLACE-REGION.cloudapp.azure.com",
+      "collectorUrl": "https://REPLACE-COLLECTOR.REPLACE-REGION.cloudapp.azure.com",
+      "timeoutMs": 15000
+    },
+    "azure_functions_flex": {
+      "kind": "http",
+      "agentUrl": "https://REPLACE-FUNCTIONS.azurewebsites.net/api",
+      "resourceUrl": "https://REPLACE-RESOURCE.REPLACE-REGION.cloudapp.azure.com",
+      "collectorUrl": "https://REPLACE-COLLECTOR.REPLACE-REGION.cloudapp.azure.com",
+      "timeoutMs": 30000
+    },
+    "azure_custom_sessions_hyperv": {
+      "kind": "session",
+      "managementEndpoint": "https://REPLACE-POOL.REPLACE-REGION.azurecontainerapps.io",
+      "poolName": "thesis-diag-pool",
+      "region": "eastus",
+      "sessionRegistryUrl": "https://REPLACE-REGISTRY.blob.core.windows.net/session-map",
+      "fixtureBlobEndpoint": "https://REPLACE-FIXTURE.blob.core.windows.net",
+      "headerIsolationVerified": false,
+      "timeoutMs": 30000
+    }
+  },
+  "routes": [
+    {
+      "deployment": "azure_vm",
+      "profile": "P1",
+      "principalObjectId": "00000000-0000-4000-8000-000000000001",
+      "credentials": {
+        "controller": "THESIS_VM_P1_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_VM_P1_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_VM_P1_COLLECTOR_ADMIN_KEY"
+      }
+    },
+    {
+      "deployment": "azure_vm",
+      "profile": "P2",
+      "principalObjectId": "00000000-0000-4000-8000-000000000002",
+      "credentials": {
+        "controller": "THESIS_VM_P2_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_VM_P2_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_VM_P2_COLLECTOR_ADMIN_KEY"
+      }
+    },
+    {
+      "deployment": "azure_vm",
+      "profile": "P3",
+      "principalObjectId": "00000000-0000-4000-8000-000000000003",
+      "credentials": {
+        "controller": "THESIS_VM_P3_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_VM_P3_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_VM_P3_COLLECTOR_ADMIN_KEY"
+      }
+    },
+    {
+      "deployment": "azure_functions_flex",
+      "profile": "P1",
+      "principalObjectId": "00000000-0000-4000-8000-000000000004",
+      "credentials": {
+        "controller": "THESIS_FN_P1_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_FN_P1_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_FN_P1_COLLECTOR_ADMIN_KEY",
+        "functionKey": "THESIS_FN_P1_FUNCTION_KEY"
+      }
+    },
+    {
+      "deployment": "azure_functions_flex",
+      "profile": "P2",
+      "principalObjectId": "00000000-0000-4000-8000-000000000005",
+      "credentials": {
+        "controller": "THESIS_FN_P2_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_FN_P2_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_FN_P2_COLLECTOR_ADMIN_KEY",
+        "functionKey": "THESIS_FN_P2_FUNCTION_KEY"
+      }
+    },
+    {
+      "deployment": "azure_functions_flex",
+      "profile": "P3",
+      "principalObjectId": "00000000-0000-4000-8000-000000000006",
+      "credentials": {
+        "controller": "THESIS_FN_P3_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_FN_P3_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_FN_P3_COLLECTOR_ADMIN_KEY",
+        "functionKey": "THESIS_FN_P3_FUNCTION_KEY"
+      }
+    },
+    {
+      "deployment": "azure_custom_sessions_hyperv",
+      "profile": "P1",
+      "principalObjectId": "00000000-0000-4000-8000-000000000007",
+      "credentials": { "controller": "THESIS_SESSION_P1_CONTROLLER_KEY" }
+    },
+    {
+      "deployment": "azure_custom_sessions_hyperv",
+      "profile": "P2",
+      "principalObjectId": "00000000-0000-4000-8000-000000000008",
+      "credentials": { "controller": "THESIS_SESSION_P2_CONTROLLER_KEY" }
+    },
+    {
+      "deployment": "azure_custom_sessions_hyperv",
+      "profile": "P3",
+      "principalObjectId": "00000000-0000-4000-8000-000000000009",
+      "credentials": { "controller": "THESIS_SESSION_P3_CONTROLLER_KEY" }
+    }
+  ]
+}
