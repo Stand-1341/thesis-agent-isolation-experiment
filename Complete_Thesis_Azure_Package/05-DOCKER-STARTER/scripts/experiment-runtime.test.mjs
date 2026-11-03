@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {buildRoutes,describeRoutes} from './build-experiment.mjs';
+import {buildRoutes,describeRoutes,createLaneSelector} from './build-experiment.mjs';
 import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
 import {createExperimentVerifier,verifierCoverage,denialWindow} from './experiment-verifier.mjs';
 import {validateExperimentConfig,DEPLOYMENTS,PROFILES} from './experiment-config.mjs';
@@ -88,6 +88,44 @@ test('coverage names exactly what is missing',()=>{
   const full=verifierCoverage({denialReader:()=>{},blobVerifier:()=>{},collectorVerifier:()=>{},resourceVerifier:()=>{}});
   assert.equal(full.networkProfile.supported,true);
   assert.equal(full.resourceProfiles.supported.length,10);
+});
+
+test('runExperiment runs two rows from the frozen matrix in parallel lanes',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  const {createHash}=await import('node:crypto');
+  const {runExperiment}=await import('./experiment-runner.mjs');
+  const matrix=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url));
+  const sha=createHash('sha256').update(matrix).digest('hex');
+  const {loadFrozenSchedule}=await import('./trial-schedule.mjs');
+  const rows=loadFrozenSchedule(matrix,sha).rows;
+  // One row from each of two deployments, so they land in different lanes.
+  const first=rows.find(row=>row.deployment==='azure_vm');
+  const second=rows.find(row=>row.deployment==='azure_functions_flex');
+  const cfg=config();
+  const adapter=()=>({reset:async()=>({u5Marker:'SYNTHETIC-abcdef'}),
+    execute:async trial=>({runId:trial.runId,scenario:trial.scenario,status:200,body:{}}),
+    collect:async()=>({resource:{events:[]},collector:{}})});
+  const routes=buildRoutes(cfg,{httpFactory:adapter,sessionFactory:adapter});
+  const saved=[];
+  const record=await runExperiment({planBytes:matrix,planSha256:sha,routes,
+    gates:{protocolFrozen:true,deploymentValidated:true,isolationValidated:true,verifierValidated:true},
+    verifier:()=>({classification:'unauthorized_success'}),
+    evidenceStore:{claim:async()=>{},save:async entry=>{saved.push(entry);}},
+    rowFilter:new Set([first.planned_run_id,second.planned_run_id]),concurrency:2});
+  assert.equal(record.length,2);
+  assert.equal(record.complete,true);
+  assert.equal(record.halted,false);
+  assert.equal(record.laneCount,2);
+  assert.equal(saved.length,2);
+  assert.deepEqual(record.map(item=>item.runId).sort(),[first.planned_run_id,second.planned_run_id].sort());
+});
+
+test('a lane selector keeps the profiles of one deployment in a single lane',()=>{
+  const select=createLaneSelector(config());
+  assert.equal(select({deployment:'azure_vm',permission_profile:'P1'}),'azure_vm');
+  assert.equal(select({deployment:'azure_vm',permission_profile:'P3'}),'azure_vm');
+  assert.notEqual(select({deployment:'azure_vm',permission_profile:'P1'}),
+                  select({deployment:'azure_custom_sessions_hyperv',permission_profile:'P1'}));
 });
 
 test('the denial query window extends past the trial by the audit window',()=>{

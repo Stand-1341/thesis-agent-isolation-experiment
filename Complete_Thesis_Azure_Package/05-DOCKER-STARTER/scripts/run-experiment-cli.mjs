@@ -19,7 +19,7 @@ import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {loadExperimentConfig} from './experiment-config.mjs';
-import {buildRoutes,describeRoutes} from './build-experiment.mjs';
+import {buildRoutes,describeRoutes,createLaneSelector} from './build-experiment.mjs';
 import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
 import {runExperiment} from './experiment-runner.mjs';
 import {loadFrozenSchedule} from './trial-schedule.mjs';
@@ -36,6 +36,9 @@ const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
   --profile <P1|P2|P3>   restrict to one profile
   --gates <v,v,v,v>      the four readiness gates, in the order
                          protocolFrozen,deploymentValidated,isolationValidated,verifierValidated
+  --concurrency <n>      lanes to run at once (default 3, one per deployment).
+                         Trials sharing a deployment share its fixture and always run
+                         one-at-a-time inside that lane.
   --deps <file>          module default-exporting {blobVerifier, collectorVerifier,
                          resourceVerifier, denialReader, sessionFactory, httpFactory}
   --allow-incomplete-verifier
@@ -55,6 +58,11 @@ function parseArgs(argv) {
     switch(arg) {
       case '--config': options.config=value(); break;
       case '--deps': options.deps=value(); break;
+      case '--concurrency': {
+        const raw=value();
+        if(!/^\d+$/.test(raw) || Number(raw)<1 || Number(raw)>32) throw new Error('--concurrency must be 1..32');
+        options.concurrency=Number(raw); break;
+      }
       case '--matrix': options.matrix=value(); break;
       case '--evidence': options.evidence=value(); break;
       case '--limit': {
@@ -126,8 +134,11 @@ async function main(argv) {
     try {
       const {pathToFileURL}=await import('node:url');
       const module=await import(pathToFileURL(resolve(options.deps)).href);
-      deps=module.default ?? module;
-      if(!deps || typeof deps!=='object') throw new Error('deps module must export an object');
+      const exported=module.default ?? module;
+      // A deps module may export the bundle directly, or a factory that needs the
+      // validated config (live dependencies do).
+      deps=typeof exported==='function'?await exported({config,env:process.env}):exported;
+      if(!deps || typeof deps!=='object') throw new Error('deps module must export an object or a factory returning one');
     } catch (error) {
       process.stderr.write(`deps error: ${error.message}\n`);
       return EXIT.config;
@@ -236,7 +247,9 @@ async function main(argv) {
   let results;
   try {
     results=await runExperiment({planBytes:matrix,planSha256:matrixSha256,routes:rawRoutes,
-      gates,verifier,evidenceStore,arm:'deterministic',rowFilter:selectedIds});
+      gates,verifier,evidenceStore,arm:'deterministic',rowFilter:selectedIds,
+      concurrency:options.concurrency ?? 3,
+      laneFor:typeof deps.laneFor==='function'?deps.laneFor:createLaneSelector(config)});
   } catch (error) {
     // A throw here means the run stopped; the evidence store already holds the
     // indeterminate records for the trial that failed.
@@ -248,6 +261,7 @@ async function main(argv) {
   for(const record of results) counts[record.classification]=(counts[record.classification]??0)+1;
   const summary={arm:'deterministic',matrixSha256,planned:selected.length,executed:results.length,
     halted:results.halted===true,haltedAt:results.haltedAt??null,complete:results.complete===true,classifications:counts,
+    concurrency:results.concurrency??1,lanes:results.laneCount??1,
     gates,gatesVerifiedByTool:false};
   if(options.json) process.stdout.write(`${JSON.stringify(summary,null,2)}\n`);
   else {

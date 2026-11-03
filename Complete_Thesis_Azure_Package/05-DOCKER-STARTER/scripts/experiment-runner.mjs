@@ -1,11 +1,12 @@
 /** Compose the existing scheduler and trial runner; readiness flags remain operator assertions. */
 import {loadFrozenSchedule,runSchedule} from './trial-schedule.mjs';
+import {runScheduleParallel,laneByDeployment} from './parallel-schedule.mjs';
 import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
 import {runTrial} from './trial-runner.mjs';
 import {createGPT5MiniLiveAdapter} from './live-agent-trial.mjs';
 import {verifyImplementationManifest} from './implementation-manifest.mjs';
 
-export async function runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,arm='deterministic',modelEndpoint,getModelToken,maxPhaseSpendUsd=19,implementationSha256,rowFilter}) {
+export async function runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,arm='deterministic',modelEndpoint,getModelToken,maxPhaseSpendUsd=19,implementationSha256,rowFilter,concurrency=1,laneFor=laneByDeployment}) {
   if(!['deterministic','gpt5mini_live'].includes(arm)) throw new Error('invalid experiment arm');
   if(typeof verifier!=='function' || !evidenceStore || typeof evidenceStore.claim!=='function' || typeof evidenceStore.save!=='function')
     throw new Error('verifier and evidence store are required');
@@ -33,6 +34,10 @@ export async function runExperiment({planBytes,planSha256,routes,gates,verifier,
   // crash or an uncertain response. A durable exclusive phase claim prevents
   // an automatic relaunch with a fresh counter; manual reconciliation is required.
   if(arm==='gpt5mini_live') await evidenceStore.claim('phase-gpt5mini-live');
-  return runSchedule(rows,trial=>runTrial({trial:{...trial,planSha256:plan.sha256},gates:gateSnapshot,adapter,arm,
-    verifier:(t,observations)=>verifier(t,{...observations,workloadPrincipalId:router.principalObjectId(t),arm}),evidenceStore}));
+  const runOne=trial=>runTrial({trial:{...trial,planSha256:plan.sha256},gates:gateSnapshot,adapter,arm,
+    verifier:(t,observations)=>verifier(t,{...observations,workloadPrincipalId:router.principalObjectId(t),arm}),evidenceStore});
+  // Lanes, not raw concurrency: a lane owns the fixture its trials reset, so two
+  // trials may only overlap when they cannot observe each other's state.
+  if(!Number.isInteger(concurrency) || concurrency<1) throw new Error('invalid concurrency');
+  return concurrency===1?runSchedule(rows,runOne):runScheduleParallel(rows,runOne,{laneFor,concurrency});
 }

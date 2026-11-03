@@ -56,6 +56,29 @@ export function buildRoutes(config, deps={}) {
   return routes;
 }
 
+/**
+ * Map a scheduled row to the lane that owns its fixture. Two trials may run at the
+ * same time only if their lanes differ, so this is the function that decides how
+ * much of the experiment is allowed to overlap.
+ *
+ * Default: the deployment. All three profiles of a deployment share its resource
+ * and collector service, so they must not overlap. A route or deployment that is
+ * given genuinely separate fixture endpoints declares a `laneKey` and becomes its
+ * own lane.
+ */
+export function createLaneSelector(config) {
+  const byRoute=new Map();
+  for(const route of config.routes) {
+    const deploymentKey=config.deployments[route.deployment]?.laneKey;
+    const key=route.laneKey ?? (typeof deploymentKey==='string' && deploymentKey?deploymentKey:route.deployment);
+    byRoute.set(`${route.deployment}:${route.profile}`,key);
+  }
+  return row=>{
+    const profile=row?.permission_profile ?? row?.profile;
+    return byRoute.get(`${row?.deployment}:${profile}`) ?? String(row?.deployment ?? 'unknown');
+  };
+}
+
 /** Build the router the runner consumes, so a bad route fails before spend. */
 export function buildAdapterRouter(config, deps={}) {
   return createTrialAdapterRouter(buildRoutes(config,deps));
