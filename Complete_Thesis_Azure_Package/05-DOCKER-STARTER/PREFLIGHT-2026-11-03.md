@@ -60,6 +60,11 @@ applicable, and 4 unsupported P3 rows. It still reports 13 missing credential
 variables, unchecked runtime dependencies, and all four readiness gates
 unverified. It did not contact any trial route.
 
+The Functions access restriction now allows the firewall egress IP
+`20.120.82.51/32`. A controller-side unauthenticated `GET /api/run` returned
+HTTP 404 (the trigger accepts POST), confirming host reachability through the
+firewall and source allowlist. No authenticated POST was issued.
+
 The Key Vault `thesisexpkv20261103` is deployed, restricted to the firewall
 egress IP, and grants the controller identity Secrets User. It is empty; no
 function, resource, or collector credentials have been provisioned to it. The
