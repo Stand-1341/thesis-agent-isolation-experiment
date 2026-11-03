@@ -99,7 +99,29 @@ function gatesFrom(values) {
   return gates;
 }
 
-function selectRows(rows, options) {
+const abilityUnknown=source=>source!=='deps.denialReader';
+
+/**
+ * The deps module is the only thing that knows whether a deployment has attributable
+ * denial telemetry. A structural preflight still has to report scope honestly, so it
+ * imports the module when one is supplied and reports why it could not when it can't.
+ */
+async function resolveNetworkCapabilities(options,configShape) {
+  if(!options.deps) return {capabilities:{},source:'no --deps supplied'};
+  try {
+    const module=await import(pathToFileURL(resolve(options.deps)).href);
+    const exported=module.default ?? module;
+    const deps=typeof exported==='function'?await exported({config:configShape,env:process.env}):exported;
+    const capabilities=deps?.denialReader?.capabilities;
+    if(!capabilities || typeof capabilities!=='object')
+      return {capabilities:{},source:'deps.denialReader advertises no capabilities'};
+    return {capabilities,source:'deps.denialReader'};
+  } catch (error) {
+    return {capabilities:{},source:`unavailable (${String(error?.message ?? error).split('\n')[0]})`};
+  }
+}
+
+function selectRows(rows,options) {
   let selected=rows;
   if(options.deployment) selected=selected.filter(row=>row.deployment===options.deployment);
   if(options.profile) selected=selected.filter(row=>row.permission_profile===options.profile);
@@ -139,7 +161,11 @@ async function main(argv) {
   try { configShape=await loadExperimentConfigShape(resolve(options.config)); }
   catch(error) { process.stderr.write(`configuration error: ${error.message}\n`); return EXIT.config; }
   const routeKeys=new Set(selected.map(row=>`${row.deployment}:${row.permission_profile ?? row.profile}`));
-  const scope=analyzeTrialScope(selected);
+  // Scope must be reported with the same network capability the run would use, or the
+  // preflight claims rows are unsupported that the operator has already configured.
+  // Without this the BLOCKER lines for VM/Flex P3 were unclearable by any correct setup.
+  const {capabilities:networkCapabilities,source:capabilitySource}=await resolveNetworkCapabilities(options,configShape);
+  const scope=analyzeTrialScope(selected,{networkCapabilities});
   const missingCredentials=missingCredentialVariables(configShape,process.env,routeKeys);
   const matrixSha256=createHash('sha256').update(matrix).digest('hex');
 
@@ -148,6 +174,7 @@ async function main(argv) {
     const report={dryRun:true,readiness:'structural_only_not_ready',matrixSha256,plannedMatrixRows:rows.length,
       selectedRows:selected.length,measurableRows:scope.measurable,notApplicableRows:scope.notApplicable,
       unsupportedRows:scope.unsupported,unsupportedByRoute:scope.unsupportedByRoute,
+      networkCapabilitySource:capabilitySource,
       missingCredentialVariables:missingCredentials,readinessGates:GATE_NAMES.map(name=>`${name}=unverified`),
       runtimeDependencies:'not_checked',routes,
       note:'Structural preflight only. Adapter/verifier dependencies, Azure gates, reachability, isolation, and telemetry are not verified.'};
@@ -157,6 +184,8 @@ async function main(argv) {
       say(`matrix hash ${report.matrixSha256}`);
       say(`Scope: ${scope.measurable} measurable, ${scope.notApplicable} not applicable, ${scope.unsupported} unsupported.`);
       for(const [route,count] of Object.entries(scope.unsupportedByRoute)) say(`BLOCKER ${route}: ${count} unsupported rows`);
+      if(scope.unsupported && abilityUnknown(capabilitySource))
+        say(`       network-denial capability ${capabilitySource}; those rows are reported unsupported until a denialReader advertises it`);
       if(missingCredentials.length) say(`BLOCKER missing credential environment variables: ${missingCredentials.join(', ')}`);
       say(`Readiness gates remain unverified: ${GATE_NAMES.join(', ')}`);
       say('Not deployment-ready. Nothing executed.');
@@ -266,9 +295,16 @@ async function main(argv) {
     say(`executed    ${summary.executed}/${summary.planned}`);
     for(const [name,count] of Object.entries(counts).sort()) say(`  ${name.padEnd(26)} ${count}`);
     if(summary.halted) say(`HALTED at ${summary.haltedAt} — investigate before resuming`);
+    if(!summary.matrixComplete && summary.scopeComplete && !summary.halted)
+      say('Scope note: the selected rows all completed, but this is not the full 450-row matrix.');
     say('Note: the four readiness gates are operator assertions; this tool does not verify them.');
   }
-  return summary.halted || !summary.scopeComplete || summary.executed!==summary.planned || !summary.matrixComplete ? EXIT.partial : EXIT.complete;
+  // The exit code describes the run that was asked for, not the matrix that was not.
+  // Requiring matrixComplete made success unreachable: a complete full-matrix selection
+  // is refused because the session P3 cells have no selective-egress design, so every
+  // executable run — always a scoped subset — would report the same code as a halt.
+  // matrixComplete stays in the summary as information; it must not gate the result.
+  return summary.halted || !summary.scopeComplete || summary.executed!==summary.planned ? EXIT.partial : EXIT.complete;
 }
 
 function buildRoutesForDisplay(config) {

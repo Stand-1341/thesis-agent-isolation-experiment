@@ -229,11 +229,14 @@ Exit codes on a real run:
 
 | Code | Meaning |
 |---|---|
-| `0` | Matrix completed |
-| `2` | Partial or halted (a trial was indeterminate) |
+| `0` | Every selected row executed and none halted. A scoped run (`--deployment`) can reach this; the summary still reports `matrixComplete: false` because it was not all 450 |
+| `2` | Halted, or fewer rows executed than were selected |
 | `3` | Gates unmet |
 | `4` | Config or dependency error |
 | `5` | Usage error |
+
+Exit code `0` means the run you asked for finished, not that the study is done. Read
+`matrixComplete` in the summary for that.
 
 ---
 
@@ -243,7 +246,12 @@ Exit codes on a real run:
 |---|---|---|
 | `auditWindowSeconds` | `3600` | Traffic analytics has a 60-minute default processing interval and ingestion "can take up to 1 hour"; firewall logs can take 30 minutes to start populating. A shorter window reports "no denial" on trials where the denial exists |
 | `--concurrency` | `3` | One lane per deployment. Trials sharing a deployment share its fixture, so they run one at a time inside that lane. More lanes require separate resource/collector endpoints per route |
-| `--limit` | none | All 450 trials |
+| `--limit` | none | Rows selected by `--deployment`/`--profile` |
+
+Supplying `THESIS_VM_TARGET_RESOURCE_ID` **and** `THESIS_DENIAL_DESTINATION_IP`
+is what makes the VM P3 U5/U7 rows measurable; the Functions rows additionally
+need `THESIS_FLEX_SOURCE_IP`. Without them those 20 rows are unsupported and any
+selection containing them is refused.
 
 ---
 
@@ -262,8 +270,31 @@ per-destination rules.
 
 **60 of 450 trials are declared `not_applicable`.** U6 and U8 ask for another
 session's data and a previous session's retained state. The VM and Functions arms
-host no sessions, so the precondition does not exist. They are recorded as scope
-gaps and the run continues; `indeterminate` still halts on first occurrence.
+host no sessions, so the precondition does not exist. They are written as evidence
+records with `executionAttempted: false` and the run continues; `indeterminate`
+still halts on first occurrence.
+
+**Up to 70 of 450 trials are `unsupported`, and the runner refuses to touch them.**
+
+| Rows | Cells | Clearable? |
+|---:|---|---|
+| 50 | session arm, every P3 cell | **No.** The pool cannot provide selective egress with independently attributable denial evidence |
+| 10 | VM P3 U5/U7 | Yes — configure VM denial telemetry (§4) |
+| 10 | Functions P3 U5/U7 | Yes — configure Functions denial telemetry (§4) |
+
+Those 20 rows become measurable the moment the denial reader advertises the
+capability, which it does when `THESIS_VM_TARGET_RESOURCE_ID` +
+`THESIS_DENIAL_DESTINATION_IP` (VM) and `THESIS_FLEX_SOURCE_IP` (Functions) are
+set. Confirm with the scope line: **320 → 330 → 340 measurable** as each is added.
+The 50 session-P3 rows never clear.
+
+**The consequence is unavoidable: a full 450-row run is refused outright.** The
+runner rejects the selection before claiming a single run ID, so nothing is
+half-executed. Executable runs are scoped — `--deployment azure_vm`,
+`--profile P2`, or `--limit n` — and each reports `matrixComplete: false`.
+
+Budget with nothing configured: **320 measurable, 60 not applicable, 70
+unsupported.** Fully configured except the session-P3 design: **340 / 60 / 50.**
 
 **U7 and U5 share one destination host** — `/restricted` and `/collect` on the
 same collector. A destination-based denial cannot separate them, so the

@@ -146,15 +146,31 @@ directory; this is the part that should not wait.
 - ~~A halted schedule looks like a completed one~~ — `halted`/`haltedAt`/
   `complete` are properties on the result.
 - ~~60 of 450 trials are unclassifiable and halt the run at trial 21~~ — U6 and U8
-  on a sessionless deployment are now declared `not_applicable` rather than
-  `indeterminate`. A scope gap in the matrix is not the environment failing to
-  answer, and it no longer stops the study. The full matrix completes.
+  on a sessionless deployment are now declared `not_applicable`, written as
+  evidence with `executionAttempted: false`. A scope gap in the matrix is not the
+  environment failing to answer, and it no longer stops the study.
+- ~~A clean run cannot report success~~ — the exit code required
+  `matrixComplete`, which required a full 450-row selection, which is refused
+  because the 50 session P3 cells have no selective-egress design. Every
+  executable run is a scoped subset, so a flawless run returned the same code as
+  a halt. Code `0` now means the selected scope finished; `matrixComplete` stays
+  in the summary as information.
 - ~~The audit window cannot be set correctly~~ — it was 300 s with a hard 600 s
   ceiling in three places, while Microsoft documents up to one hour of ingestion
   latency. Default is now 3600 s, ceiling 7200 s.
 - ~~The flow-log query could not match an internet denial~~ — `SrcIp` is blank in
   `AzurePublic`/`ExternalPublic` flows, so the source scope now uses
   `TargetResourceId` and destinations match `DestIp` or `DestPublicIps`.
+
+**Scope of an executable run**
+
+320 of 450 rows are measurable. 60 are `not_applicable` (U6/U8 outside the
+sessions arm) and are recorded without invoking the workload. 70 are
+`unsupported` and the runner refuses any selection containing them: 50 session-arm
+P3 cells and 20 P3 U5/U7 cells on VM and Functions with no denial capability
+configured. **A full 450-row run is therefore refused outright**, before any run
+ID is claimed. The executable form is a scoped subset, which is what the preflight
+report of 2026-11-03 records.
 
 **Research integrity — still open**
 
