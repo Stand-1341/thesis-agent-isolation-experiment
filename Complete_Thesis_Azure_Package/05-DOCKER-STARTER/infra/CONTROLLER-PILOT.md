@@ -107,9 +107,10 @@ function key), `resource-admin-key` (research host `ADMIN_TOKEN`),
 use the hidden terminal prompts in `infra/provision-functions-p1-secrets.mjs`
 from this package directory. Run `node ./infra/provision-functions-p1-secrets.mjs`
 from the signed-in PowerShell session. This uses Node and Azure CLI, so it does
-not require changing PowerShell's script execution policy. The helper submits
-values directly to Key Vault and only prints the secret names. Do not put the
-values in Git, command history, task logs, or chat. The controller identity
+not require changing PowerShell's script execution policy. The helper first
+checks existing values in memory, prompts only for missing or invalid ones,
+requires credentials to be 32–512 characters, and prints names only. Do not
+put values in Git, command history, task logs, or chat. The controller identity
 already has Key Vault Secrets User and the launcher fetches values in memory
 through managed identity; it prints no secret contents. A missing or
 inaccessible secret stops the launcher before any trial is claimed. After the

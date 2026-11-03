@@ -1,5 +1,39 @@
 # Deployment preflight report — 2026-11-03
 
+## Latest live snapshot — 2026-11-03 15:51 UTC
+
+All six expected Key Vault secret names exist. The second one-row smoke exited
+with code 4 before claiming a row because the controller credential is too
+short; no trial evidence was created. Its value must be the full Function App
+setting `TRIAL_REQUEST_KEY`, 32–512 characters. The earlier helper accepted a
+short value, so the provisioner has been corrected to check stored values in
+memory and prompt only for missing/invalid entries. It never displays values.
+
+The controller image was rebuilt with 32–512-character validation and pulled
+onto the VM as
+`thesis-controller-pilot:functions-p1-kv-launcher-20261103-v2`, digest
+`sha256:7b0421115679d810ebc5d49f1db154a9e8d795f73a5ec0c723929c184a3932a0`.
+The updated package passes **204/204** local tests. Temporary vault-scoped
+Secrets Officer access and the client `/32` allowlist are active again so the
+account holder can correct only invalid entries; remove both after
+provisioning. No cloud trial is running.
+
+## Latest live snapshot — 2026-11-03 15:48 UTC
+
+All six expected Key Vault secret names are enabled. A one-row controller run
+exited with code 4 before the runner claimed a trial; its sanitized error said
+`THESIS_FN_P1_CONTROLLER_KEY` was too short. No trial row or evidence file was
+created. The value must be the full Functions App setting `TRIAL_REQUEST_KEY`,
+at least 32 characters. The other five secret values were not inspected or
+printed. Temporary user Secrets Officer and client-IP access have been removed.
+
+The provisioner now checks each existing value in memory, skips valid entries,
+and requests only missing or invalid values through hidden input. The launcher
+also rejects credentials outside 32–512 characters before starting the runner.
+The updated code passes **204/204** local tests. The deployed image still needs
+to be rebuilt with the new validation before retrying the smoke. No cloud trial
+is running.
+
 ## Latest live snapshot — 2026-11-03 10:14 UTC
 
 **No cloud trial has run, and the experiment remains blocked on credentials.**
@@ -25,10 +59,11 @@ currently lists no secrets. To unblock secure operator entry, the signed-in
 user now has a temporary `Key Vault Secrets Officer` assignment scoped only to
 this vault, and the current client `/32` is temporarily allowlisted by the
 vault firewall. A hidden-prompt Node helper,
-`infra/provision-functions-p1-secrets.mjs`, is ready for the account holder to
-enter the six values directly. Run it with `node ./infra/provision-functions-p1-secrets.mjs`;
-it avoids PowerShell's disabled-script policy and prints names only. Remove both temporary
-grants after provisioning. An automatic review rejected transferring existing
+`infra/provision-functions-p1-secrets.mjs`, checks existing values in memory
+and prompts only for missing or invalid ones. Run it with
+`node ./infra/provision-functions-p1-secrets.mjs`; it avoids PowerShell's
+disabled-script policy, requires 32–512 characters, and prints names only.
+Remove both temporary grants after provisioning. An automatic review rejected transferring existing
 Function settings through the local shell, and no secret values were retrieved
 or written. The required six values and secure operator steps are listed in
 `infra/CONTROLLER-PILOT.md`. After the vault is populated, a one-row pilot

@@ -48,7 +48,7 @@ export async function loadPilotEnvironment({env=process.env,fetchImpl=globalThis
     if(!response.ok) throw safeError(`required Key Vault secret unavailable: ${secretName} (HTTP ${response.status})`);
     let body;
     try { body=await response.json(); } catch { throw safeError(`invalid Key Vault response for ${secretName}`); }
-    if(typeof body?.value!=='string' || !body.value || /[\r\n]/.test(body.value))
+    if(typeof body?.value!=='string' || body.value.length<32 || body.value.length>512 || /[\r\n]/.test(body.value))
       throw safeError(`required Key Vault secret is empty or invalid: ${secretName}`);
     values[environmentName]=body.value;
   }

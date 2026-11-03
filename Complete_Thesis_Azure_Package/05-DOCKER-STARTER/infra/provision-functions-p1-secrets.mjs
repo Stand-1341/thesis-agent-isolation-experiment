@@ -55,17 +55,34 @@ export function getAzureKeyVaultToken() {
   }
 }
 
+function validCredential(value) {
+  return typeof value==='string' && value.length>=32 && value.length<=512 && !/[\r\n]/.test(value);
+}
+
 export async function provisionPilotSecrets({vaultName=process.env.THESIS_KEYVAULT_NAME||DEFAULT_VAULT,
   token=getAzureKeyVaultToken(),fetchImpl=globalThis.fetch,readSecret=readHidden}={}) {
   if(!/^[a-zA-Z0-9-]{3,24}$/.test(vaultName)) throw safeError('invalid Key Vault name');
   if(typeof token!=='string' || !token) throw safeError('Key Vault token is required');
   if(typeof fetchImpl!=='function') throw safeError('fetch implementation is required');
-  const saved=[];
+  const saved=[],alreadyValid=[];
   for(const [name,source] of SECRET_SOURCES) {
-    const value=await readSecret(`Enter ${name} (${source}): `);
-    if(typeof value!=='string' || !value || /[\r\n]/.test(value))
-      throw safeError(`empty or invalid value for ${name}; no trial was started`);
     const url=`https://${vaultName}.vault.azure.net/secrets/${encodeURIComponent(name)}?api-version=7.4`;
+    let current;
+    try {
+      current=await fetchImpl(url,{method:'GET',redirect:'error',signal:AbortSignal.timeout(30000),
+        headers:{authorization:`Bearer ${token}`}});
+    } catch { throw safeError(`could not check ${name}; no secret value was displayed`); }
+    if(current.ok) {
+      let body;
+      try { body=await current.json(); } catch { throw safeError(`could not validate ${name}; no secret value was displayed`); }
+      if(validCredential(body?.value)) { alreadyValid.push(name); continue; }
+    } else if(current.status!==404) {
+      throw safeError(`could not check ${name} (HTTP ${current.status}); no secret value was displayed`);
+    }
+
+    const value=await readSecret(`Enter ${name} (${source}; 32 to 512 characters): `);
+    if(!validCredential(value))
+      throw safeError(`invalid credential length or format for ${name}; enter the full value (32 to 512 characters); no trial was started`);
     let response;
     try {
       response=await fetchImpl(url,{method:'PUT',redirect:'error',signal:AbortSignal.timeout(30000),
@@ -75,14 +92,15 @@ export async function provisionPilotSecrets({vaultName=process.env.THESIS_KEYVAU
     if(!response.ok) throw safeError(`could not save ${name} (HTTP ${response.status}); earlier values, if any, may already be stored`);
     saved.push(name);
   }
-  return saved;
+  return {saved,alreadyValid};
 }
 
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
-    const saved=await provisionPilotSecrets();
+    const {saved,alreadyValid}=await provisionPilotSecrets();
+    for(const name of alreadyValid) process.stdout.write(`Already valid: ${name}\n`);
     for(const name of saved) process.stdout.write(`Saved secret: ${name}\n`);
-    process.stdout.write('All six pilot secret values were submitted; no values were displayed.\n');
+    process.stdout.write('All six pilot secrets are valid; no values were displayed.\n');
   } catch(error) {
     process.stderr.write(`${error?.message||'secret provisioning failed'}\n`);
     process.exitCode=1;
