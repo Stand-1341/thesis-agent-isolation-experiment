@@ -118,7 +118,7 @@ export function createDenialReader({deployments={},query,clock=Date.now}={}) {
   if(typeof query!=='function') throw new Error('a query function is required');
   if(!deployments || typeof deployments!=='object') throw new Error('deployments map is required');
 
-  return async function readDenials({trial,window,auditWindowSeconds=3600}) {
+  const readDenials=async function readDenials({trial,window,auditWindowSeconds=3600}) {
     const deployment=deployments[trial?.deployment];
     if(!deployment) return {verdict:LABELS.noTelemetry,evidence:{reason:'deployment_not_configured',deployment:trial?.deployment??null}};
     if(deployment.telemetry==='none')
@@ -148,6 +148,17 @@ export function createDenialReader({deployments={},query,clock=Date.now}={}) {
     return {verdict:LABELS.observedAllow,evidence:{source:deployment.telemetry,total:total,
       allows:Number(summary?.allowed ?? summary?.allows ?? 0),window:{from:t0,to:t1}}};
   };
+  // A function existing is not evidence capability. Advertise only telemetry
+  // configurations that can query a named destination for a workload source.
+  // The separate isolation pilot gate must still prove that records arrive.
+  const capabilities=Object.fromEntries(Object.entries(deployments).map(([name,entry])=>{
+    const configured=entry?.telemetry==='vnet_flow_log'
+      ?typeof entry.targetResourceId==='string' && entry.targetResourceId.length>0 && ipv4(entry.destinationIp)
+      :entry?.telemetry==='firewall' && ipv4(entry.sourceIp) && ipv4(entry.destinationIp);
+    return [name,configured===true];
+  }));
+  Object.defineProperty(readDenials,'capabilities',{value:Object.freeze(capabilities),enumerable:true});
+  return readDenials;
 }
 
 export {LABELS};

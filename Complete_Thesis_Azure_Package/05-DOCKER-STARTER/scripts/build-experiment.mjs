@@ -25,14 +25,15 @@ const required=(names,where)=>{
  *                 loudly at start-up instead of midway through the matrix.
  * @param deps.sessionFactory  (route, deployment) => reset/execute/collect/cleanup
  */
-export function buildRoutes(config, deps={}) {
+export function buildRoutes(config, deps={}, {routeKeys}={}) {
   if(!config || !Array.isArray(config.routes) || config.routes.length!==DEPLOYMENTS.length*PROFILES.length)
     throw new Error('config must contain all nine routes; run validateExperimentConfig first');
   const routes={};
   for(const route of config.routes) {
+    const key=`${route.deployment}:${route.profile}`;
+    if(routeKeys && !routeKeys.has(key)) continue;
     const deployment=config.deployments[route.deployment];
     if(!deployment) throw new Error(`route ${route.deployment}:${route.profile} has no deployment block`);
-    const key=`${route.deployment}:${route.profile}`;
     if(deployment.kind==='http') {
       if(typeof deps.httpFactory==='function') {
         routes[key]={principalObjectId:route.principalObjectId,adapter:deps.httpFactory(route,deployment)};
@@ -88,12 +89,14 @@ export function buildAdapterRouter(config, deps={}) {
  * Describe what a route would do, for --dry-run and for the operator's review
  * before anything is created. Never returns credential values.
  */
-export function describeRoutes(config) {
+export function describeRoutes(config, {routeKeys}={}) {
   return config.routes.map(route=>{
+    const key=`${route.deployment}:${route.profile}`;
+    if(routeKeys && !routeKeys.has(key)) return null;
     const deployment=config.deployments[route.deployment];
-    return {route:`${route.deployment}:${route.profile}`,kind:deployment.kind,
+    return {route:key,kind:deployment.kind,
       principalObjectId:route.principalObjectId,
       target:deployment.kind==='http'?deployment.agentUrl:`${deployment.poolName} (${deployment.region})`,
       credentialVariables:Object.values(route.credentials).sort()};
-  }).sort((a,b)=>a.route<b.route?-1:1);
+  }).filter(Boolean).sort((a,b)=>a.route<b.route?-1:1);
 }

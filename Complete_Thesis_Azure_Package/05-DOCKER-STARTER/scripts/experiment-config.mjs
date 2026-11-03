@@ -124,7 +124,21 @@ export function validateExperimentConfig(raw) {
  * is the only place a secret exists in memory; it is never written to disk and the
  * error message lists missing variable names only.
  */
-export function resolveCredentials(config, env=process.env) {
+export function missingCredentialVariables(config,env=process.env,routeKeys) {
+  const selected=routeKeys?new Set(routeKeys):null;
+  const missing=new Set();
+  for(const route of config.routes) {
+    if(selected && !selected.has(`${route.deployment}:${route.profile}`)) continue;
+    for(const ref of Object.values(route.credentials)) {
+      const value=env[ref];
+      if(typeof value!=='string' || !value) missing.add(ref);
+    }
+  }
+  return [...missing].sort();
+}
+
+export function resolveCredentials(config, env=process.env, routeKeys) {
+  const selected=routeKeys?new Set(routeKeys):null;
   const missing=new Set();
   const read=name=>{
     const value=env[name];
@@ -135,6 +149,7 @@ export function resolveCredentials(config, env=process.env) {
     return value;
   };
   const routes=config.routes.map(route=>{
+    if(selected && !selected.has(`${route.deployment}:${route.profile}`)) return route;
     const credentials={};
     for(const [name,ref] of Object.entries(route.credentials)) credentials[name]=read(ref);
     return {...route,credentials};
@@ -144,8 +159,12 @@ export function resolveCredentials(config, env=process.env) {
 }
 
 export async function loadExperimentConfig(path, env=process.env) {
+  return resolveCredentials(await loadExperimentConfigShape(path),env);
+}
+
+export async function loadExperimentConfigShape(path) {
   const text=await readFile(path,'utf8');
   let raw;
   try {raw=JSON.parse(text);} catch (error) {throw new Error(`config is not valid JSON: ${error.message}`);}
-  return resolveCredentials(validateExperimentConfig(raw),env);
+  return validateExperimentConfig(raw);
 }

@@ -56,8 +56,15 @@ export function validateSchedule(rows) {
 }
 
 /** Fail fast: caller must investigate any failed or indeterminate trial before continuing. */
-export async function runSchedule(rows, runOne) {
-  validateSchedule(rows);
+export async function runSchedule(rows, runOne, {validatedSubset=false}={}) {
+  if(validatedSubset) {
+    if(!Array.isArray(rows) || !rows.length) throw new Error('schedule subset must be a non-empty array');
+    const ids=new Set();
+    for(const row of rows) {
+      if(!row || typeof row.planned_run_id!=='string' || ids.has(row.planned_run_id)) throw new Error('invalid or duplicate schedule subset row');
+      ids.add(row.planned_run_id);
+    }
+  } else validateSchedule(rows);
   if (typeof runOne !== 'function') throw new Error('runner required');
   const results=[];
   let notApplicableCount=0;

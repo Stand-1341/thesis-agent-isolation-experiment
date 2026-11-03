@@ -47,9 +47,9 @@ test('a missing configuration file exits 4',()=>{
 });
 
 test('missing credential variables are named, never printed as values',()=>{
-  const {code,err}=run(['--config',EXAMPLE,'--dry-run'],{});
+  const {code,out}=run(['--config',EXAMPLE,'--dry-run'],{});
   assert.equal(code,4);
-  assert.match(err,/missing credential environment variables: THESIS_FN_P1_COLLECTOR_ADMIN_KEY/);
+  assert.match(out,/missing credential environment variables: THESIS_FN_P1_COLLECTOR_ADMIN_KEY/);
 });
 
 test('a dry run over the frozen matrix reports the real digest and its blockers',()=>{
@@ -57,7 +57,8 @@ test('a dry run over the frozen matrix reports the real digest and its blockers'
   assert.equal(code,4);
   assert.match(out,/matrix hash 39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298/);
   assert.match(out,/450 planned trials, 450 selected/);
-  assert.match(out,/BLOCKER/);
+  assert.match(out,/70 unsupported/);
+  assert.match(out,/Readiness gates remain unverified/);
 });
 
 test('filters reduce the selected rows without changing the matrix digest',()=>{
@@ -77,7 +78,7 @@ test('a measured run without all four gates exits 3 and executes nothing',async(
   assert.match(err,/deploymentValidated: false/);
 });
 
-test('a dry run with every dependency supplied is clean and exits 0',async()=>{
+test('a dry run remains structural and never reports deployment readiness',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'cli-'));
   const deps=join(dir,'deps.mjs');
   await writeFile(deps,`export default {
@@ -89,7 +90,8 @@ test('a dry run with every dependency supplied is clean and exits 0',async()=>{
     sessionFactory:()=>({reset:async()=>{},execute:async()=>({}),collect:async()=>({})})
   };\n`);
   const {code,out}=run(['--config',EXAMPLE,'--deps',deps,'--dry-run'],credentialEnv());
-  assert.equal(code,0,out);
-  assert.doesNotMatch(out,/BLOCKER/);
-  assert.match(out,/all resolve/);
+  assert.equal(code,4,out);
+  assert.match(out,/BLOCKER/);
+  assert.match(out,/Structural preflight only/);
+  assert.match(out,/Not deployment-ready/);
 });

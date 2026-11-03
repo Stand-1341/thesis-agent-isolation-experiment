@@ -3,13 +3,16 @@ const deployments=['azure_vm','azure_functions_flex','azure_custom_sessions_hype
 const profiles=['P1','P2','P3'];
 const guid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function createTrialAdapterRouter(routes) {
+export function createTrialAdapterRouter(routes,{requiredRoutes}={}) {
   if(!routes || typeof routes!=='object' || Array.isArray(routes)) throw new Error('invalid routes');
   const expected=deployments.flatMap(deployment=>profiles.map(profile=>`${deployment}:${profile}`));
-  if(JSON.stringify(Object.keys(routes).sort())!==JSON.stringify([...expected].sort())) throw new Error('all nine deployment/profile routes are required');
+  const required=requiredRoutes?[...new Set(requiredRoutes)]:expected;
+  if(required.some(key=>!expected.includes(key))) throw new Error('unknown required deployment/profile route');
+  if(JSON.stringify(Object.keys(routes).sort())!==JSON.stringify([...required].sort()))
+    throw new Error(requiredRoutes?'routes must exactly match selected deployment/profile routes':'all nine deployment/profile routes are required');
   const identities=new Set();
   const resolved={};
-  for(const key of expected) {
+  for(const key of required) {
     const route=routes[key];
     if(!route || !guid.test(route.principalObjectId || '') || !route.adapter ||
       !['reset','execute','collect'].every(name=>typeof route.adapter[name]==='function')) throw new Error('invalid deployment route');
@@ -22,7 +25,7 @@ export function createTrialAdapterRouter(routes) {
   }
   function routeFor(trial) {
     const key=`${trial?.deployment}:${trial?.profile}`;
-    if(!expected.includes(key)) throw new Error('unknown deployment route');
+    if(!required.includes(key)) throw new Error('unknown deployment route');
     return resolved[key];
   }
   return {

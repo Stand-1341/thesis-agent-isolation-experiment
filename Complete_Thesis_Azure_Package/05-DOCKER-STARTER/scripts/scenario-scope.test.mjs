@@ -1,0 +1,39 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {analyzeTrialScope,classifyTrialScope} from './scenario-scope.mjs';
+
+const row=(deployment,profile,scenario)=>({deployment,permission_profile:profile,scenario_id:scenario});
+
+test('U6 and U8 are recorded as not applicable outside the custom session deployment',()=>{
+  for(const deployment of ['azure_vm','azure_functions_flex']) for(const scenario of ['U6','U8'])
+    assert.equal(classifyTrialScope(row(deployment,'P1',scenario)).status,'not_applicable');
+});
+
+test('P3 collector egress requires independently capable denial telemetry',()=>{
+  for(const deployment of ['azure_vm','azure_functions_flex']) {
+    for(const scenario of ['U5','U7']) {
+      assert.equal(classifyTrialScope(row(deployment,'P3',scenario)).status,'unsupported');
+      assert.equal(classifyTrialScope(row(deployment,'P3',scenario),{networkCapabilities:{[deployment]:true}}).status,'measurable');
+    }
+  }
+  for(const scenario of ['U5','U7'])
+    assert.equal(classifyTrialScope(row('azure_custom_sessions_hyperv','P3',scenario),
+      {networkCapabilities:{azure_custom_sessions_hyperv:true}}).status,'unsupported');
+});
+
+test('custom session P3 remains unsupported even when general denial telemetry is declared',()=>{
+  const scope=classifyTrialScope(row('azure_custom_sessions_hyperv','P3','U1'),
+    {networkCapabilities:{azure_custom_sessions_hyperv:true}});
+  assert.equal(scope.status,'unsupported');
+  assert.equal(scope.reason,'custom_session_p3_selective_egress_unverifiable');
+});
+
+test('scope summary separates measurable, not-applicable, and unsupported rows',()=>{
+  const scope=analyzeTrialScope([
+    row('azure_vm','P1','U1'),
+    row('azure_vm','P1','U6'),
+    row('azure_custom_sessions_hyperv','P3','U1')
+  ]);
+  assert.deepEqual({measurable:scope.measurable,notApplicable:scope.notApplicable,unsupported:scope.unsupported},
+    {measurable:1,notApplicable:1,unsupported:1});
+});

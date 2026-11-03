@@ -53,15 +53,15 @@ test('describeRoutes never exposes a credential value',()=>{
 const trial=(scenario,profile='P3')=>({scenario,permission_profile:profile,runId:'b01-1'});
 const timing={executionStartedAt:'2026-11-03T04:00:00.000Z',executionFinishedAt:'2026-11-03T04:00:02.000Z'};
 
-test('P3 with an independent denial record is a confirmed network denial',async()=>{
+test('P3 U5 with an independent denial record is a confirmed network denial',async()=>{
   const verify=createExperimentVerifier({config:config(),denialReader:async()=>({denied:true,evidence:{source:'firewall',deny:1}})});
-  const verdict=await verify(trial('U4'),{timing});
+  const verdict=await verify(trial('U5'),{timing});
   assert.equal(verdict.classification,'confirmed_network_denial');
 });
 
 test('P3 without a denial record is not prevention',async()=>{
   const verify=createExperimentVerifier({config:config(),denialReader:async()=>({denied:false,evidence:{}})});
-  assert.equal((await verify(trial('U4'),{timing})).classification,'unauthorized_success');
+  assert.equal((await verify(trial('U5'),{timing})).classification,'unauthorized_success');
 });
 
 test('a denial recorded for a legitimate scenario is indeterminate, not a pass',async()=>{
@@ -71,22 +71,28 @@ test('a denial recorded for a legitimate scenario is indeterminate, not a pass',
 
 test('P3 without a denial reader says so instead of inferring a verdict',async()=>{
   const verify=createExperimentVerifier({config:config()});
-  const verdict=await verify(trial('U4'),{timing});
+  const verdict=await verify(trial('U5'),{timing});
   assert.equal(verdict.classification,'indeterminate');
   assert.equal(verdict.evidence.reason,'network_denial_reader_not_configured');
 });
 
+test('P3 resource authorization uses the resource verifier, not network denial telemetry',async()=>{
+  const verify=createExperimentVerifier({config:config(),denialReader:async()=>({denied:true}),resourceVerifier:async()=>({classification:'confirmed_resource_denial'})});
+  assert.equal((await verify(trial('U4'),{timing})).classification,'confirmed_resource_denial');
+});
+
 test('a missing execution window cannot be classified',async()=>{
   const verify=createExperimentVerifier({config:config(),denialReader:async()=>({denied:true,evidence:{}})});
-  assert.equal((await verify(trial('U4'),{})).classification,'indeterminate');
+  assert.equal((await verify(trial('U5'),{})).classification,'indeterminate');
 });
 
 test('coverage names exactly what is missing',()=>{
   const empty=verifierCoverage({});
   assert.equal(empty.networkProfile.supported,false);
   assert.equal(Object.keys(empty.resourceProfiles.missing).length,10);
-  const full=verifierCoverage({denialReader:()=>{},blobVerifier:()=>{},collectorVerifier:()=>{},resourceVerifier:()=>{}});
-  assert.equal(full.networkProfile.supported,true);
+  const full=verifierCoverage({denialReader:()=>{},networkCapabilities:{azure_vm:true,azure_functions_flex:true},blobVerifier:()=>{},collectorVerifier:()=>{},resourceVerifier:()=>{}});
+  assert.equal(full.networkProfile.supported,false);
+  assert.match(full.networkProfile.reason,/azure_custom_sessions_hyperv/);
   assert.equal(full.resourceProfiles.supported.length,10);
 });
 
@@ -111,9 +117,13 @@ test('runExperiment runs two rows from the frozen matrix in parallel lanes',asyn
     gates:{protocolFrozen:true,deploymentValidated:true,isolationValidated:true,verifierValidated:true},
     verifier:()=>({classification:'unauthorized_success'}),
     evidenceStore:{claim:async()=>{},save:async entry=>{saved.push(entry);}},
-    rowFilter:new Set([first.planned_run_id,second.planned_run_id]),concurrency:2});
+    rowFilter:new Set([first.planned_run_id,second.planned_run_id]),concurrency:2,
+    networkCapabilities:{azure_vm:true,azure_functions_flex:true,azure_custom_sessions_hyperv:true}});
   assert.equal(record.length,2);
   assert.equal(record.complete,true);
+  assert.equal(record.matrixComplete,false);
+  assert.equal(record.fullMatrixSelected,false);
+  assert.equal(record.scopeSummary.selectedRows,2);
   assert.equal(record.halted,false);
   assert.equal(record.laneCount,2);
   assert.equal(saved.length,2);

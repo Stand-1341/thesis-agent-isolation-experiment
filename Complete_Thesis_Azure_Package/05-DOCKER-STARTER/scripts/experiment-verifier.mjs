@@ -14,6 +14,7 @@
  */
 
 const NETWORK_PROFILE='P3';
+const NETWORK_DENIAL_SCENARIOS=new Set(['U5','U7']);
 const BLOB_SCENARIOS=new Set(['U1','U2','U3','U6','U8','L1','L2']);
 const COLLECTOR_SCENARIOS=new Set(['U5','U7']);
 
@@ -55,9 +56,10 @@ export function createExperimentVerifier({config,denialReader,blobVerifier,colle
     const profile=trial.permission_profile ?? trial.profile;
     const window=windowFor(observations);
 
-    // P3 is the network-restricted arm. Classify it from independent denial
-    // telemetry, and from nothing else.
-    if(profile===NETWORK_PROFILE) {
+    // Only the two collector egress attempts are network-denial trials. The
+    // other P3 scenarios test P2-style resource authorization or legitimate
+    // operations and must use their resource/collector evidence readers.
+    if(profile===NETWORK_PROFILE && NETWORK_DENIAL_SCENARIOS.has(trial.scenario)) {
       if(!window) return indeterminate('missing_execution_window');
       if(typeof denialReader!=='function')
         return indeterminate('network_denial_reader_not_configured',
@@ -118,16 +120,32 @@ export function denialWindow({start,end}, auditWindowSeconds=3600, skewMs=0) {
  * classify. The CLI refuses to start a measured run with gaps, because the
  * alternative is discovering them 200 trials in — after the spend, with a halt.
  */
-export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifier,denialReader}={}) {
+export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifier,denialReader,networkCapabilities={},rows}={}) {
   const missing={};
-  for(const scenario of ['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2']) {
-    const reason=scenario==='U5'||scenario==='U7'
+  const selected=rows ?? ['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv'].flatMap(deployment=>
+    ['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2'].flatMap(scenario=>
+      ['P1','P2','P3'].map(permission_profile=>({scenario_id:scenario,permission_profile,deployment}))));
+  const networkGaps=[];
+  for(const row of selected) {
+    const scenario=row.scenario_id ?? row.scenario;
+    const profile=row.permission_profile ?? row.profile;
+    const deployment=row.deployment;
+    if((scenario==='U6'||scenario==='U8') && deployment!=='azure_custom_sessions_hyperv') continue;
+    let reason=scenario==='U5'||scenario==='U7'
       ?(typeof collectorVerifier==='function'?null:'collector_verifier_not_configured')
       :scenario==='U4'
         ?(typeof resourceVerifier==='function'?null:'resource_verifier_not_configured')
         :(typeof blobVerifier==='function'?null:'blob_verifier_not_configured');
     if(reason) missing[scenario]=reason;
+    if(profile==='P3' && (scenario==='U5'||scenario==='U7')) {
+      if(typeof denialReader!=='function') networkGaps.push(`${deployment}:network_denial_reader_not_configured`);
+      else if(deployment==='azure_custom_sessions_hyperv') networkGaps.push(`${deployment}:custom_session_p3_selective_egress_unverifiable`);
+      else if(networkCapabilities[deployment]!==true) networkGaps.push(`${deployment}:independent_network_denial_evidence_unavailable`);
+    }
+    if(profile==='P3' && deployment==='azure_custom_sessions_hyperv')
+      networkGaps.push(`${deployment}:custom_session_p3_selective_egress_unverifiable`);
   }
+  const uniqueNetworkGaps=[...new Set(networkGaps)];
   return {resourceProfiles:{supported:Object.keys(missing).length===0?['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2']:[],missing},
-    networkProfile:{supported:typeof denialReader==='function',reason:typeof denialReader==='function'?null:'network_denial_reader_not_configured'}};
+    networkProfile:{supported:uniqueNetworkGaps.length===0,reason:uniqueNetworkGaps.length?uniqueNetworkGaps.join(', '):null,missing:uniqueNetworkGaps}};
 }

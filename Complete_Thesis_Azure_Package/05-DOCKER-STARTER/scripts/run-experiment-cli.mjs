@@ -8,7 +8,7 @@
  *
  * Exit codes are part of the interface; a wrapper script or a human watching a
  * terminal must be able to tell "finished" from "stopped":
- *   0  every scheduled trial ran and none was indeterminate
+ *   0  the full frozen matrix has a disposition and none was indeterminate
  *   2  the run halted on an indeterminate trial, or produced fewer records than
  *      the schedule asked for — the matrix is partial
  *   3  a readiness gate is not satisfied
@@ -19,11 +19,12 @@ import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {loadExperimentConfig} from './experiment-config.mjs';
+import {loadExperimentConfigShape,missingCredentialVariables,resolveCredentials} from './experiment-config.mjs';
 import {buildRoutes,describeRoutes,createLaneSelector} from './build-experiment.mjs';
 import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
 import {runExperiment} from './experiment-runner.mjs';
 import {loadFrozenSchedule} from './trial-schedule.mjs';
+import {analyzeTrialScope} from './scenario-scope.mjs';
 
 const EXIT={complete:0,partial:2,gates:3,config:4,usage:5};
 
@@ -44,7 +45,7 @@ const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
                          resourceVerifier, denialReader, sessionFactory, httpFactory}
   --allow-incomplete-verifier
                          permit a pilot where some scenarios have no verifier
-  --dry-run              validate config, build routes and print the plan; execute nothing
+  --dry-run              structural config/matrix/scope report only; never proves readiness
   --json                 machine-readable summary on stdout
   --help
 
@@ -118,34 +119,6 @@ async function main(argv) {
 
   const say=message=>{ if(!options.json) process.stdout.write(`${message}\n`); };
 
-  let config;
-  try {
-    config=await loadExperimentConfig(resolve(options.config));
-  } catch (error) {
-    process.stderr.write(`configuration error: ${error.message}\n`);
-    return EXIT.config;
-  }
-
-  // Runtime dependencies that cannot be derived from the config file: the evidence
-  // readers, the session adapter factory, and the network-denial reader. Supplied as
-  // a module so their construction (token providers, log clients) stays testable and
-  // separate from this CLI.
-  let deps={};
-  if(options.deps) {
-    try {
-      const {pathToFileURL}=await import('node:url');
-      const module=await import(pathToFileURL(resolve(options.deps)).href);
-      const exported=module.default ?? module;
-      // A deps module may export the bundle directly, or a factory that needs the
-      // validated config (live dependencies do).
-      deps=typeof exported==='function'?await exported({config,env:process.env}):exported;
-      if(!deps || typeof deps!=='object') throw new Error('deps module must export an object or a factory returning one');
-    } catch (error) {
-      process.stderr.write(`deps error: ${error.message}\n`);
-      return EXIT.config;
-    }
-  }
-
   const defaultMatrix=fileURLToPath(new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url));
   const matrixPath=resolve(options.matrix ?? defaultMatrix);
   let matrix,rows;
@@ -162,7 +135,51 @@ async function main(argv) {
     return EXIT.config;
   }
 
+  let configShape;
+  try { configShape=await loadExperimentConfigShape(resolve(options.config)); }
+  catch(error) { process.stderr.write(`configuration error: ${error.message}\n`); return EXIT.config; }
+  const routeKeys=new Set(selected.map(row=>`${row.deployment}:${row.permission_profile ?? row.profile}`));
+  const scope=analyzeTrialScope(selected);
+  const missingCredentials=missingCredentialVariables(configShape,process.env,routeKeys);
   const matrixSha256=createHash('sha256').update(matrix).digest('hex');
+
+  if(options.dryRun) {
+    const routes=describeRoutes(configShape,{routeKeys});
+    const report={dryRun:true,readiness:'structural_only_not_ready',matrixSha256,plannedMatrixRows:rows.length,
+      selectedRows:selected.length,measurableRows:scope.measurable,notApplicableRows:scope.notApplicable,
+      unsupportedRows:scope.unsupported,unsupportedByRoute:scope.unsupportedByRoute,
+      missingCredentialVariables:missingCredentials,readinessGates:GATE_NAMES.map(name=>`${name}=unverified`),
+      runtimeDependencies:'not_checked',routes,
+      note:'Structural preflight only. Adapter/verifier dependencies, Azure gates, reachability, isolation, and telemetry are not verified.'};
+    if(options.json) process.stdout.write(`${JSON.stringify(report,null,2)}\n`);
+    else {
+      say(`Structural preflight only: ${rows.length} planned trials, ${selected.length} selected; no trials executed.`);
+      say(`matrix hash ${report.matrixSha256}`);
+      say(`Scope: ${scope.measurable} measurable, ${scope.notApplicable} not applicable, ${scope.unsupported} unsupported.`);
+      for(const [route,count] of Object.entries(scope.unsupportedByRoute)) say(`BLOCKER ${route}: ${count} unsupported rows`);
+      if(missingCredentials.length) say(`BLOCKER missing credential environment variables: ${missingCredentials.join(', ')}`);
+      say(`Readiness gates remain unverified: ${GATE_NAMES.join(', ')}`);
+      say('Not deployment-ready. Nothing executed.');
+    }
+    return EXIT.config;
+  }
+  if(missingCredentials.length) {
+    process.stderr.write(`configuration error: missing credential environment variables: ${missingCredentials.join(', ')}\n`);
+    return EXIT.config;
+  }
+  let config;
+  try { config=resolveCredentials(configShape,process.env,routeKeys); }
+  catch(error) { process.stderr.write(`configuration error: ${error.message}\n`); return EXIT.config; }
+  let deps={};
+  if(options.deps) {
+    try {
+      const module=await import(pathToFileURL(resolve(options.deps)).href);
+      const exported=module.default ?? module;
+      deps=typeof exported==='function'?await exported({config,env:process.env}):exported;
+      if(!deps || typeof deps!=='object') throw new Error('deps module must export an object or a factory returning one');
+    } catch(error) { process.stderr.write(`deps error: ${error.message}\n`); return EXIT.config; }
+  }
+
   say(`schedule    ${matrixPath}`);
   say(`             ${rows.length} planned trials, ${selected.length} selected`);
   say(`matrix hash ${matrixSha256}`);
@@ -180,39 +197,14 @@ async function main(argv) {
 
   let rawRoutes,routeError;
   try {
-    rawRoutes=buildRoutes(config,deps);
+    rawRoutes=buildRoutes(config,deps,{routeKeys});
     // Validate through the same router the runner uses, so a reused principal or a
     // route with a missing adapter member fails here rather than at trial 1.
-    createTrialAdapterRouter(rawRoutes);
+    createTrialAdapterRouter(rawRoutes,{requiredRoutes:[...routeKeys]});
   } catch (error) {
     routeError=error;
   }
-  say(`routes      ${config.routes.length} configured${routeError?' — not yet buildable':''}`);
-
-  if(options.dryRun) {
-    const plan=describeRoutes(config);
-    // A dry run is a readiness report: it names what is still missing instead of
-    // stopping at the first gap, and it never touches Azure to find out.
-    const blockers=[];
-    if(routeError) blockers.push(routeError.message);
-    if(!deps.denialReader) blockers.push('no denialReader: P3 network verdicts cannot be produced');
-    if(typeof deps.blobVerifier!=='function') blockers.push('no blobVerifier: U1/U2/U3/U6/U8/L1/L2 cannot be classified');
-    if(typeof deps.collectorVerifier!=='function') blockers.push('no collectorVerifier: U5/U7 cannot be classified');
-    if(typeof deps.resourceVerifier!=='function') blockers.push('no resourceVerifier: U4 cannot be classified');
-    const ready=blockers.length===0;
-    if(options.json) process.stdout.write(`${JSON.stringify({dryRun:true,ready,matrixSha256,selected:selected.length,blockers,routes:plan},null,2)}\n`);
-    else {
-      say('');
-      say('route                          kind     target');
-      for(const entry of plan) say(`${entry.route.padEnd(30)} ${entry.kind.padEnd(8)} ${entry.target}`);
-      say('');
-      for(const blocker of blockers) say(`BLOCKER ${blocker}`);
-      say('');
-      say(ready?'Dry run: configuration, routes and verifiers all resolve. Nothing executed.'
-              :`Dry run: ${blockers.length} blocker(s). Nothing executed.`);
-    }
-    return ready?EXIT.complete:EXIT.config;
-  }
+  say(`routes      ${routeKeys.size} selected routes${routeError?' — not yet buildable':''}`);
   if(routeError) {
     process.stderr.write(`route error: ${routeError.message}\n`);
     return EXIT.config;
@@ -232,13 +224,14 @@ async function main(argv) {
       blobVerifier:deps.blobVerifier,collectorVerifier:deps.collectorVerifier,resourceVerifier:deps.resourceVerifier});
     verifier=built;
     coverage=module.verifierCoverage({denialReader:deps.denialReader,blobVerifier:deps.blobVerifier,
-      collectorVerifier:deps.collectorVerifier,resourceVerifier:deps.resourceVerifier});
+      collectorVerifier:deps.collectorVerifier,resourceVerifier:deps.resourceVerifier,
+      networkCapabilities:deps.denialReader?.capabilities ?? {},rows:selected});
   } catch (error) {
     process.stderr.write(`verifier error: ${error.message}\n`);
     return EXIT.config;
   }
   const gaps=[...(coverage.resourceProfiles.supported.length?[]:Object.entries(coverage.resourceProfiles.missing).map(([s,r])=>`${s} (P1/P2): ${r}`)),
-    ...(coverage.networkProfile.supported?[]:[`U1-U8,L1,L2 (P3): ${coverage.networkProfile.reason}`])];
+    ...(coverage.networkProfile.supported?[]:[`selected P3 network-denial cells: ${coverage.networkProfile.reason}`])];
   if(gaps.length && !options.allowIncompleteVerifier) {
     process.stderr.write('refusing to run: the verifier cannot classify every scheduled trial\n'+
       `${gaps.map(gap=>`  ${gap}`).join('\n')}\n`+
@@ -251,7 +244,8 @@ async function main(argv) {
     results=await runExperiment({planBytes:matrix,planSha256:matrixSha256,routes:rawRoutes,
       gates,verifier,evidenceStore,arm:'deterministic',rowFilter:selectedIds,
       concurrency:options.concurrency ?? 3,
-      laneFor:typeof deps.laneFor==='function'?deps.laneFor:createLaneSelector(config)});
+      laneFor:typeof deps.laneFor==='function'?deps.laneFor:createLaneSelector(config),
+      networkCapabilities:deps.denialReader?.capabilities ?? {}});
   } catch (error) {
     // A throw here means the run stopped; the evidence store already holds the
     // indeterminate records for the trial that failed.
@@ -261,8 +255,9 @@ async function main(argv) {
 
   const counts={};
   for(const record of results) counts[record.classification]=(counts[record.classification]??0)+1;
-  const summary={arm:'deterministic',matrixSha256,planned:selected.length,executed:results.length,
-    halted:results.halted===true,haltedAt:results.haltedAt??null,complete:results.complete===true,classifications:counts,
+  const summary={arm:'deterministic',matrixSha256,matrixRows:rows.length,planned:selected.length,executed:results.length,
+    halted:results.halted===true,haltedAt:results.haltedAt??null,scopeComplete:results.complete===true,
+    matrixComplete:results.matrixComplete===true,classifications:counts,scope:results.scopeSummary,
     concurrency:results.concurrency??1,lanes:results.laneCount??1,notApplicable:results.notApplicable??0,
     gates,gatesVerifiedByTool:false};
   if(options.json) process.stdout.write(`${JSON.stringify(summary,null,2)}\n`);
@@ -273,7 +268,7 @@ async function main(argv) {
     if(summary.halted) say(`HALTED at ${summary.haltedAt} — investigate before resuming`);
     say('Note: the four readiness gates are operator assertions; this tool does not verify them.');
   }
-  return summary.halted || !summary.complete || summary.executed!==summary.planned ? EXIT.partial : EXIT.complete;
+  return summary.halted || !summary.scopeComplete || summary.executed!==summary.planned || !summary.matrixComplete ? EXIT.partial : EXIT.complete;
 }
 
 function buildRoutesForDisplay(config) {

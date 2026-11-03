@@ -31,6 +31,7 @@ function liveDraftPlanBytes(){
 test('composes the frozen schedule, matching route, principal and evidence; stops on indeterminate',async()=>{
   const planBytes=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url));
   const planSha256=createHash('sha256').update(planBytes).digest('hex');
+  const {rows:scheduledRows}=loadFrozenSchedule(planBytes,planSha256);
   const deployments=['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv'],profiles=['P1','P2','P3'];
   const seen=[],routes={};let n=0;
   for(const deployment of deployments) for(const profile of profiles) {
@@ -45,7 +46,8 @@ test('composes the frozen schedule, matching route, principal and evidence; stop
     assert.equal(workloadPrincipalId,routes[`${trial.deployment}:${trial.profile}`].principalObjectId);
     return {classification:'indeterminate',evidence:{reason:'simulated pilot only'}};
   };
-  const result=await runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore});
+  const result=await runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,
+    rowFilter:new Set([scheduledRows[0].planned_run_id]),networkCapabilities:{azure_vm:true,azure_functions_flex:true}});
   assert.equal(result.length,1);assert.equal(claims.length,1);assert.equal(records.length,1);assert.equal(seen.length,1);
   assert.equal(records[0].trial.planSha256,planSha256);assert.equal(records[0].classification,'indeterminate');
   await assert.rejects(runExperiment({planBytes,planSha256,routes,gates:{...gates,isolationValidated:false},verifier,evidenceStore}),/readiness gates/);
@@ -57,6 +59,7 @@ test('composes the frozen schedule, matching route, principal and evidence; stop
 test('live phase claim prevents a fresh budget counter after a prior launch',async()=>{
   const planBytes=liveDraftPlanBytes();
   const planSha256=createHash('sha256').update(planBytes).digest('hex');
+  const {rows:scheduledRows}=loadFrozenSchedule(planBytes,planSha256);
   const {sha256:implementationSha256}=await implementationManifest();
   const routes={};let n=0,resets=0;
   for(const deployment of ['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv']) for(const profile of ['P1','P2','P3']) {
@@ -67,9 +70,29 @@ test('live phase claim prevents a fresh budget counter after a prior launch',asy
   const evidenceStore={claim:async id=>{claims.push(id);throw new Error('already claimed');},save:async()=>{}};
   const gates={protocolFrozen:true,deploymentValidated:true,isolationValidated:true,verifierValidated:true};
   const args={planBytes,planSha256,routes,gates,verifier:async()=> 'indeterminate',evidenceStore,arm:'gpt5mini_live',
-    modelEndpoint:'https://example.openai.azure.com/',getModelToken:async()=> 'test',implementationSha256};
+    modelEndpoint:'https://example.openai.azure.com/',getModelToken:async()=> 'test',implementationSha256,
+    rowFilter:new Set([scheduledRows[0].planned_run_id]),networkCapabilities:{azure_vm:true,azure_functions_flex:true}};
   await assert.rejects(runExperiment({...args,planSha256:'0'.repeat(64)}),/frozen digest/);
   assert.deepEqual(claims,[]);
   await assert.rejects(runExperiment(args),/already claimed/);
   assert.deepEqual(claims,['phase-gpt5mini-live']);assert.equal(resets,0);
+});
+
+test('preflight N/A rows are evidenced without invoking a workload adapter',async()=>{
+  const planBytes=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url));
+  const planSha256=createHash('sha256').update(planBytes).digest('hex');
+  const {rows}=loadFrozenSchedule(planBytes,planSha256);
+  const row=rows.find(item=>item.deployment==='azure_vm' && item.scenario_id==='U6');
+  let adapterCalls=0;const records=[];
+  const routes={[`azure_vm:${row.permission_profile}`]:{principalObjectId:'00000000-0000-0000-0000-000000000001',adapter:{
+    reset:async()=>{adapterCalls++;},execute:async()=>{adapterCalls++;},collect:async()=>{adapterCalls++;}}}};
+  const results=await runExperiment({planBytes,planSha256,routes,
+    gates:{protocolFrozen:true,deploymentValidated:true,isolationValidated:true,verifierValidated:true},
+    verifier:async()=>({classification:'indeterminate'}),rowFilter:new Set([row.planned_run_id]),
+    evidenceStore:{claim:async()=>{},save:async record=>records.push(record)}});
+  assert.equal(adapterCalls,0);
+  assert.equal(results[0].classification,'not_applicable');
+  assert.equal(results[0].executionAttempted,false);
+  assert.equal(results.matrixComplete,false);
+  assert.equal(records.length,1);
 });
