@@ -1,8 +1,8 @@
 /**
  * LEGACY PLANNING SKETCH — NOT the study matrix.
  *
- * The frozen schedule for the 450 measured trials is
- * 03-PLANNED-TRIAL-MATRIX-450.csv (10 columns, planned_run_id like
+ * The frozen schedule for the measured trials is
+ * 03-PLANNED-TRIAL-MATRIX-400-REV2.csv (400 rows; 10 columns, planned_run_id like
  * b01-01-<deployment>-<profile>-<scenario>). Its bytes and SHA-256 are recorded in
  * EXPERIMENT-STATUS.md and enforced by trial-schedule.mjs / the CI digest guard.
  *

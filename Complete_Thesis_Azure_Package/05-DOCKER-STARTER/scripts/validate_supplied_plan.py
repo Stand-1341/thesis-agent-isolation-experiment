@@ -1,40 +1,93 @@
-"""Validate the supplied trial schedule; this never starts or records trials."""
+"""Validate a supplied trial schedule; this never starts or records trials.
+
+Checks structure, not size. The original version hardcoded 450 rows in 5 blocks of
+90 containing the full deployment x profile x scenario product, which made the
+revision-2 plan unloadable the moment the session-arm P3 cells were withdrawn.
+
+The invariant that actually matters is kept and strengthened: **every block is a
+complete replication** — all blocks contain exactly the same set of cells, each
+once, in ascending order. Integrity against tampering is the frozen digest's job,
+so it is reported here rather than guessed at.
+"""
 import csv
 import hashlib
-import itertools
 import json
+import sys
+from collections import Counter
 from pathlib import Path
 
-PLAN = Path(__file__).resolve().parents[2] / '03-PLANNED-TRIAL-MATRIX-450.csv'
-DEPLOYMENTS = {'azure_vm', 'azure_functions_flex', 'azure_custom_sessions_hyperv'}
-PROFILES = {'P1', 'P2', 'P3'}
-SCENARIOS = {*(f'U{i}' for i in range(1, 9)), 'L1', 'L2'}
+PACKAGE = Path(__file__).resolve().parents[2]
+DEFAULT_PLANS = [
+    PACKAGE / '03-PLANNED-TRIAL-MATRIX-400-REV2.csv',   # current
+    PACKAGE / '03-PLANNED-TRIAL-MATRIX-450.csv',        # superseded, kept as history
+]
+HEADER = ['planned_run_id', 'block', 'order_in_block', 'deployment', 'permission_profile',
+          'scenario_id', 'scenario_type', 'status', 'result', 'verified_evidence_ref']
 
 
-def validate(path=PLAN):
+def validate(path):
     raw = path.read_bytes()
     with path.open(encoding='utf-8-sig', newline='') as stream:
-        rows = list(csv.DictReader(stream))
-    if len(rows) != 450:
-        raise ValueError(f'expected 450 rows, found {len(rows)}')
-    if len({r['planned_run_id'] for r in rows}) != 450:
-        raise ValueError('run IDs are not unique')
-    expected = set(itertools.product(DEPLOYMENTS, PROFILES, SCENARIOS))
-    for block in range(1, 6):
-        group = [r for r in rows if r['block'] == str(block)]
+        reader = csv.DictReader(stream)
+        if reader.fieldnames != HEADER:
+            raise ValueError(f'{path.name}: header does not match the expected columns')
+        rows = list(reader)
+
+    if not rows:
+        raise ValueError(f'{path.name}: no rows')
+    if len({r['planned_run_id'] for r in rows}) != len(rows):
+        raise ValueError(f'{path.name}: run IDs are not unique')
+    if any(not r['planned_run_id'] for r in rows):
+        raise ValueError(f'{path.name}: a row has no run ID')
+
+    blocks = Counter(int(r['block']) for r in rows)
+    numbers = sorted(blocks)
+    if numbers != list(range(1, len(numbers) + 1)):
+        raise ValueError(f'{path.name}: block numbers are not contiguous from 1')
+    if len(set(blocks.values())) != 1:
+        raise ValueError(f'{path.name}: blocks are not the same size: {dict(blocks)}')
+
+    cell_sets = {}
+    for block in numbers:
+        group = [r for r in rows if int(r['block']) == block]
+        orders = [int(r['order_in_block']) for r in group]
+        if len(set(orders)) != len(orders):
+            raise ValueError(f'{path.name}: block {block} repeats an order_in_block value')
+        if orders != sorted(orders):
+            raise ValueError(f'{path.name}: block {block} order is out of sequence')
         cells = [(r['deployment'], r['permission_profile'], r['scenario_id']) for r in group]
-        if len(group) != 90 or set(cells) != expected:
-            raise ValueError(f'block {block} does not contain each cell exactly once')
-        if [int(r['order_in_block']) for r in group] != list(range(1, 91)):
-            raise ValueError(f'block {block} order is incomplete or out of sequence')
+        if len(set(cells)) != len(cells):
+            raise ValueError(f'{path.name}: block {block} repeats a trial cell')
+        cell_sets[block] = set(cells)
+
+    reference = cell_sets[numbers[0]]
+    for block in numbers[1:]:
+        if cell_sets[block] != reference:
+            missing = reference - cell_sets[block]
+            extra = cell_sets[block] - reference
+            raise ValueError(f'{path.name}: block {block} is not a replication of block 1 '
+                             f'(missing {sorted(missing)}, extra {sorted(extra)})')
+
     for r in rows:
         if r['status'] != 'NOT RUN' or r['result'] or r['verified_evidence_ref']:
-            raise ValueError('the supplied plan must contain no recorded results')
-        if r['scenario_type'] != ('unauthorized' if r['scenario_id'].startswith('U') else 'legitimate'):
-            raise ValueError(f"incorrect scenario type: {r['planned_run_id']}")
-    return {'status': 'planned_not_measured', 'source': path.name, 'sha256': hashlib.sha256(raw).hexdigest(),
-            'rows': len(rows), 'blocks': 5, 'unauthorized': 360, 'legitimate': 90}
+            raise ValueError(f'{path.name}: the supplied plan must contain no recorded results')
+        expected = 'unauthorized' if r['scenario_id'].startswith('U') else 'legitimate'
+        if r['scenario_type'] != expected:
+            raise ValueError(f"{path.name}: incorrect scenario type: {r['planned_run_id']}")
+
+    return {
+        'status': 'planned_not_measured',
+        'source': path.name,
+        'sha256': hashlib.sha256(raw).hexdigest(),
+        'rows': len(rows),
+        'blocks': len(numbers),
+        'rowsPerBlock': blocks[numbers[0]],
+        'distinctCells': len(reference),
+        'unauthorized': sum(1 for r in rows if r['scenario_type'] == 'unauthorized'),
+        'legitimate': sum(1 for r in rows if r['scenario_type'] == 'legitimate'),
+    }
 
 
 if __name__ == '__main__':
-    print(json.dumps(validate(), indent=2))
+    targets = [Path(a) for a in sys.argv[1:]] or DEFAULT_PLANS
+    print(json.dumps([validate(p) for p in targets], indent=2))

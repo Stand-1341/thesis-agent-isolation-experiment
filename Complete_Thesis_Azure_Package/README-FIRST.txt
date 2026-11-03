@@ -9,13 +9,18 @@ START HERE
    project. This is STARTER CODE, not a completed or production-ready system.
 4. 05-DOCKER-STARTER/TESTING.md documents what was and was not verified.
 5. 04-AZURE-THESIS-REVISION-CHECKLIST.md lists required thesis edits.
-6. 03-PLANNED-TRIAL-MATRIX-450.csv is a plan, NOT collected results.
+6. 03-PLANNED-TRIAL-MATRIX-400-REV2.csv is the current plan, NOT collected
+   results. Revision 2 withdrew the 50 custom-session P3 cells because the
+   platform has no selective egress and no attributable denial telemetry for
+   session pools; see 13-MATRIX-REVISION-1.md. The superseded 450-row plan is
+   retained unmodified as the historical record.
 7. Also in this directory: 06-PROPOSED-AZURE-METHOD.md,
    08-AZURE-IDENTITY-DESIGN-DRAFT.md, 09-SESSION-POOL-PILOT.md,
    10-GPT5-MINI-LIVE-AGENT-PHASE-DRAFT.md, 11-AZURE-COST-AND-CREDIT-PLAN.md.
    12-RUN-INPUTS.md is the complete list of inputs a measured run requires and
    where each value comes from, with the read-only az command for every one.
    Start there before attempting to execute anything.
+   13-MATRIX-REVISION-1.md records what was withdrawn from the plan and why.
    07-PILOT-ACCEPTANCE.md is SUPERSEDED and is kept only as history: the release
    gate is 05-DOCKER-STARTER/PILOT-ACCEPTANCE.md, which is what every other
    document points at. Do not run trials against the 07 checklist.
@@ -32,7 +37,7 @@ DOCKER STARTER QUICK START (OPTIONAL)
 
   npm run plan is a legacy planning sketch, not the study schedule. Its 6-column
   output is rejected by the only schedule loader ("matrix header does not match").
-  The authoritative schedule is 03-PLANNED-TRIAL-MATRIX-450.csv. The command
+  The authoritative schedule is 03-PLANNED-TRIAL-MATRIX-400-REV2.csv. The command
   prints a warning saying so; do not treat its output as the plan of record.
 
 If you do not want local Docker, use Azure Container Registry remote builds:

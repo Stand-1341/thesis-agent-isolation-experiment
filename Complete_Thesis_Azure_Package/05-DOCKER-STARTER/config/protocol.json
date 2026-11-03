@@ -1,14 +1,66 @@
 {
- "status":"planning_not_validated",
- "revision":"azure-proposed-v0",
- "deployments":["azure_vm","azure_functions_flex","azure_custom_sessions_hyperv"],
- "profiles":["P1","P2","P3"],
- "unauthorized":["U1","U2","U3","U4","U5","U6","U7","U8"],
- "legitimate":["L1","L2"],
- "repetitions":5,
- "expectedDeterministicTrials":450,
- "operationTimeoutSeconds":30,
- "auditWindowSeconds":3600,
- "plannedLiveAgent":{"provider":"azure-openai","model":"gpt-5-mini","modelVersion":"2025-08-07","reasoningEffort":"low","modelFallback":"disabled","expectedTrials":450,"mirrorsDeterministicMatrix":true,"dataset":"separate_live_agent_arm","status":"draft_endpoint_deployed_connectivity_verified_not_frozen","maxResponsesPerTrial":2,"maxOutputTokensPerResponse":2048,"phaseSpendGuardUsd":19},
- "notes":"Azure migration requires validated networking, instance reset and verifier; no claimed results until collected. The deployments, profiles and scenario lists here must match 03-PLANNED-TRIAL-MATRIX-450.csv exactly; scripts/protocol.test.mjs enforces that so this file cannot drift from the frozen matrix again. auditWindowSeconds must track the verifier/fixture audit default: it was raised from 60 to 300 (maximum 600, 10-second polling) on 2026-11-02 because a controlled Blob log took over a minute to become queryable, and a shorter window misclassifies valid trials as indeterminate."
+ "status": "planning_not_validated",
+ "revision": "azure-proposed-v1-rev2",
+ "deployments": [
+  "azure_vm",
+  "azure_functions_flex",
+  "azure_custom_sessions_hyperv"
+ ],
+ "profiles": [
+  "P1",
+  "P2",
+  "P3"
+ ],
+ "unauthorized": [
+  "U1",
+  "U2",
+  "U3",
+  "U4",
+  "U5",
+  "U6",
+  "U7",
+  "U8"
+ ],
+ "legitimate": [
+  "L1",
+  "L2"
+ ],
+ "repetitions": 5,
+ "expectedDeterministicTrials": 400,
+ "operationTimeoutSeconds": 30,
+ "auditWindowSeconds": 3600,
+ "plannedLiveAgent": {
+  "provider": "azure-openai",
+  "model": "gpt-5-mini",
+  "modelVersion": "2025-08-07",
+  "reasoningEffort": "low",
+  "modelFallback": "disabled",
+  "expectedTrials": 400,
+  "mirrorsDeterministicMatrix": true,
+  "dataset": "separate_live_agent_arm",
+  "status": "draft_endpoint_deployed_connectivity_verified_not_frozen",
+  "maxResponsesPerTrial": 2,
+  "maxOutputTokensPerResponse": 2048,
+  "phaseSpendGuardUsd": 19
+ },
+ "notes": "Revision 2 withdraws the 50 custom-session P3 cells: the platform has no selective egress and no attributable network denial telemetry for session pools, so those cells could never be measured. The 450-row plan is retained unmodified as the historical record with its own digest. The deployments, profiles and scenario lists here must match the matrix named in `matrix.file`; scripts/protocol.test.mjs enforces that against the declared digest so this file cannot drift from the frozen matrix. auditWindowSeconds tracks the ingestion latency documented by Microsoft (traffic analytics: 60-minute default interval, ingestion can take up to one hour).",
+ "matrix": {
+  "file": "03-PLANNED-TRIAL-MATRIX-400-REV2.csv",
+  "sha256": "d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863",
+  "trials": 400,
+  "blocks": 5,
+  "rowsPerBlock": 80,
+  "unauthorized": 320,
+  "legitimate": 80,
+  "supersedes": {
+   "file": "03-PLANNED-TRIAL-MATRIX-450.csv",
+   "sha256": "39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298",
+   "trials": 450
+  },
+  "withdrawn": {
+   "count": 50,
+   "reason": "custom session pool exposes only a binary EgressEnabled/EgressDisabled. There is no configuration that denies one destination while allowing another, and no VNet, UDR or flow-log path for attributable denial evidence, so the P3 containment claim cannot be made on that deployment.",
+   "cells": "azure_custom_sessions_hyperv x P3 x 10 scenarios x 5 repetitions"
+  }
+ }
 }

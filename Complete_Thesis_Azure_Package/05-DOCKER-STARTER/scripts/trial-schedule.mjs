@@ -36,13 +36,31 @@ export async function runFrozenSchedule(bytes,expectedSha256,runOne) {
   return runSchedule(plan.rows,trial=>runOne({...trial,planSha256:plan.sha256}));
 }
 
+/**
+ * Structural validation only. The matrix size is NOT hardcoded: revision 1 withdrew
+ * the session-arm P3 cells, so the schedule went from 450 rows to 400, and a
+ * validator pinned to 450 would have made the revised plan unloadable. Integrity is
+ * enforced by the frozen digest, not by a row count here — this function checks the
+ * shape is coherent so a truncated or reordered file cannot pass as a complete one.
+ *
+ * Block sizes must be equal, block numbers contiguous from 1, order_in_block unique
+ * and ascending within a block (gaps are expected: withdrawn cells leave holes), and
+ * every (block, deployment, profile, scenario) cell may appear once.
+ */
 export function validateSchedule(rows) {
-  if (!Array.isArray(rows) || rows.length !== 450) throw new Error('schedule must contain 450 rows');
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error('schedule must contain rows');
   const ids = new Set();
   const cells = new Set();
-  for (let index=0; index<rows.length; index++) {
-    const row=rows[index], block=Math.floor(index/90)+1, order=index%90+1;
-    if (Number(row.block)!==block || Number(row.order_in_block)!==order) throw new Error('invalid block order');
+  const perBlock = new Map();
+  const lastOrder = new Map();
+  for (const row of rows) {
+    const block = Number(row.block);
+    const order = Number(row.order_in_block);
+    if (!Number.isInteger(block) || block < 1) throw new Error('invalid block number');
+    if (!Number.isInteger(order) || order < 1) throw new Error('invalid block order');
+    if (lastOrder.has(block) && order <= lastOrder.get(block)) throw new Error('invalid block order');
+    lastOrder.set(block, order);
+    perBlock.set(block, (perBlock.get(block) ?? 0) + 1);
     if (!/^[A-Za-z0-9_-]{1,150}$/.test(row.planned_run_id || '') || ids.has(row.planned_run_id)) throw new Error('invalid or duplicate run ID');
     ids.add(row.planned_run_id);
     if (!deployments.includes(row.deployment) || !profiles.includes(row.permission_profile) || !scenarios.includes(row.scenario_id)) throw new Error('invalid trial cell');
@@ -52,7 +70,13 @@ export function validateSchedule(rows) {
     if (cells.has(key)) throw new Error('duplicate trial cell');
     cells.add(key);
   }
-  return {rows:rows.length, blocks:5, unauthorized:360, legitimate:90};
+  const blocks = [...perBlock.keys()].sort((a,b)=>a-b);
+  if (blocks.length !== blocks.at(-1)) throw new Error('block numbers must be contiguous from 1');
+  const sizes = new Set([...perBlock.values()]);
+  if (sizes.size !== 1) throw new Error(`blocks must be the same size, got ${[...perBlock.entries()].map(([b,n])=>`${b}:${n}`).join(' ')}`);
+  return {rows:rows.length, blocks:blocks.length, rowsPerBlock:[...sizes][0],
+    unauthorized:rows.filter(row=>row.scenario_type==='unauthorized').length,
+    legitimate:rows.filter(row=>row.scenario_type==='legitimate').length};
 }
 
 /** Fail fast: caller must investigate any failed or indeterminate trial before continuing. */

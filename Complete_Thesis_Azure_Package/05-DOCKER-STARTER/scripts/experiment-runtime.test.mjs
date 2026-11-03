@@ -100,7 +100,7 @@ test('runExperiment runs two rows from the frozen matrix in parallel lanes',asyn
   const {readFile}=await import('node:fs/promises');
   const {createHash}=await import('node:crypto');
   const {runExperiment}=await import('./experiment-runner.mjs');
-  const matrix=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url));
+  const matrix=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
   const sha=createHash('sha256').update(matrix).digest('hex');
   const {loadFrozenSchedule}=await import('./trial-schedule.mjs');
   const rows=loadFrozenSchedule(matrix,sha).rows;

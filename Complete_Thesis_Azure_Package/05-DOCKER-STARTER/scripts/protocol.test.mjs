@@ -14,15 +14,16 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {loadFrozenSchedule} from './trial-schedule.mjs';
 
-const frozenPlanSha256='39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298';
+const frozenPlanSha256='d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863';
 
 function loadProtocol(){
   return JSON.parse(readFileSync(new URL('../config/protocol.json',import.meta.url),'utf8'));
 }
 function loadMatrix(){
-  const bytes=readFileSync(new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url));
+  const bytes=readFileSync(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
   return loadFrozenSchedule(bytes,frozenPlanSha256).rows;
 }
 
@@ -59,13 +60,50 @@ test('protocol.json scenario classification matches every matrix row',()=>{
 
 test('protocol.json trial counts match the frozen matrix',()=>{
   const protocol=loadProtocol(),rows=loadMatrix();
-  assert.equal(rows.length,450);
-  assert.equal(protocol.expectedDeterministicTrials,rows.length);
+  assert.equal(rows.length,protocol.expectedDeterministicTrials);
   assert.equal(protocol.repetitions,5);
   assert.equal(protocol.plannedLiveAgent.expectedTrials,rows.length);
-  // 5 repetitions x 3 deployments x 3 profiles x 10 scenarios
-  assert.equal(protocol.repetitions*protocol.deployments.length*protocol.profiles.length
-    *(protocol.unauthorized.length+protocol.legitimate.length),rows.length);
+  // Revision 2 withdrew the 50 session-arm P3 cells, so the matrix is no longer the
+  // clean product of repetitions x deployments x profiles x scenarios. It is checked
+  // against the declared shape instead of being re-derived from the protocol lists.
+  const declared=protocol.matrix;
+  assert.ok(declared, 'protocol.json must declare the matrix it describes');
+  assert.equal(declared.trials,rows.length);
+  assert.equal(declared.blocks,new Set(rows.map(row=>row.block)).size);
+  assert.equal(declared.rowsPerBlock,rows.length/declared.blocks);
+  assert.equal(declared.unauthorized,rows.filter(row=>row.scenario_type==='unauthorized').length);
+  assert.equal(declared.legitimate,rows.filter(row=>row.scenario_type==='legitimate').length);
+  assert.equal(declared.withdrawn.count,declared.supersedes.trials-declared.trials);
+});
+
+test('the declared digest is the digest of the matrix actually in the repository',()=>{
+  const protocol=loadProtocol();
+  const declared=protocol.matrix;
+  const bytes=readFileSync(new URL(`../../${declared.file}`,import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),declared.sha256,
+    `${declared.file} no longer matches the digest protocol.json declares`);
+  // The superseded revision stays in the repository, unmodified, as the historical plan.
+  const priorBytes=readFileSync(new URL(`../../${declared.supersedes.file}`,import.meta.url));
+  assert.equal(createHash('sha256').update(priorBytes).digest('hex'),declared.supersedes.sha256,
+    'the superseded matrix must not be edited; it is the record of what was planned');
+});
+
+test('revision 2 withdraws exactly the session-arm P3 cells and nothing else',()=>{
+  const protocol=loadProtocol();
+  const current=loadMatrix();
+  const prior=loadFrozenSchedule(
+    readFileSync(new URL(`../../${protocol.matrix.supersedes.file}`,import.meta.url)),
+    protocol.matrix.supersedes.sha256).rows;
+  const kept=new Set(current.map(row=>row.planned_run_id));
+  const dropped=prior.filter(row=>!kept.has(row.planned_run_id));
+  assert.equal(dropped.length,50);
+  for(const row of dropped) {
+    assert.equal(row.deployment,'azure_custom_sessions_hyperv');
+    assert.equal(row.permission_profile,'P3');
+  }
+  // Every surviving row keeps its original run ID, so evidence stays traceable.
+  const priorIds=new Set(prior.map(row=>row.planned_run_id));
+  for(const row of current) assert.ok(priorIds.has(row.planned_run_id));
 });
 
 test('protocol.json audit window cannot be shorter than the documented log latency',()=>{

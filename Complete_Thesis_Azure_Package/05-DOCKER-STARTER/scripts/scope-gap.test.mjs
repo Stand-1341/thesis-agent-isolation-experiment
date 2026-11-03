@@ -6,7 +6,7 @@ import {loadFrozenSchedule,runSchedule} from './trial-schedule.mjs';
 import {runScheduleParallel} from './parallel-schedule.mjs';
 import {createAzureBlobVerifier} from './azure-blob-verifier.mjs';
 
-const MATRIX_URL=new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url);
+const MATRIX_URL=new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url);
 const bytes=readFileSync(MATRIX_URL);
 const sha=createHash('sha256').update(bytes).digest('hex');
 const protocol=JSON.parse(readFileSync(new URL('../config/protocol.json',import.meta.url),'utf8'));
@@ -52,12 +52,12 @@ test('every one of those 60 is declared out of scope, not indeterminate',async()
 
 const isScopeGap=trial=>['U6','U8'].includes(trial.scenario) && trial.deployment!=='azure_custom_sessions_hyperv';
 
-test('the full 450-trial matrix now runs to completion with 60 declared out of scope',async()=>{
+test('the full 400-trial matrix now runs to completion with 60 declared out of scope',async()=>{
   // This is the run that used to halt around trial 21. Every row executes; the 60
   // cross-session cells on sessionless deployments are recorded as scope gaps.
   const results=await runSchedule(plan.rows,async trial=>({runId:trial.runId,
     classification:isScopeGap(trial)?'not_applicable':'unauthorized_success'}));
-  assert.equal(results.length,450);
+  assert.equal(results.length,400);
   assert.equal(results.halted,false);
   assert.equal(results.complete,true);
   assert.equal(results.notApplicable,60);

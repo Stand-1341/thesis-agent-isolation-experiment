@@ -257,7 +257,12 @@ selection containing them is refused.
 
 ## 8. Limits you should accept before spending anything
 
-**150 of 450 trials can carry `confirmed_network_denial`.** Microsoft lists both
+**This is revision 2 of the plan: 400 trials, not 450.** The 50 session-arm P3
+cells were withdrawn because the platform cannot host that claim — see
+`13-MATRIX-REVISION-1.md`. Revision 1 (450 rows) stays in the repository
+unmodified as the historical record.
+
+**100 of 400 trials can carry `confirmed_network_denial`.** Microsoft lists both
 Azure Container Apps and Azure Functions as incompatible with VNet flow logs, and
 session pools expose only a binary `EgressEnabled`/`EgressDisabled` with no
 per-destination rules.
@@ -266,35 +271,35 @@ per-destination rules.
 |---|---|
 | `azure_vm` | Provable — flow-log `D` state plus a named `AclRule` |
 | `azure_functions_flex` | Firewall-scoped deny only, attributed to one of the app's outbound IPs |
-| `azure_custom_sessions_hyperv` | Configuration-level only. Not provable, by design |
+| `azure_custom_sessions_hyperv` | **Withdrawn from the containment claim.** Only P1 and P2 remain on this arm |
 
-**60 of 450 trials are declared `not_applicable`.** U6 and U8 ask for another
+**60 of 400 trials are declared `not_applicable`.** U6 and U8 ask for another
 session's data and a previous session's retained state. The VM and Functions arms
 host no sessions, so the precondition does not exist. They are written as evidence
 records with `executionAttempted: false` and the run continues; `indeterminate`
 still halts on first occurrence.
 
-**Up to 70 of 450 trials are `unsupported`, and the runner refuses to touch them.**
+**20 trials are `unsupported` until you configure denial telemetry.**
 
-| Rows | Cells | Clearable? |
+| Rows | Cells | Clearable |
 |---:|---|---|
-| 50 | session arm, every P3 cell | **No.** The pool cannot provide selective egress with independently attributable denial evidence |
 | 10 | VM P3 U5/U7 | Yes — configure VM denial telemetry (§4) |
 | 10 | Functions P3 U5/U7 | Yes — configure Functions denial telemetry (§4) |
 
-Those 20 rows become measurable the moment the denial reader advertises the
-capability, which it does when `THESIS_VM_TARGET_RESOURCE_ID` +
-`THESIS_DENIAL_DESTINATION_IP` (VM) and `THESIS_FLEX_SOURCE_IP` (Functions) are
-set. Confirm with the scope line: **320 → 330 → 340 measurable** as each is added.
-The 50 session-P3 rows never clear.
+They become measurable the moment the denial reader advertises the capability,
+which it does when `THESIS_VM_TARGET_RESOURCE_ID` + `THESIS_DENIAL_DESTINATION_IP`
+(VM) and `THESIS_FLEX_SOURCE_IP` (Functions) are set. Confirm on the scope line:
+**320 → 330 → 340 measurable** as each is added.
 
-**The consequence is unavoidable: a full 450-row run is refused outright.** The
-runner rejects the selection before claiming a single run ID, so nothing is
-half-executed. Executable runs are scoped — `--deployment azure_vm`,
-`--profile P2`, or `--limit n` — and each reports `matrixComplete: false`.
+The runner still refuses any selection containing an unsupported row, before
+claiming a single run ID — so a partly configured deployment cannot half-execute.
+Configure both and the whole 400-row matrix runs in one pass.
 
-Budget with nothing configured: **320 measurable, 60 not applicable, 70
-unsupported.** Fully configured except the session-P3 design: **340 / 60 / 50.**
+| Configuration | Measurable | Not applicable | Unsupported |
+|---|---:|---:|---:|
+| Nothing | 320 | 60 | 20 |
+| VM telemetry only | 330 | 60 | 10 |
+| Both | **340** | 60 | **0** |
 
 **U7 and U5 share one destination host** — `/restricted` and `/collect` on the
 same collector. A destination-based denial cannot separate them, so the

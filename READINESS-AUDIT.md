@@ -164,13 +164,18 @@ directory; this is the part that should not wait.
 
 **Scope of an executable run**
 
-320 of 450 rows are measurable. 60 are `not_applicable` (U6/U8 outside the
-sessions arm) and are recorded without invoking the workload. 70 are
-`unsupported` and the runner refuses any selection containing them: 50 session-arm
-P3 cells and 20 P3 U5/U7 cells on VM and Functions with no denial capability
-configured. **A full 450-row run is therefore refused outright**, before any run
-ID is claimed. The executable form is a scoped subset, which is what the preflight
-report of 2026-11-03 records.
+**The plan is revision 2: 400 rows.** Revision 1 withdrew the 50 custom-session
+P3 cells, which the platform cannot host — session pools expose a binary
+`EgressDisabled`/`EgressEnabled` with no per-destination rule, no VNet path and no
+flow-log coverage, so the containment claim had no configuration to observe. The
+450-row revision 1 is retained unmodified as the historical record with its own
+digest; see `Complete_Thesis_Azure_Package/13-MATRIX-REVISION-1.md`.
+
+Of the 400: 320 are measurable with nothing configured, 60 are `not_applicable`
+(U6/U8 outside the sessions arm, recorded without invoking the workload), and 20
+are `unsupported` until VM and Functions denial telemetry is configured. With both
+configured the split is 340 / 60 / 0 and **the whole matrix runs in one pass** —
+verified end to end, 400 rows executed, exit 0.
 
 **Research integrity — still open**
 

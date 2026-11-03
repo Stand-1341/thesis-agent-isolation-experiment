@@ -21,7 +21,11 @@ env:
   # Frozen SHA-256 of the supplied 450-row study matrix. Recorded in
   # EXPERIMENT-STATUS.md, trial-schedule.test.mjs and generate-gpt5mini-live-plan.mjs.
   # Update all four together or not at all.
+  # Revision 1 of the plan: retained unmodified as the historical record of what was
+  # scheduled before the session-arm P3 cells were withdrawn.
   FROZEN_PLAN_SHA256: 39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298
+  # Revision 2: the schedule the runner executes.
+  FROZEN_PLAN_SHA256_REV2: d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863
 
 jobs:
   build-and-test:
@@ -82,13 +86,19 @@ jobs:
       # changed the matrix bytes and broke the frozen digest on Linux checkouts.
       - name: Frozen plan digest
         run: |
-          actual="$(sha256sum Complete_Thesis_Azure_Package/03-PLANNED-TRIAL-MATRIX-450.csv | cut -d' ' -f1)"
-          echo "expected: $FROZEN_PLAN_SHA256"
-          echo "actual  : $actual"
-          if [ "$actual" != "$FROZEN_PLAN_SHA256" ]; then
-            echo "::error::03-PLANNED-TRIAL-MATRIX-450.csv no longer matches the frozen digest. Byte-exact artifact: do not reformat, re-save, or let git normalize it."
-            exit 1
-          fi
+          set -e
+          check() {
+            actual="$(sha256sum "Complete_Thesis_Azure_Package/$1" | cut -d' ' -f1)"
+            echo "$1"
+            echo "  expected: $2"
+            echo "  actual  : $actual"
+            if [ "$actual" != "$2" ]; then
+              echo "::error::$1 no longer matches the frozen digest. Byte-exact artifact: do not reformat, re-save, or let git normalize it."
+              exit 1
+            fi
+          }
+          check 03-PLANNED-TRIAL-MATRIX-450.csv "$FROZEN_PLAN_SHA256"
+          check 03-PLANNED-TRIAL-MATRIX-400-REV2.csv "$FROZEN_PLAN_SHA256_REV2"
 
       - name: Supplied plan validation
         working-directory: ${{ env.STARTER_DIR }}

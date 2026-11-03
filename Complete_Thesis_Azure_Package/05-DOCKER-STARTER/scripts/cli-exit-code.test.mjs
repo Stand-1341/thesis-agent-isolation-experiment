@@ -97,10 +97,26 @@ test('a halted run exits 2, so success and failure stay distinguishable',()=>{
   assert.notEqual(out.code,0);
 });
 
-test('an unsupported scope is refused before any run ID is claimed',()=>{
+test('the full revision-2 matrix now executes end to end',()=>{
   const {deps,evidence}=scaffold(PASSING_DEPS);
-  // No --deployment/--profile/--limit: the full 450 rows include the 50 session P3
-  // cells that have no selective-egress design, so the run must be refused whole.
+  // Revision 2 withdrew the 50 session-arm P3 cells, so an unfiltered selection has no
+  // unsupported rows left: the whole 400-row matrix runs in one pass.
+  const out=run(['--config',CONFIG,'--deps',deps,'--evidence',evidence,'--gates',GATES,'--json']);
+  assert.ok(out.summary,`expected a JSON summary, got:\n${out.stdout}\n${out.stderr}`);
+  assert.equal(out.summary.executed,400);
+  assert.equal(out.summary.halted,false);
+  assert.equal(out.summary.matrixComplete,true);
+  assert.equal(out.summary.scope.unsupportedRows,0);
+  assert.equal(out.code,0,`expected a complete matrix run to exit 0, got ${out.code}`);
+});
+
+test('a selection with an unsupported row is still refused before any claim',()=>{
+  // Without advertised denial capability the VM and Functions P3 U5/U7 cells have no
+  // evidence source, so a selection containing them must be refused whole.
+  const dir=mkdtempSync(join(tmpdir(),'thesis-refuse-'));
+  const deps=join(dir,'deps.mjs');
+  writeFileSync(deps,PASSING_DEPS.replace('{azure_vm:true,azure_functions_flex:true}','{}'));
+  const evidence=join(dir,'evidence');
   const out=run(['--config',CONFIG,'--deps',deps,'--evidence',evidence,'--gates',GATES]);
   assert.notEqual(out.code,0);
   assert.match(out.stdout+out.stderr,/refusing to run/i);

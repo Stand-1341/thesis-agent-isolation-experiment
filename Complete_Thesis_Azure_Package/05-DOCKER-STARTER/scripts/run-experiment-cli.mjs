@@ -31,7 +31,8 @@ const EXIT={complete:0,partial:2,gates:3,config:4,usage:5};
 const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
 
   --config <file>        deployment configuration (no secrets; see experiment-config.mjs)
-  --matrix <file>        schedule to run (default ../03-PLANNED-TRIAL-MATRIX-450.csv)
+  --matrix <file>        schedule to run (default ../03-PLANNED-TRIAL-MATRIX-400-REV2.csv,
+                         revision 2 of the frozen plan; rev 1 withdrew 50 cells)
   --evidence <dir>       evidence directory (default: config evidenceDirectory)
   --limit <n>            stop after n trials, for a pilot run
   --deployment <name>    restrict to one deployment
@@ -101,6 +102,16 @@ function gatesFrom(values) {
 
 const abilityUnknown=source=>source!=='deps.denialReader';
 
+/** The frozen digest, as declared by the protocol rather than derived from the file. */
+async function readDeclaredMatrix() {
+  try {
+    const text=await readFile(new URL('../config/protocol.json',import.meta.url),'utf8');
+    const matrix=JSON.parse(text).matrix;
+    if(!matrix || typeof matrix.sha256!=='string' || !/^[0-9a-f]{64}$/.test(matrix.sha256)) return null;
+    return matrix;
+  } catch (error) { return null; }
+}
+
 /**
  * The deps module is the only thing that knows whether a deployment has attributable
  * denial telemetry. A structural preflight still has to report scope honestly, so it
@@ -141,7 +152,7 @@ async function main(argv) {
 
   const say=message=>{ if(!options.json) process.stdout.write(`${message}\n`); };
 
-  const defaultMatrix=fileURLToPath(new URL('../../03-PLANNED-TRIAL-MATRIX-450.csv',import.meta.url));
+  const defaultMatrix=fileURLToPath(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
   const matrixPath=resolve(options.matrix ?? defaultMatrix);
   let matrix,rows;
   try {
@@ -168,6 +179,17 @@ async function main(argv) {
   const scope=analyzeTrialScope(selected,{networkCapabilities});
   const missingCredentials=missingCredentialVariables(configShape,process.env,routeKeys);
   const matrixSha256=createHash('sha256').update(matrix).digest('hex');
+  // The digest has to be checked against a declared value, not computed from the same
+  // bytes it is meant to authenticate. Without this the freeze proved only that the
+  // file matched itself, so an edited matrix would verify happily.
+  const declared=await readDeclaredMatrix();
+  if(!options.matrix && declared) {
+    if(declared.sha256!==matrixSha256) {
+      process.stderr.write(`matrix digest mismatch for ${declared.file}\n  declared ${declared.sha256}\n  actual   ${matrixSha256}\n`+
+        'The default schedule must match config/protocol.json. Use --matrix only for a deliberate pilot.\n');
+      return EXIT.config;
+    }
+  }
 
   if(options.dryRun) {
     const routes=describeRoutes(configShape,{routeKeys});
