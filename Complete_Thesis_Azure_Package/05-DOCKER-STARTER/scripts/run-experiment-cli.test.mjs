@@ -37,6 +37,7 @@ test('usage errors exit 5 without touching configuration',()=>{
   assert.equal(run([]).code,5);
   assert.equal(run(['--config']).code,5);
   assert.equal(run(['--config','x','--limit','0']).code,5);
+  assert.equal(run(['--config','x','--offset','-1']).code,5);
   assert.equal(run(['--config','x','--nope']).code,5);
 });
 
@@ -100,6 +101,12 @@ export default {denialReader:Object.assign(async()=>({verdict:'observed_allow',e
   const evidence=JSON.parse(envelope.payload);
   assert.equal(evidence.mode,'non_counted_pilot');
   assert.equal(evidence.trial.planSha256,summary.matrixSha256);
+
+  const next=run(['--config',EXAMPLE,'--deps',deps,'--pilot','--deployment','azure_vm','--profile','P1','--offset','1','--limit','1',
+    '--pilot-evidence',pilotEvidence,'--json'],credentialEnv());
+  assert.equal(next.code,0,next.err);
+  const nextEnvelope=JSON.parse(readFileSync(join(pilotEvidence,'pilot-azure_vm-P1-U2.json'),'utf8'));
+  assert.equal(JSON.parse(nextEnvelope.payload).trial.scenario,'U2');
 });
 
 test('pilot rejects measured gates and custom schedules',()=>{

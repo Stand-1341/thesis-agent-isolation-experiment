@@ -1,5 +1,39 @@
 # Deployment preflight report — 2026-11-03
 
+## Latest live snapshot — 2026-11-03 17:27 UTC
+
+All six Key Vault secrets are present. Research and collector admin credentials
+now pass read-only authentication checks. The Functions P1 controller and
+function keys were subsequently exercised by the live route: L2 returned HTTP
+201 and its verifier read a matching Azure Storage `PutBlob` audit row for the
+configured P1 principal and run ID. The non-counted U6 and U8 rows are correctly
+marked `not_applicable` on Functions because those scenarios require sessions.
+
+The first Functions HTTP adapter omitted Azure Blob fixture preparation. L1
+therefore reached Storage and returned `BlobNotFound`; it is already claimed
+and was not repeated. The live dependency factory now wraps HTTP routes with
+the run-scoped Azure fixture adapter, which prepares the Blob objects before
+execution. The rebuilt controller image
+`thesis-controller-pilot:functions-p1-kv-launcher-20261103-v5` was pushed to
+ACR with digest
+`sha256:3663f981bd5edadbfd19275e09f8d07081efe56395e4941be7d0980eabb73a2f`.
+The updated local suite passes **204/204** tests.
+
+With fixture preparation in place, the previously unclaimed L2 row completed
+as `legitimate_completion` in non-counted pilot mode. Its persisted record
+contains the expected `authorized-records` value and a matching 201 audit row.
+No measured study trial has run.
+
+The Functions P1 pilot is still incomplete. U1 and U2 were indeterminate at
+reset before the admin credentials were corrected; U3 and U4 were indeterminate
+at execution before the function key was corrected; U5 was indeterminate at
+execution before the controller key was corrected. Their claims and evidence
+remain preserved and those rows were not replayed. U7 is still indeterminate:
+the Function call timed out and collector verification failed. The run covering
+U8/L1/L2 stopped at L1; after fixing fixture preparation, only L2 (the remaining
+unclaimed row) was run. No container is currently running. These partial pilot
+results do not pass the pilot acceptance gates or establish study readiness.
+
 ## Latest live snapshot — 2026-11-03 15:51 UTC
 
 All six expected Key Vault secret names exist. The second one-row smoke exited

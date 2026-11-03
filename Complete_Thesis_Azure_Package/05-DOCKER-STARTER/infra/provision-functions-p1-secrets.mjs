@@ -60,10 +60,12 @@ function validCredential(value) {
 }
 
 export async function provisionPilotSecrets({vaultName=process.env.THESIS_KEYVAULT_NAME||DEFAULT_VAULT,
-  token=getAzureKeyVaultToken(),fetchImpl=globalThis.fetch,readSecret=readHidden}={}) {
+  token=getAzureKeyVaultToken(),fetchImpl=globalThis.fetch,readSecret=readHidden,replaceNames=[]}={}) {
   if(!/^[a-zA-Z0-9-]{3,24}$/.test(vaultName)) throw safeError('invalid Key Vault name');
   if(typeof token!=='string' || !token) throw safeError('Key Vault token is required');
   if(typeof fetchImpl!=='function') throw safeError('fetch implementation is required');
+  if(!Array.isArray(replaceNames) || replaceNames.some(name=>!SECRET_SOURCES.some(([known])=>known===name)))
+    throw safeError('unknown secret name requested for replacement');
   const saved=[],alreadyValid=[];
   for(const [name,source] of SECRET_SOURCES) {
     const url=`https://${vaultName}.vault.azure.net/secrets/${encodeURIComponent(name)}?api-version=7.4`;
@@ -73,9 +75,13 @@ export async function provisionPilotSecrets({vaultName=process.env.THESIS_KEYVAU
         headers:{authorization:`Bearer ${token}`}});
     } catch { throw safeError(`could not check ${name}; no secret value was displayed`); }
     if(current.ok) {
-      let body;
-      try { body=await current.json(); } catch { throw safeError(`could not validate ${name}; no secret value was displayed`); }
-      if(validCredential(body?.value)) { alreadyValid.push(name); continue; }
+      if(replaceNames.includes(name)) {
+        // A forced replacement still expects the existing Key Vault GET to return 200.
+      } else {
+        let body;
+        try { body=await current.json(); } catch { throw safeError(`could not validate ${name}; no secret value was displayed`); }
+        if(validCredential(body?.value)) { alreadyValid.push(name); continue; }
+      }
     } else if(current.status!==404) {
       throw safeError(`could not check ${name} (HTTP ${current.status}); no secret value was displayed`);
     }
@@ -97,7 +103,12 @@ export async function provisionPilotSecrets({vaultName=process.env.THESIS_KEYVAU
 
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
-    const {saved,alreadyValid}=await provisionPilotSecrets();
+    const args=process.argv.slice(2),replaceNames=[];
+    for(let i=0;i<args.length;i++) {
+      if(args[i]!=='--replace' || !args[i+1]) throw safeError('usage: node infra/provision-functions-p1-secrets.mjs [--replace <secret-name>]');
+      replaceNames.push(args[++i]);
+    }
+    const {saved,alreadyValid}=await provisionPilotSecrets({replaceNames});
     for(const name of alreadyValid) process.stdout.write(`Already valid: ${name}\n`);
     for(const name of saved) process.stdout.write(`Saved secret: ${name}\n`);
     process.stdout.write('All six pilot secrets are valid; no values were displayed.\n');

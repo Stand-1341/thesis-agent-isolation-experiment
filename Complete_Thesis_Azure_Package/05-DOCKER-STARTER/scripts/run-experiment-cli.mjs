@@ -35,6 +35,7 @@ const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
   --pilot                run the separate frozen 80-row non-counted pilot schedule
   --pilot-evidence <dir> isolated evidence directory for --pilot (default: results/non-counted-pilot)
   --limit <n>            limit a run to an initial subset (with --pilot this is non-counted)
+  --offset <n>           skip the first n rows after route filters (useful to avoid a prior claim)
   --deployment <name>    restrict to one deployment
   --profile <P1|P2|P3>   restrict to one profile
   --gates <v,v,v,v>      the four measured-study readiness gates, in the order
@@ -72,6 +73,11 @@ function parseArgs(argv) {
         const raw=value();
         if(!/^\d+$/.test(raw) || Number(raw)<1) throw new Error('--limit must be a positive integer');
         options.limit=Number(raw); break;
+      }
+      case '--offset': {
+        const raw=value();
+        if(!/^\d+$/.test(raw)) throw new Error('--offset must be a non-negative integer');
+        options.offset=Number(raw); break;
       }
       case '--deployment': options.deployment=value(); break;
       case '--profile': options.profile=value(); break;
@@ -137,7 +143,8 @@ function selectRows(rows,options) {
   let selected=rows;
   if(options.deployment) selected=selected.filter(row=>row.deployment===options.deployment);
   if(options.profile) selected=selected.filter(row=>row.permission_profile===options.profile);
-  if(options.limit) selected=selected.slice(0,options.limit);
+  const start=options.offset??0;
+  selected=selected.slice(start,options.limit===undefined?undefined:start+options.limit);
   return selected;
 }
 

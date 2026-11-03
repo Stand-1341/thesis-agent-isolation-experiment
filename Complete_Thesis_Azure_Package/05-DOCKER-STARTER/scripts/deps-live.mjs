@@ -244,8 +244,26 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
     };
   }
 
+  // HTTP workloads also exercise Azure Blob scenarios. Seed each run-scoped
+  // fixture before execution; resetting only the research/collector APIs leaves
+  // authorized-docs and authorized-records missing (BlobNotFound). The controller
+  // identity seeds pilot fixtures; study readiness still depends on separately
+  // validated audit and evidence controls.
+  const httpFactory=(route,deployment)=>{
+    const base=createHttpPilotAdapter({agentUrl:route.agentUrl ?? deployment.agentUrl,
+      resourceUrl:deployment.resourceUrl,collectorUrl:deployment.collectorUrl,
+      resourceAdminToken:route.credentials.resourceAdmin,collectorAdminToken:route.credentials.collectorAdmin,
+      controllerToken:route.credentials.controller,
+      ...(route.credentials.functionKey===undefined?{}:{functionKey:route.credentials.functionKey}),
+      ...(deployment.timeoutMs===undefined?{}:{timeoutMs:deployment.timeoutMs})});
+    return createAzureFixtureAdapter({base,blobEndpoint:fixtureBlobEndpoint,
+      getControllerToken:getStorageToken,getVerifierToken:getStorageToken,
+      timeoutMs:deployment.timeoutMs??15000});
+  };
+
   if(missing.size) throw new Error(`missing live dependency environment: ${[...missing].sort().join(', ')}`);
 
   return {denialReader,blobVerifier,collectorVerifier,resourceVerifier,
+    httpFactory,
     ...(sessionFactory?{sessionFactory}:{}),laneFor:createLaneSelector(config),notes};
 }

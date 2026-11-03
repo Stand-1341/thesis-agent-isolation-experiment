@@ -76,6 +76,10 @@ export function buildPilotArgs(extraArgs=[]) {
       const count=Number(args[i+1]);
       if(!Number.isInteger(count)||count<1||count>10) throw safeError('--limit must be between 1 and 10');
       i++;
+    } else if(args[i]==='--offset') {
+      const offset=Number(args[i+1]);
+      if(!Number.isInteger(offset)||offset<0||offset>9) throw safeError('--offset must be between 0 and 9');
+      i++;
     } else throw safeError(`unsupported pilot launcher option: ${args[i]}`);
   }
   return ['scripts/run-experiment-cli.mjs','--config','config/experiment.pilot.functions-p1.example.json',

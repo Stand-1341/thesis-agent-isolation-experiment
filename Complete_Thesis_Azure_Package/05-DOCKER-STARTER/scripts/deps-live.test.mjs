@@ -36,6 +36,12 @@ test('unverified live verifiers are constructible only in explicitly non-counted
   assert.equal(typeof pilot.blobVerifier,'function');
   assert.equal(typeof pilot.collectorVerifier,'function');
   assert.equal(typeof pilot.resourceVerifier,'function');
+  assert.equal(typeof pilot.httpFactory,'function');
+  const functionsRoute=resolved.routes.find(route=>route.deployment==='azure_functions_flex'&&route.profile==='P1');
+  const functionsAdapter=pilot.httpFactory(functionsRoute,resolved.deployments.azure_functions_flex);
+  assert.equal(typeof functionsAdapter.reset,'function');
+  assert.equal(typeof functionsAdapter.execute,'function');
+  assert.equal(typeof functionsAdapter.collect,'function');
   const session=pilot.sessionFactory(resolved.routes.find(route=>route.deployment==='azure_custom_sessions_hyperv'&&route.profile==='P1'));
   assert.equal(typeof session.reset,'function');
   assert.equal(typeof session.execute,'function');
