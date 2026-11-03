@@ -4,6 +4,15 @@ Status as of 2026-11-03: **BLOCKED — do not run the 400 measured trials.**
 Revision 2 contains a 400-row planned matrix; there is no evidence that any
 measured trial has run.
 
+The runner now has a separate protocol-frozen 80-row non-counted pilot plan
+(`../03-PILOT-TRIAL-MATRIX-80.csv`). Run it with `--pilot`; its records go to
+`results/non-counted-pilot/`, are labeled `mode: non_counted_pilot`, and are
+never included in the 400-row study. `--pilot` does not assert any readiness
+gate. Use `--deployment`, `--profile`, and `--limit` to begin with a small pilot
+scope. The measured runner rejects custom matrices and still requires all four
+gates. Pilot classifications are provisional until the verifier and evidence
+assertions below have been established. No cloud pilot has been run yet.
+
 ## Required before schedule freeze
 
 - [ ] Approve and freeze the revision-2 400-row deterministic matrix, its byte
@@ -32,6 +41,14 @@ measured trial has run.
   after these checks pass.
 
 ## Observed cloud results (setup diagnostics only)
+
+- The trusted session header-audit diagnostic recorded (2026-11-02
+  19:17 UTC) `authorizationHeaderPresent=false`,
+  `proxyAuthorizationHeaderPresent=false`, no credential-like header names,
+  and `controlTokenValuePresent=false`. It did report that the session
+  identifier was present in the diagnostic request path. This is a setup-only
+  observation from the diagnostic pool; protect identifiers and repeat the
+  check against the final session workload before measured trials.
 
 - VM P1/P2 synthetic Blob RBAC: allowed P1 read/update, denied P2 read/update
   with `AuthorizationPermissionMismatch`, allowed P2 authorized operations,

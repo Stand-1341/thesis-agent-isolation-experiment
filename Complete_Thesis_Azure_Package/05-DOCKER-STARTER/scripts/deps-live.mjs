@@ -31,6 +31,7 @@ import {createSessionLifecycleObserver} from './session-lifecycle-observer.mjs';
 import {createSessionFixturePreparer} from './session-fixture-preparer.mjs';
 import {createAzureFixtureAdapter} from './azure-fixture-adapter.mjs';
 import {createSessionPilotAdapter} from './session-pilot-adapter.mjs';
+import {createHttpPilotAdapter} from './http-pilot-adapter.mjs';
 import {createLaneSelector} from './build-experiment.mjs';
 
 const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -55,8 +56,10 @@ function ip(env,missing,name,{optional=false}={}) {
  * @param overrides  optional per-deployment telemetry, e.g.
  *                {azure_vm:{sourceIp,destinationIp}, azure_functions_flex:{sourceIp}}
  */
-export default function createLiveDeps({config,env=process.env,overrides={}}={}) {
+export default function createLiveDeps({config,env=process.env,overrides={},mode='measured'}={}) {
   if(!config || !config.deployments) throw new Error('createLiveDeps requires the validated experiment config');
+  if(!['measured','non_counted_pilot'].includes(mode)) throw new Error('invalid live dependency mode');
+  const pilotMode=mode==='non_counted_pilot';
   const missing=new Set();
   const notes=[];
 
@@ -106,10 +109,9 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
     }
   });
 
-  // The verifier constructors below refuse to run unless their pilot gates are
-  // asserted. Collect them here so the operator sees the whole list, and say
-  // plainly what they are: results of a pilot, not switches to flip when a run is
-  // wanted.
+  // Measured mode requires the verifier assertions. Non-counted pilot mode can
+  // run the candidate verifiers while labeling all records provisional; it never
+  // turns an unverified assertion into a readiness gate.
   const ASSERTIONS={
     THESIS_COLLECTOR_INDEPENDENTLY_VALIDATED:'independent collector evidence established',
     THESIS_RESOURCE_INDEPENDENTLY_VALIDATED:'independent resource evidence established',
@@ -120,9 +122,10 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
     THESIS_SESSION_HEADER_ISOLATION_VERIFIED:'session proxy proven to strip privileged headers'
   };
   const unasserted=Object.entries(ASSERTIONS).filter(([name])=>!flag(env,name)).map(([name,what])=>`${name} (${what})`);
-  if(unasserted.length) throw new Error(
+  if(unasserted.length && !pilotMode) throw new Error(
     `verifier pilot gates have not been established:\n${unasserted.map(item=>`  ${item}`).join('\n')}\n`+
     'Each of these is the outcome of a pilot check, not a configuration switch. Set one to true only after that check actually passed.');
+  if(unasserted.length) notes.push(`NON-COUNTED PILOT: unestablished verifier assertions: ${unasserted.join('; ')}`);
 
   // ---- resource and collector verdicts -----------------------------------
   const deploymentOf=trial=>config.deployments[trial?.deployment];
@@ -135,12 +138,12 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
     readCollector:async trial=>createCollectorEvidenceReader({collectorUrl:deploymentOf(trial)?.collectorUrl,
       verifierKey:verifierKeyFor(trial)})(trial),
     collectorIndependentlyValidated:flag(env,'THESIS_COLLECTOR_INDEPENDENTLY_VALIDATED'),
-    clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED')});
+    clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED'),pilotMode});
   const resourceVerifier=createResourceVerifier({
     readResource:async trial=>createResourceEvidenceReader({resourceUrl:deploymentOf(trial)?.resourceUrl,
       verifierKey:verifierKeyFor(trial)})(trial),
     resourceIndependentlyValidated:flag(env,'THESIS_RESOURCE_INDEPENDENTLY_VALIDATED'),
-    clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED')});
+    clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED'),pilotMode});
 
   // ---- Blob-backed scenarios ---------------------------------------------
   const blobDeployment=config.deployments.azure_vm;
@@ -160,6 +163,7 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
     authorizationValidated:flag(env,'THESIS_AUTHORIZATION_VALIDATED'),
     clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED'),
     denialStatusTextValidated:flag(env,'THESIS_DENIAL_STATUS_TEXT_VALIDATED'),
+    pilotMode,
     auditWaitMs:Number(env.THESIS_AUDIT_WAIT_MS??3600000),
     pollIntervalMs:Number(env.THESIS_AUDIT_POLL_MS??10000)});
 
@@ -172,31 +176,40 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
       return route.credentials.controller;
     };
     const registryContainerUrl=reader(env,missing,'THESIS_SESSION_REGISTRY_URL')??sessionDeployment.sessionRegistryUrl;
-    const storageContainerUrl=reader(env,missing,'THESIS_BLOB_FIXTURE_CONTAINER_URL');
     const sessionRegistry=createAzureSessionRegistry({containerUrl:registryContainerUrl,getToken:getStorageToken,timeoutMs:15000});
     const lifecycleObserver=createSessionLifecycleObserver({managementEndpoint:sessionDeployment.managementEndpoint,
       poolName:sessionDeployment.poolName,region:sessionDeployment.region,getAccessToken:getSessionToken,
       expectedPrincipalId:reader(env,missing,'THESIS_SESSION_CONTROL_PRINCIPAL_ID'),sessionRegistry,timeoutMs:30000});
-    const fixturePreparer=createSessionFixturePreparer({
-      managementEndpoint:sessionDeployment.managementEndpoint,poolName:sessionDeployment.poolName,
-      region:sessionDeployment.region,blobEndpoint:sessionDeployment.fixtureBlobEndpoint,
-      blobResourceId:env.THESIS_BLOB_RESOURCE_ID,
-      controllerToken:'unused-placeholder-not-a-secret',getControlToken:getSessionToken,
-      controlPrincipalId:env.THESIS_SESSION_CONTROL_PRINCIPAL_ID,
-      getOwnerToken:getSessionToken,ownerPrincipalId:env.THESIS_SESSION_FIXTURE_OWNER_PRINCIPAL_ID,
-      sessionRegistry,lifecycleObserver,
-      readAudit:createStorageAuditReader({workspaceId,getToken:getStorageToken})});
-    const fixtureAdapter=createAzureFixtureAdapter({base:sessionDeployment.fixtureBlobEndpoint,
-      blobEndpoint:sessionDeployment.fixtureBlobEndpoint,getControllerToken:getStorageToken,
-      getVerifierToken:getStorageToken,prepareSessionFixture:fixturePreparer,observeSessionFixture:async()=>({})});
-    sessionFactory=route=>createSessionPilotAdapter({
-      fixtureAdapter,managementEndpoint:sessionDeployment.managementEndpoint,poolName:sessionDeployment.poolName,
-      region:sessionDeployment.region,getAccessToken:getSessionToken,
-      expectedControllerPrincipalId:env.THESIS_SESSION_CONTROL_PRINCIPAL_ID,
-      controllerToken:controllerTokenFor(route),sessionRegistry,lifecycleObserver,
-      // This one must be established by a pilot, not assumed: it decides whether a
-      // privileged token is forwarded into the workload.
-      headerIsolationVerified:flag(env,'THESIS_SESSION_HEADER_ISOLATION_VERIFIED'),timeoutMs:30000});
+    sessionFactory=route=>{
+      const controllerToken=controllerTokenFor(route);
+      // Session workloads still share the research fixture service, but their
+      // reset/evidence credentials are route-scoped just like the HTTP arms.
+      const base=createHttpPilotAdapter({agentUrl:sessionDeployment.managementEndpoint,
+        resourceUrl:sessionDeployment.resourceUrl,collectorUrl:sessionDeployment.collectorUrl,
+        resourceAdminToken:route.credentials.resourceAdmin,collectorAdminToken:route.credentials.collectorAdmin,
+        controllerToken,timeoutMs:sessionDeployment.timeoutMs??30000});
+      const fixturePreparer=createSessionFixturePreparer({
+        managementEndpoint:sessionDeployment.managementEndpoint,poolName:sessionDeployment.poolName,
+        region:sessionDeployment.region,blobEndpoint:sessionDeployment.fixtureBlobEndpoint,
+        blobResourceId:env.THESIS_BLOB_RESOURCE_ID,
+        controllerToken,getControlToken:getSessionToken,
+        controlPrincipalId:env.THESIS_SESSION_CONTROL_PRINCIPAL_ID,
+        getOwnerToken:getSessionToken,ownerPrincipalId:env.THESIS_SESSION_FIXTURE_OWNER_PRINCIPAL_ID,
+        sessionRegistry,lifecycleObserver,
+        readAudit:createStorageAuditReader({workspaceId,getToken:getStorageToken})});
+      const fixtureAdapter=createAzureFixtureAdapter({base,
+        blobEndpoint:sessionDeployment.fixtureBlobEndpoint,getControllerToken:getStorageToken,
+        getVerifierToken:getStorageToken,prepareSessionFixture:fixturePreparer,
+        observeSessionFixture:fixtureRunId=>lifecycleObserver.observe(fixtureRunId)});
+      return createSessionPilotAdapter({
+        fixtureAdapter,managementEndpoint:sessionDeployment.managementEndpoint,poolName:sessionDeployment.poolName,
+        region:sessionDeployment.region,getAccessToken:getSessionToken,
+        expectedControllerPrincipalId:env.THESIS_SESSION_CONTROL_PRINCIPAL_ID,
+        controllerToken,sessionRegistry,lifecycleObserver,
+        // This one must be established by a pilot, not assumed: it decides whether a
+        // privileged token is forwarded into the workload.
+        headerIsolationVerified:flag(env,'THESIS_SESSION_HEADER_ISOLATION_VERIFIED'),timeoutMs:sessionDeployment.timeoutMs??30000});
+    };
   }
 
   if(missing.size) throw new Error(`missing live dependency environment: ${[...missing].sort().join(', ')}`);

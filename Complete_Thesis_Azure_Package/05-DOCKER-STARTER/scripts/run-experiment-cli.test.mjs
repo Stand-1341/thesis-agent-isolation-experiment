@@ -78,6 +78,35 @@ test('a measured run without all four gates exits 3 and executes nothing',async(
   assert.match(err,/deploymentValidated: false/);
 });
 
+test('the separate frozen pilot runs without measured gates and writes only non-counted evidence',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'cli-pilot-'));
+  const deps=join(dir,'deps.mjs');
+  await writeFile(deps,`const ok=async trial=>({classification:String(trial.scenario).startsWith('L')?'legitimate_completion':'unauthorized_success'});
+const httpFactory=()=>({reset:async()=>({u5Marker:'SYNTHETIC-marker'}),execute:async trial=>({runId:trial.runId,scenario:trial.scenario,status:200}),collect:async()=>({resource:{events:[]},collector:{}})});
+export default {denialReader:Object.assign(async()=>({verdict:'observed_allow',evidence:{}}),{capabilities:{azure_vm:true,azure_functions_flex:true}}),blobVerifier:ok,collectorVerifier:ok,resourceVerifier:ok,sessionFactory:httpFactory,httpFactory};\n`);
+  const pilotEvidence=join(dir,'pilot-evidence');
+  const out=run(['--config',EXAMPLE,'--deps',deps,'--pilot','--deployment','azure_vm','--profile','P1','--limit','1',
+    '--pilot-evidence',pilotEvidence,'--json'],credentialEnv());
+  const summary=out.out.includes('{')?JSON.parse(out.out.slice(out.out.indexOf('{'))):null;
+  assert.ok(summary,`expected a JSON summary, exit ${out.code}:\n${out.out}\n${out.err}`);
+  assert.equal(out.code,0,out.err);
+  assert.equal(summary.mode,'non_counted_pilot');
+  assert.equal(summary.studyCounted,false);
+  assert.equal(summary.executed,1);
+  assert.equal(summary.matrixComplete,false);
+  assert.equal(summary.pilotScheduleComplete,false);
+  assert.deepEqual(Object.values(summary.gates),[false,false,false,false]);
+  const envelope=JSON.parse(readFileSync(join(pilotEvidence,'pilot-azure_vm-P1-U1.json'),'utf8'));
+  const evidence=JSON.parse(envelope.payload);
+  assert.equal(evidence.mode,'non_counted_pilot');
+  assert.equal(evidence.trial.planSha256,summary.matrixSha256);
+});
+
+test('pilot rejects measured gates and custom schedules',()=>{
+  assert.equal(run(['--config',EXAMPLE,'--pilot','--gates','protocolFrozen']).code,5);
+  assert.equal(run(['--config',EXAMPLE,'--matrix','unreviewed.csv']).code,5);
+});
+
 test('a dry run remains structural and never reports deployment readiness',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'cli-'));
   const deps=join(dir,'deps.mjs');

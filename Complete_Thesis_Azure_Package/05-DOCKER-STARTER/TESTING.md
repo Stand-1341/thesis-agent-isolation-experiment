@@ -30,6 +30,11 @@ not a trial runner and its checks are never counted in the planned matrix.
 
 ## Local source checks
 
+The non-counted pilot runner can exercise a selected route without setting the
+measured-study readiness gates. It uses a separate frozen schedule and evidence
+directory. Its records are provisional, cannot count as study outcomes, and
+must not be used to assert a gate without review.
+
 - Node.js `node --test scripts/*.test.mjs` (also `npm test`): see the latest verification entry below.
   This includes synthetic Azure-audit/session checks; these are not Azure end-to-end
   results. The suite is hermetic: it reads the frozen matrix from git, not from a
@@ -92,7 +97,9 @@ pool, storage, registry, and logging resources can continue to incur charges.
 
 ## Latest verification — 2026-11-03
 
-- Full local verification: **183 tests passed, 0 failed**.
+- Full local verification: **188 tests passed, 0 failed**. New checks cover
+  the separate frozen non-counted pilot schedule, pilot record labels, and
+  rejection of custom schedules or measured gates in pilot mode.
 - `infra/functions-route.bicep`, `infra/vm-route.bicep`,
   `infra/functions-p3-egress-candidate.bicep`, and
   `infra/research-host-pilot.bicep` compile.
@@ -106,4 +113,26 @@ pool, storage, registry, and logging resources can continue to incur charges.
 - Overall deployment readiness remains **blocked**. There is no real
   `config/experiment.json`, no validated per-route app/VM deployment matrix,
   no complete independent P3 denial evidence, and no full pilot or measured
-  trial. Current Azure credit/spend could not be refreshed during this check.
+  trial. No Azure trial process is running.
+
+## Current Azure credit and standing resources — 2026-11-03
+
+- Azure's billing credit-balance API currently reports **$200 USD** as both
+  current and estimated remaining credit. This is separate from the
+  `thesis-experiment-budget` alert, which reports **$16.60 tracked spend against
+  a $125 alert budget** for 2026-11-01 through 2028-10-31. Usage-detail charges
+  are lagging, so their current resource-by-resource allocation is unavailable.
+- The deployed East US Azure Firewall Basic has a public retail base rate of
+  **$0.395 per hour (~$9.48 per day), plus traffic processing**; the offer can
+  change the billed rate. See [Azure Firewall pricing](https://azure.microsoft.com/en-us/pricing/details/azure-firewall/).
+- The custom-container session pool reports **one node and one ready session**.
+  Azure documents those pools as dedicated-compute billed. A zero-ready update
+  was attempted but the pool still reports one ready session; the service
+  requires at least one ready session for this pool shape. See
+  [Container Apps billing](https://learn.microsoft.com/en-us/azure/container-apps/billing).
+- The separate header-audit job recorded one setup-only observation:
+  `Authorization` and `Proxy-Authorization` were absent in the session,
+  `credentialLikeHeaderNames` was empty, and the control-token value was not
+  present. The session identifier was visible to the diagnostic container, so
+  it remains restricted and is never written to ordinary trial evidence. This
+  result is diagnostic-pool evidence, not a full route or trial result.

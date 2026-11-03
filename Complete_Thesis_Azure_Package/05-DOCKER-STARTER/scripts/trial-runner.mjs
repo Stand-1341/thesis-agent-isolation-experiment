@@ -8,12 +8,14 @@ const requiredGates = ['protocolFrozen', 'deploymentValidated', 'isolationValida
 const validOutcomes = new Set(['unauthorized_success', 'confirmed_resource_denial', 'confirmed_network_denial', 'legitimate_completion', 'legitimate_failed', 'agent_no_attempt', 'indeterminate', 'not_applicable']);
 const safeErrorType=error=>['Error','TypeError','RangeError','AbortError','TimeoutError','SyntaxError','AggregateError'].includes(error?.name)?error.name:'Error';
 
-export async function runTrial({trial, gates, adapter, verifier, evidenceDirectory, evidenceStore, arm='deterministic'}) {
+export async function runTrial({trial, gates, adapter, verifier, evidenceDirectory, evidenceStore, arm='deterministic', mode='measured'}) {
   if(!['deterministic','gpt5mini_live'].includes(arm)) throw new Error('invalid experiment arm');
+  if(!['measured','non_counted_pilot'].includes(mode)) throw new Error('invalid run mode');
   if (!trial || !/^[A-Za-z0-9_-]{1,150}$/.test(trial.runId || '')) throw new Error('invalid run ID');
   if((arm==='gpt5mini_live' && !trial.runId.startsWith('live-')) || (arm==='deterministic' && trial.runId.startsWith('live-'))) throw new Error('run ID does not belong to the selected experiment arm');
+  if((mode==='non_counted_pilot' && !trial.runId.startsWith('pilot-')) || (mode==='measured' && trial.runId.startsWith('pilot-'))) throw new Error('run ID does not belong to the selected run mode');
   if (!/^(U[1-8]|L[12])$/.test(trial.scenario || '')) throw new Error('invalid scenario');
-  if (!requiredGates.every(gate => gates?.[gate] === true)) throw new Error('trial readiness gates have not all passed');
+  if (mode==='measured' && !requiredGates.every(gate => gates?.[gate] === true)) throw new Error('trial readiness gates have not all passed');
   if (!adapter || !['reset','execute','collect'].every(name => typeof adapter[name] === 'function') || typeof verifier !== 'function') {
     throw new Error('trial adapters and verifier are required');
   }
@@ -72,7 +74,7 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
       const expected=trial.scenario.startsWith('U')?'agent_no_attempt':'legitimate_failed';
       if(classification!==expected) throw new Error('no-tool model behavior must remain separate from infrastructure prevention');
     }
-    record = {runId:trial.runId, arm, trial, startedAt, executionStartedAt, executionFinishedAt, executionElapsedMs, finishedAt:new Date().toISOString(), classification, reset, output, evidence, ...(verificationEvidence === undefined ? {} : {verificationEvidence})};
+    record = {runId:trial.runId, arm, mode, trial, startedAt, executionStartedAt, executionFinishedAt, executionElapsedMs, finishedAt:new Date().toISOString(), classification, reset, output, evidence, ...(verificationEvidence === undefined ? {} : {verificationEvidence})};
     stage = 'save';
     await store.save(record);
   } catch (error) {
@@ -87,7 +89,7 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
     if (stage !== 'save') await store.save({runId:trial.runId, trial, startedAt,
       executionStartedAt,executionFinishedAt,executionElapsedMs,finishedAt:new Date().toISOString(), classification:'indeterminate', failedStage:stage,
       errorType:safeErrorType(error), reset, output, ...(partialReset?{partialResetEvidence:partialReset}:{}), ...(azureFixtureProgress?{azureFixtureProgress}:{}),
-      ...(error?.partial===undefined?{}:{partialModelEvidence:error.partial}), evidence, verificationEvidence, arm});
+      ...(error?.partial===undefined?{}:{partialModelEvidence:error.partial}), evidence, verificationEvidence, arm, mode});
     throw error;
   }
   // Preserve the measured record first. An indeterminate trial is left intact
@@ -101,12 +103,12 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
         name:/^[a-z_]{1,40}$/.test(item?.name || '')?item.name:'unknown',
         status:['completed','failed'].includes(item?.status)?item.status:'unknown',
         errorType:item?.status==='failed'?safeErrorType({name:item?.errorType}):undefined})):undefined;
-      try {await store.save({runId:cleanupId,scope:'post_trial_cleanup',sourceRunId:trial.runId,status:'failed',
+      try {await store.save({runId:cleanupId,scope:'post_trial_cleanup',sourceRunId:trial.runId,mode,status:'failed',
         errorType:safeErrorType(error),details});}
       catch {throw new Error('post-trial cleanup and cleanup evidence both failed');}
       throw new Error('post-trial cleanup failed');
     }
-    if(outcome!==undefined) await store.save({runId:cleanupId,scope:'post_trial_cleanup',sourceRunId:trial.runId,status:'completed',outcome});
+    if(outcome!==undefined) await store.save({runId:cleanupId,scope:'post_trial_cleanup',sourceRunId:trial.runId,mode,status:'completed',outcome});
   }
   return record;
 }

@@ -22,6 +22,7 @@ function config(){
       azure_vm:{kind:'http',agentUrl:'https://vm.example',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
       azure_functions_flex:{kind:'http',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
       azure_custom_sessions_hyperv:{kind:'session',managementEndpoint:'https://thesissessionpool.envabc123.eastus.azurecontainerapps.io',
+        resourceUrl:'https://res.example',collectorUrl:'https://col.example',
         poolName:'thesissessionpool',region:'eastus',sessionRegistryUrl:'https://reg.blob.core.windows.net/m',
         fixtureBlobEndpoint:'https://fx.blob.core.windows.net'}},
     routes});

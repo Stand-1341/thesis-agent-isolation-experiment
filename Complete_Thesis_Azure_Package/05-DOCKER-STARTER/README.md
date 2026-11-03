@@ -1,6 +1,6 @@
 # Azure-only thesis: Docker-first compatibility starter
 
-**Status: starter / local simulation, not measured thesis results.** Based on Chapter 3 of *Which Cloud Deployment Architecture Best Contains Compromised AI Agents*. It deliberately contains no real credentials, target scanning, cloud attacks, or arbitrary shell execution. The baseline remains deterministic. A controller-side Azure GPT-5 mini Responses API client has now been added, but its tools and prompts are not integrated into the runner. It has been called only for setup checks: earlier entries in `EXPERIMENT-STATUS.md` record setup-only Responses calls returning READY. No measured trial has used it, which is the claim that matters here.
+**Status: deployment in progress / no measured thesis results.** Based on Chapter 3 of *Which Cloud Deployment Architecture Best Contains Compromised AI Agents*. It contains no real credentials, target scanning, cloud attacks, or arbitrary shell execution. The deterministic runner supports the frozen revision-2 study plan and a separate frozen 80-row non-counted cloud pilot. The Azure GPT-5 mini Responses API client remains a separate draft arm; setup-only calls succeeded, but no measured trial has used it.
 
 ## What you get
 
@@ -16,7 +16,7 @@ The legacy generator uses `TRIAL_PLAN_SEED` (default `azure-thesis-planning-v1`)
 
 `scripts/verify-local.mjs` checks only the starter's local mock evidence. It requires an operation-specific audit event for resource outcomes and leaves network failures indeterminate. It is not a cloud verifier or proof of P3 enforcement.
 
-`scripts/trial-runner.mjs` is an adapter-based orchestration prototype, not a deployable Azure runner. It requires explicit readiness gates and injected reset, execution, collection and verification functions. It claims each run ID before execution and saves partial observations on failure; a leftover claim requires reconciliation. Azure adapters, durable independent evidence and validated gates remain to be implemented. Gate booleans are caller assertions, not proof.
+`scripts/run-experiment-cli.mjs` is the entry point. The counted study uses only the schedule whose digest is declared in `config/protocol.json` and requires all four readiness gates. `--pilot` selects a different, protocol-frozen 80-row schedule, uses a separate evidence directory, and labels every record `non_counted_pilot`; measured gates remain false. Pilot evidence is provisional and does not prove any gate. Claims are exclusive and failures require manual reconciliation. Route deployment, independent evidence protection, and live Azure pilot validation remain incomplete.
 
 `scripts/azure-blob-evidence.mjs` is a candidate Azure Blob evidence adapter. It accepts a controller-supplied Entra token and uses conditional creation for claims and records. Selected Azure Blob role assignments and one separate audit read have been exercised, but this adapter's complete claim/record lifecycle, all effective permissions, and storage immutability have not. Conditional creation and checksums do not prevent a separately authorized principal from changing or deleting blobs.
 

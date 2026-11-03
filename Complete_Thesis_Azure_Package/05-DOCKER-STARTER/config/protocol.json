@@ -62,5 +62,14 @@
    "reason": "custom session pool exposes only a binary EgressEnabled/EgressDisabled. There is no configuration that denies one destination while allowing another, and no VNet, UDR or flow-log path for attributable denial evidence, so the P3 containment claim cannot be made on that deployment.",
    "cells": "azure_custom_sessions_hyperv x P3 x 10 scenarios x 5 repetitions"
   }
+ },
+ "pilotPlan": {
+  "file": "03-PILOT-TRIAL-MATRIX-80.csv",
+  "sha256": "a2c9d16c823bb89ce02992a96fe046bd2918eba9f2e7005fdcdd70ffaa5a9cca",
+  "trials": 80,
+  "repetitions": 1,
+  "countedAsStudyTrials": false,
+  "derivedFrom": "d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863",
+  "purpose": "non-counted live route and evidence pilot before the 400-trial deterministic study"
  }
 }

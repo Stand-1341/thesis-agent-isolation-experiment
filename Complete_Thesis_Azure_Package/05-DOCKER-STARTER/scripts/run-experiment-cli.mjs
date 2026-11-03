@@ -17,7 +17,7 @@
  */
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {resolve} from 'node:path';
+import {isAbsolute,relative,resolve,sep} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {loadExperimentConfigShape,missingCredentialVariables,resolveCredentials} from './experiment-config.mjs';
 import {buildRoutes,describeRoutes,createLaneSelector} from './build-experiment.mjs';
@@ -31,27 +31,26 @@ const EXIT={complete:0,partial:2,gates:3,config:4,usage:5};
 const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
 
   --config <file>        deployment configuration (no secrets; see experiment-config.mjs)
-  --matrix <file>        schedule to run (default ../03-PLANNED-TRIAL-MATRIX-400-REV2.csv,
-                         revision 2 of the frozen plan; rev 1 withdrew 50 cells)
   --evidence <dir>       evidence directory (default: config evidenceDirectory)
-  --limit <n>            stop after n trials, for a pilot run
+  --pilot                run the separate frozen 80-row non-counted pilot schedule
+  --pilot-evidence <dir> isolated evidence directory for --pilot (default: results/non-counted-pilot)
+  --limit <n>            limit a run to an initial subset (with --pilot this is non-counted)
   --deployment <name>    restrict to one deployment
   --profile <P1|P2|P3>   restrict to one profile
-  --gates <v,v,v,v>      the four readiness gates, in the order
+  --gates <v,v,v,v>      the four measured-study readiness gates, in the order
                          protocolFrozen,deploymentValidated,isolationValidated,verifierValidated
   --concurrency <n>      lanes to run at once (default 3, one per deployment).
                          Trials sharing a deployment share its fixture and always run
                          one-at-a-time inside that lane.
   --deps <file>          module default-exporting {blobVerifier, collectorVerifier,
                          resourceVerifier, denialReader, sessionFactory, httpFactory}
-  --allow-incomplete-verifier
-                         permit a pilot where some scenarios have no verifier
   --dry-run              structural config/matrix/scope report only; never proves readiness
   --json                 machine-readable summary on stdout
   --help
 
-A measured run is refused unless all four gates are asserted. The gates are
-operator assertions: this tool cannot verify them, and says so in the summary.`;
+A measured run is refused unless all four gates are asserted. A non-counted pilot
+uses a separately frozen schedule, its own evidence directory, and never asserts
+measured-study gates. The gates are operator assertions: this tool cannot verify them.`;
 
 function parseArgs(argv) {
   const options={dryRun:false,json:false};
@@ -61,12 +60,13 @@ function parseArgs(argv) {
     switch(arg) {
       case '--config': options.config=value(); break;
       case '--deps': options.deps=value(); break;
+      case '--pilot': options.pilot=true; break;
+      case '--pilot-evidence': options.pilotEvidence=value(); break;
       case '--concurrency': {
         const raw=value();
         if(!/^\d+$/.test(raw) || Number(raw)<1 || Number(raw)>32) throw new Error('--concurrency must be 1..32');
         options.concurrency=Number(raw); break;
       }
-      case '--matrix': options.matrix=value(); break;
       case '--evidence': options.evidence=value(); break;
       case '--limit': {
         const raw=value();
@@ -77,7 +77,6 @@ function parseArgs(argv) {
       case '--profile': options.profile=value(); break;
       case '--gates': options.gates=value().split(',').map(s=>s.trim()).filter(Boolean); break;
       case '--dry-run': options.dryRun=true; break;
-      case '--allow-incomplete-verifier': options.allowIncompleteVerifier=true; break;
       case '--json': options.json=true; break;
       case '--help': case '-h': options.help=true; break;
       default: throw new Error(`unknown option ${arg}`);
@@ -103,10 +102,11 @@ function gatesFrom(values) {
 const abilityUnknown=source=>source!=='deps.denialReader';
 
 /** The frozen digest, as declared by the protocol rather than derived from the file. */
-async function readDeclaredMatrix() {
+async function readDeclaredMatrix(pilot=false) {
   try {
     const text=await readFile(new URL('../config/protocol.json',import.meta.url),'utf8');
-    const matrix=JSON.parse(text).matrix;
+    const protocol=JSON.parse(text);
+    const matrix=pilot?protocol.pilotPlan:protocol.matrix;
     if(!matrix || typeof matrix.sha256!=='string' || !/^[0-9a-f]{64}$/.test(matrix.sha256)) return null;
     return matrix;
   } catch (error) { return null; }
@@ -122,7 +122,7 @@ async function resolveNetworkCapabilities(options,configShape) {
   try {
     const module=await import(pathToFileURL(resolve(options.deps)).href);
     const exported=module.default ?? module;
-    const deps=typeof exported==='function'?await exported({config:configShape,env:process.env}):exported;
+    const deps=typeof exported==='function'?await exported({config:configShape,env:process.env,mode:options.pilot?'non_counted_pilot':'measured'}):exported;
     const capabilities=deps?.denialReader?.capabilities;
     if(!capabilities || typeof capabilities!=='object')
       return {capabilities:{},source:'deps.denialReader advertises no capabilities'};
@@ -150,10 +150,15 @@ async function main(argv) {
   }
   if(options.help) { process.stdout.write(`${USAGE}\n`); return EXIT.complete; }
 
+  if(options.pilot && options.evidence) { process.stderr.write('--evidence cannot be used with --pilot; use --pilot-evidence to keep records separate\n'); return EXIT.usage; }
+  if(!options.pilot && options.pilotEvidence) { process.stderr.write('--pilot-evidence requires --pilot\n'); return EXIT.usage; }
+  if(options.pilot && options.gates?.length) { process.stderr.write('--pilot never accepts measured-study readiness gates\n'); return EXIT.usage; }
+
   const say=message=>{ if(!options.json) process.stdout.write(`${message}\n`); };
 
-  const defaultMatrix=fileURLToPath(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
-  const matrixPath=resolve(options.matrix ?? defaultMatrix);
+  const declared=await readDeclaredMatrix(options.pilot);
+  if(!declared) { process.stderr.write('protocol error: frozen schedule metadata is missing or invalid\n'); return EXIT.config; }
+  const matrixPath=resolve(fileURLToPath(new URL(`../../${declared.file}`,import.meta.url)));
   let matrix,rows;
   try {
     matrix=await readFile(matrixPath);
@@ -179,21 +184,19 @@ async function main(argv) {
   const scope=analyzeTrialScope(selected,{networkCapabilities});
   const missingCredentials=missingCredentialVariables(configShape,process.env,routeKeys);
   const matrixSha256=createHash('sha256').update(matrix).digest('hex');
-  // The digest has to be checked against a declared value, not computed from the same
-  // bytes it is meant to authenticate. Without this the freeze proved only that the
-  // file matched itself, so an edited matrix would verify happily.
-  const declared=await readDeclaredMatrix();
-  if(!options.matrix && declared) {
-    if(declared.sha256!==matrixSha256) {
-      process.stderr.write(`matrix digest mismatch for ${declared.file}\n  declared ${declared.sha256}\n  actual   ${matrixSha256}\n`+
-        'The default schedule must match config/protocol.json. Use --matrix only for a deliberate pilot.\n');
-      return EXIT.config;
-    }
+  // Always compare to protocol metadata; a caller-supplied schedule can never
+  // turn an unreviewed subset into measured data.
+  if(declared.sha256!==matrixSha256) {
+    process.stderr.write(`matrix digest mismatch for ${declared.file}\n  declared ${declared.sha256}\n  actual   ${matrixSha256}\n`);
+    return EXIT.config;
+  }
+  if(options.pilot && (declared.countedAsStudyTrials!==false || declared.trials!==rows.length)) {
+    process.stderr.write('pilot schedule metadata must explicitly mark every row non-counted and match its row count\n'); return EXIT.config;
   }
 
   if(options.dryRun) {
     const routes=describeRoutes(configShape,{routeKeys});
-    const report={dryRun:true,readiness:'structural_only_not_ready',matrixSha256,plannedMatrixRows:rows.length,
+    const report={dryRun:true,mode:options.pilot?'non_counted_pilot':'measured',studyCounted:!options.pilot,readiness:'structural_only_not_ready',matrixSha256,plannedMatrixRows:rows.length,
       selectedRows:selected.length,measurableRows:scope.measurable,notApplicableRows:scope.notApplicable,
       unsupportedRows:scope.unsupported,unsupportedByRoute:scope.unsupportedByRoute,
       networkCapabilitySource:capabilitySource,
@@ -202,7 +205,7 @@ async function main(argv) {
       note:'Structural preflight only. Adapter/verifier dependencies, Azure gates, reachability, isolation, and telemetry are not verified.'};
     if(options.json) process.stdout.write(`${JSON.stringify(report,null,2)}\n`);
     else {
-      say(`Structural preflight only: ${rows.length} planned trials, ${selected.length} selected; no trials executed.`);
+      say(`Structural preflight only (${report.mode}): ${rows.length} planned trials, ${selected.length} selected; no trials executed.`);
       say(`matrix hash ${report.matrixSha256}`);
       say(`Scope: ${scope.measurable} measurable, ${scope.notApplicable} not applicable, ${scope.unsupported} unsupported.`);
       for(const [route,count] of Object.entries(scope.unsupportedByRoute)) say(`BLOCKER ${route}: ${count} unsupported rows`);
@@ -226,7 +229,7 @@ async function main(argv) {
     try {
       const module=await import(pathToFileURL(resolve(options.deps)).href);
       const exported=module.default ?? module;
-      deps=typeof exported==='function'?await exported({config,env:process.env}):exported;
+      deps=typeof exported==='function'?await exported({config,env:process.env,mode:options.pilot?'non_counted_pilot':'measured'}):exported;
       if(!deps || typeof deps!=='object') throw new Error('deps module must export an object or a factory returning one');
     } catch(error) { process.stderr.write(`deps error: ${error.message}\n`); return EXIT.config; }
   }
@@ -234,12 +237,22 @@ async function main(argv) {
   say(`schedule    ${matrixPath}`);
   say(`             ${rows.length} planned trials, ${selected.length} selected`);
   say(`matrix hash ${matrixSha256}`);
-  say(`evidence    ${resolve(options.evidence ?? config.evidenceDirectory)}`);
+  const defaultPilotEvidence=fileURLToPath(new URL('../results/non-counted-pilot',import.meta.url));
+  const evidenceDirectory=resolve(options.pilot?(options.pilotEvidence ?? defaultPilotEvidence):(options.evidence ?? config.evidenceDirectory));
+  if(options.pilot) {
+    const studyEvidence=resolve(config.evidenceDirectory);
+    const overlaps=(a,b)=>{const rel=relative(a,b);return rel==='' || (rel!=='..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));};
+    if(overlaps(evidenceDirectory,studyEvidence) || overlaps(studyEvidence,evidenceDirectory)) {
+      process.stderr.write('pilot evidence directory must be separate from measured-study evidence\n'); return EXIT.config;
+    }
+  }
+  say(`mode        ${options.pilot?'NON-COUNTED PILOT':'MEASURED STUDY'}`);
+  say(`evidence    ${evidenceDirectory}`);
 
   // Build the routes even for a dry run: a missing dependency or a reused
   // workload principal must surface now, not after the first trial.
   const gates=gatesFrom(options.gates);
-  if(!options.dryRun && !Object.values(gates).every(Boolean)) {
+  if(!options.pilot && !options.dryRun && !Object.values(gates).every(Boolean)) {
     process.stderr.write('refusing to run: not all readiness gates are asserted\n'+
       `${GATE_NAMES.map(name=>`  ${name}: ${gates[name]}`).join('\n')}\n`+
       'Pass --gates with all four names only after each one is independently established.\n');
@@ -261,7 +274,7 @@ async function main(argv) {
     return EXIT.config;
   }
 
-  const evidenceStore=await buildEvidenceStore(resolve(options.evidence ?? config.evidenceDirectory));
+  const evidenceStore=await buildEvidenceStore(evidenceDirectory);
   const selectedIds=new Set(selected.map(row=>row.planned_run_id));
   // Refuse to start without a real verifier. A placeholder that returns
   // 'indeterminate' would halt the schedule at trial 1, and one that guesses would
@@ -283,17 +296,17 @@ async function main(argv) {
   }
   const gaps=[...(coverage.resourceProfiles.supported.length?[]:Object.entries(coverage.resourceProfiles.missing).map(([s,r])=>`${s} (P1/P2): ${r}`)),
     ...(coverage.networkProfile.supported?[]:[`selected P3 network-denial cells: ${coverage.networkProfile.reason}`])];
-  if(gaps.length && !options.allowIncompleteVerifier) {
+  if(gaps.length) {
     process.stderr.write('refusing to run: the verifier cannot classify every scheduled trial\n'+
       `${gaps.map(gap=>`  ${gap}`).join('\n')}\n`+
       'A measured run that halts at the first unclassifiable trial wastes the spend.\n'+
-      'Pass --allow-incomplete-verifier for an explicitly partial pilot.\n');
+      'No measured or pilot trials were claimed.\n');
     return EXIT.gates;
   }
   let results;
   try {
     results=await runExperiment({planBytes:matrix,planSha256:matrixSha256,routes:rawRoutes,
-      gates,verifier,evidenceStore,arm:'deterministic',rowFilter:selectedIds,
+      gates,verifier,evidenceStore,arm:'deterministic',mode:options.pilot?'non_counted_pilot':'measured',rowFilter:selectedIds,
       concurrency:options.concurrency ?? 3,
       laneFor:typeof deps.laneFor==='function'?deps.laneFor:createLaneSelector(config),
       networkCapabilities:deps.denialReader?.capabilities ?? {}});
@@ -306,9 +319,9 @@ async function main(argv) {
 
   const counts={};
   for(const record of results) counts[record.classification]=(counts[record.classification]??0)+1;
-  const summary={arm:'deterministic',matrixSha256,matrixRows:rows.length,planned:selected.length,executed:results.length,
+  const summary={arm:'deterministic',mode:options.pilot?'non_counted_pilot':'measured',studyCounted:!options.pilot,matrixSha256,matrixRows:rows.length,planned:selected.length,executed:results.length,
     halted:results.halted===true,haltedAt:results.haltedAt??null,scopeComplete:results.complete===true,
-    matrixComplete:results.matrixComplete===true,classifications:counts,scope:results.scopeSummary,
+    matrixComplete:results.matrixComplete===true,pilotScheduleComplete:results.pilotScheduleComplete===true,classifications:counts,scope:results.scopeSummary,
     concurrency:results.concurrency??1,lanes:results.laneCount??1,notApplicable:results.notApplicable??0,
     gates,gatesVerifiedByTool:false};
   if(options.json) process.stdout.write(`${JSON.stringify(summary,null,2)}\n`);
@@ -317,7 +330,8 @@ async function main(argv) {
     say(`executed    ${summary.executed}/${summary.planned}`);
     for(const [name,count] of Object.entries(counts).sort()) say(`  ${name.padEnd(26)} ${count}`);
     if(summary.halted) say(`HALTED at ${summary.haltedAt} — investigate before resuming`);
-    if(!summary.matrixComplete && summary.scopeComplete && !summary.halted)
+    if(options.pilot) say('Pilot records are isolated, labeled non-counted, and do not clear study readiness gates.');
+    if(!options.pilot && !summary.matrixComplete && summary.scopeComplete && !summary.halted)
       say('Scope note: the selected rows all completed, but this is not the full 400-row matrix.');
     say('Note: the four readiness gates are operator assertions; this tool does not verify them.');
   }

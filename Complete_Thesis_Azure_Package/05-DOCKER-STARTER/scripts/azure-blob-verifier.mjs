@@ -9,11 +9,11 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export function createAzureBlobVerifier({readAudit,principalForTrial,blobEndpoint,blobResourceId,workspaceId,runAuthorizationControl,
   sessionFixtureOwnerPrincipalId,
   auditPipelineValidated=false,authorizationValidated=false,clockSyncValidated=false,denialStatusTextValidated=false,
-  auditWaitMs=3600000,pollIntervalMs=10000,clock=Date.now,wait=pause}) {
+  auditWaitMs=3600000,pollIntervalMs=10000,clock=Date.now,wait=pause,pilotMode=false}) {
   if(typeof readAudit!=='function' || typeof principalForTrial!=='function' || typeof clock!=='function' || typeof wait!=='function' ||
     !guid.test(workspaceId || '') || !Number.isInteger(auditWaitMs) || auditWaitMs<0 || auditWaitMs>3600000 ||
     !Number.isInteger(pollIntervalMs) || pollIntervalMs<1 || pollIntervalMs>60000) throw new Error('invalid verifier configuration');
-  if(!auditPipelineValidated || !authorizationValidated || !clockSyncValidated) throw new Error('Azure verifier pilot gates have not passed');
+  if(!pilotMode && (!auditPipelineValidated || !authorizationValidated || !clockSyncValidated)) throw new Error('Azure verifier pilot gates have not passed');
   return async function verify(trial,{reset,output,evidence,timing}) {
     if(trial.deployment==='azure_custom_sessions_hyperv' && ['U6','U8'].includes(trial.scenario)) {
       const prep=reset?.sessionPreparation, start=Date.parse(prep?.startedAt), end=Date.parse(prep?.finishedAt);

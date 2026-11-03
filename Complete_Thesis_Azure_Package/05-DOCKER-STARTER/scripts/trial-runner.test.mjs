@@ -28,6 +28,23 @@ test('gates stop execution; a claimed trial cannot execute twice', async () => {
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
 
+test('a non-counted pilot can exercise an adapter with gates false and is labeled',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'trial-pilot-'));
+  try {
+    let executions=0;
+    const adapter={reset:async()=>({marker:'synthetic'}),execute:async t=>{executions++;return {runId:t.runId,scenario:t.scenario,status:200};},collect:async()=>({events:[]})};
+    const record=await runTrial({trial:{runId:'pilot-azure_vm-P1-U1',scenario:'U1'},gates:{},adapter,
+      verifier:async()=> 'unauthorized_success',evidenceDirectory:dir,mode:'non_counted_pilot'});
+    assert.equal(executions,1);
+    assert.equal(record.mode,'non_counted_pilot');
+    assert.equal(record.classification,'unauthorized_success');
+    const saved=await readEvidence(join(dir,'pilot-azure_vm-P1-U1.json'));
+    assert.equal(saved.mode,'non_counted_pilot');
+    await assert.rejects(runTrial({trial:{runId:'planned-1',scenario:'U1'},gates:{},adapter,
+      verifier:async()=> 'unauthorized_success',evidenceDirectory:dir,mode:'non_counted_pilot'}),/run mode/);
+  } finally {await rm(dir,{recursive:true,force:true});}
+});
+
 test('a collection failure preserves the prior response as indeterminate', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'trial-runner-'));
   try {

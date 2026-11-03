@@ -1,15 +1,14 @@
 /**
- * config/protocol.json is the human-readable record of the study protocol, but
- * nothing in the runner reads it — the trial runners, verifiers and fixture
- * preparers take their values as arguments with their own defaults. That made it
+ * config/protocol.json is the human-readable record of the study protocol and now
+ * selects the frozen measured and non-counted pilot schedules. Other trial
+ * parameters are still passed to runners, verifiers and fixture preparers. That made it
  * free to drift: it still listed the old short deployment names (vm/functions/
  * sessions) that appear nowhere in the frozen matrix, and a 60-second audit
  * window that the verifiers abandoned on 2026-11-02 because a controlled Blob log
  * took over a minute to become queryable.
  *
- * These assertions keep the record honest against the artifact it claims to
- * describe. They do not make the protocol authoritative for execution; wiring that
- * up is a separate change.
+ * These assertions keep the record honest against the artifacts it claims to
+ * describe. They do not make every protocol field authoritative for execution.
  */
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,6 +25,24 @@ function loadMatrix(){
   const bytes=readFileSync(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
   return loadFrozenSchedule(bytes,frozenPlanSha256).rows;
 }
+function loadPilot(){
+  const protocol=loadProtocol();
+  const bytes=readFileSync(new URL(`../../${protocol.pilotPlan.file}`,import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),protocol.pilotPlan.sha256,
+    'non-counted pilot matrix must match its protocol digest');
+  return loadFrozenSchedule(bytes,protocol.pilotPlan.sha256).rows;
+}
+
+test('non-counted pilot has a separate frozen 80-row schedule',()=>{
+  const protocol=loadProtocol(),rows=loadPilot();
+  assert.equal(protocol.pilotPlan.countedAsStudyTrials,false);
+  assert.equal(protocol.pilotPlan.trials,80);
+  assert.equal(protocol.pilotPlan.derivedFrom,protocol.matrix.sha256);
+  assert.equal(rows.length,80);
+  assert.ok(rows.every(row=>row.planned_run_id.startsWith('pilot-')));
+  assert.equal(rows.some(row=>row.deployment==='azure_custom_sessions_hyperv' && row.permission_profile==='P3'),false);
+  assert.equal(new Set(rows.map(row=>`${row.deployment}:${row.permission_profile}`)).size,8);
+});
 
 test('protocol.json names match the frozen matrix exactly',()=>{
   const protocol=loadProtocol(),rows=loadMatrix();

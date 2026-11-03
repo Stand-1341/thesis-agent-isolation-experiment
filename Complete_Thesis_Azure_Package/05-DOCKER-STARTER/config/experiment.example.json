@@ -19,6 +19,8 @@
     "azure_custom_sessions_hyperv": {
       "kind": "session",
       "managementEndpoint": "https://thesis-diag-pool.REPLACE-ENVIRONMENT-ID.eastus.azurecontainerapps.io",
+      "resourceUrl": "https://REPLACE-RESOURCE.REPLACE-REGION.cloudapp.azure.com",
+      "collectorUrl": "https://REPLACE-COLLECTOR.REPLACE-REGION.cloudapp.azure.com",
       "poolName": "thesis-diag-pool",
       "region": "eastus",
       "sessionRegistryUrl": "https://REPLACE-REGISTRY.blob.core.windows.net/session-map",
@@ -98,13 +100,21 @@
       "deployment": "azure_custom_sessions_hyperv",
       "profile": "P1",
       "principalObjectId": "00000000-0000-4000-8000-000000000007",
-      "credentials": { "controller": "THESIS_SESSION_P1_CONTROLLER_KEY" }
+      "credentials": {
+        "controller": "THESIS_SESSION_P1_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_SESSION_P1_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_SESSION_P1_COLLECTOR_ADMIN_KEY"
+      }
     },
     {
       "deployment": "azure_custom_sessions_hyperv",
       "profile": "P2",
       "principalObjectId": "00000000-0000-4000-8000-000000000008",
-      "credentials": { "controller": "THESIS_SESSION_P2_CONTROLLER_KEY" }
+      "credentials": {
+        "controller": "THESIS_SESSION_P2_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_SESSION_P2_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_SESSION_P2_COLLECTOR_ADMIN_KEY"
+      }
     }
   ]
 }

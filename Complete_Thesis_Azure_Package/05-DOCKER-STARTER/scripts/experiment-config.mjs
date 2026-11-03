@@ -19,7 +19,7 @@ const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ENV_NAME=/^[A-Z][A-Z0-9_]{2,80}$/;
 const KINDS=['http','session'];
 const LOCAL_HOSTS=['127.0.0.1','localhost','[::1]'];
-const CREDENTIAL_KEYS={http:['controller','resourceAdmin','collectorAdmin'],session:['controller']};
+const CREDENTIAL_KEYS={http:['controller','resourceAdmin','collectorAdmin'],session:['controller','resourceAdmin','collectorAdmin']};
 
 function httpsUrl(value,name,{optional=false}={}) {
   if(optional && (value===undefined || value===null)) return undefined;
@@ -88,6 +88,8 @@ export function validateExperimentConfig(raw) {
       })();
       deployments[name]={kind:'session',
         managementEndpoint,
+        resourceUrl:httpsUrl(entry.resourceUrl,`deployments.${name}.resourceUrl`),
+        collectorUrl:httpsUrl(entry.collectorUrl,`deployments.${name}.collectorUrl`),
         poolName:entry.poolName, region:entry.region,
         sessionRegistryUrl:httpsUrl(entry.sessionRegistryUrl,`deployments.${name}.sessionRegistryUrl`),
         fixtureBlobEndpoint:httpsUrl(entry.fixtureBlobEndpoint,`deployments.${name}.fixtureBlobEndpoint`),
