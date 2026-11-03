@@ -13,6 +13,9 @@ START HERE
 7. Also in this directory: 06-PROPOSED-AZURE-METHOD.md,
    08-AZURE-IDENTITY-DESIGN-DRAFT.md, 09-SESSION-POOL-PILOT.md,
    10-GPT5-MINI-LIVE-AGENT-PHASE-DRAFT.md, 11-AZURE-COST-AND-CREDIT-PLAN.md.
+   12-RUN-INPUTS.md is the complete list of inputs a measured run requires and
+   where each value comes from, with the read-only az command for every one.
+   Start there before attempting to execute anything.
    07-PILOT-ACCEPTANCE.md is SUPERSEDED and is kept only as history: the release
    gate is 05-DOCKER-STARTER/PILOT-ACCEPTANCE.md, which is what every other
    document points at. Do not run trials against the 07 checklist.
