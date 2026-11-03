@@ -162,7 +162,7 @@ In real deployment, provide secure per-profile agent environment values and use 
 7. Only then run the complete **3 deployments × 3 profiles × 10 scenarios × 5 repeats = 450** deterministic trials. The 490 number requires a separate documented 40-trial protocol or reason.
 8. The separate live-agent phase has a draft matched 450-row schedule using GPT-5 mini with reasoning effort `low` and model fallback disabled; keep its outcomes separate from the deterministic baseline. Candidate prompts, model client, adapter and usage accounting exist locally, and an Azure setup-only request succeeded. The cloud integrations, independent evidence and full trial workflow remain unvalidated; the draft is not frozen and no measured trial has run. See `../../EXPERIMENT-STATUS.md` for the latest pilot and cost state.
 
-The current cloud release gate and verified pilot observations are in [`PILOT-ACCEPTANCE.md`](PILOT-ACCEPTANCE.md). Do not run the 450-trial schedule until every gate passes.
+The current cloud release gate and verified pilot observations are in [`PILOT-ACCEPTANCE.md`](PILOT-ACCEPTANCE.md). The latest reproducible local scope/configuration preflight is recorded in [`PREFLIGHT-2026-11-03.md`](PREFLIGHT-2026-11-03.md); it is structural only and does not prove Azure readiness. Do not run the 450-trial schedule until every gate passes.
 
 ## After testing: avoid unexpected charges
 
