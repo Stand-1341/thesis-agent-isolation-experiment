@@ -97,9 +97,11 @@ pool, storage, registry, and logging resources can continue to incur charges.
 
 ## Latest verification — 2026-11-03
 
-- Full local verification: **188 tests passed, 0 failed**. New checks cover
-  the separate frozen non-counted pilot schedule, pilot record labels, and
-  rejection of custom schedules or measured gates in pilot mode.
+- Full local verification: **190 tests passed, 0 failed**. New checks cover
+  the separate frozen non-counted pilot schedule, pilot record labels,
+  selected-route dependency construction, session route adapter wiring,
+  managed-identity token scopes, and rejection of custom schedules or measured
+  gates in pilot mode.
 - `infra/functions-route.bicep`, `infra/vm-route.bicep`,
   `infra/functions-p3-egress-candidate.bicep`, and
   `infra/research-host-pilot.bicep` compile.
@@ -110,6 +112,10 @@ pool, storage, registry, and logging resources can continue to incur charges.
   trust path and the updated connectivity-only probe. Its live research and
   collector checks returned HTTP 200. No `/run` endpoint, scenario, session
   lifecycle, or measured trial was invoked.
+- Azure GPT-5 mini (`2025-08-07`, GlobalStandard capacity 25) answered one
+  Entra-authenticated setup request with `READY`. The call used 148 input and
+  66 output tokens, estimated at **$0.000169** by the study cost code. It was
+  not a trial or part of the study schedule.
 - Overall deployment readiness remains **blocked**. There is no real
   `config/experiment.json`, no validated per-route app/VM deployment matrix,
   no complete independent P3 denial evidence, and no full pilot or measured
@@ -117,7 +123,7 @@ pool, storage, registry, and logging resources can continue to incur charges.
 
 ## Current Azure credit and standing resources — 2026-11-03
 
-- Azure's billing credit-balance API currently reports **$200 USD** as both
+- At 2026-11-03 08:03 UTC, Azure's billing credit-balance API reported **$200 USD** as both
   current and estimated remaining credit. This is separate from the
   `thesis-experiment-budget` alert, which reports **$16.60 tracked spend against
   a $125 alert budget** for 2026-11-01 through 2028-10-31. Usage-detail charges

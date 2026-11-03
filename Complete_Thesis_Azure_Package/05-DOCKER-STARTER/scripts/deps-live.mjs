@@ -20,6 +20,9 @@
  *   npm run run:experiment -- --config config/experiment.json --deps scripts/deps-live.mjs ...
  */
 import {createAzureCliLogsTokenProvider,createAzureCliSessionsTokenProvider,createAzureCliStorageTokenProvider} from './azure-cli-token.mjs';
+import {createManagedStorageTokenProvider} from './azure-managed-token.mjs';
+import {createManagedLogsTokenProvider} from './azure-managed-logs-token.mjs';
+import {createManagedSessionsTokenProvider} from './azure-managed-sessions-token.mjs';
 import {createStorageAuditReader} from './azure-storage-audit-reader.mjs';
 import {createAzureBlobVerifier} from './azure-blob-verifier.mjs';
 import {createCollectorVerifier} from './collector-verifier.mjs';
@@ -56,38 +59,57 @@ function ip(env,missing,name,{optional=false}={}) {
  * @param overrides  optional per-deployment telemetry, e.g.
  *                {azure_vm:{sourceIp,destinationIp}, azure_functions_flex:{sourceIp}}
  */
-export default function createLiveDeps({config,env=process.env,overrides={},mode='measured'}={}) {
+export default function createLiveDeps({config,env=process.env,overrides={},mode='measured',routeKeys}={}) {
   if(!config || !config.deployments) throw new Error('createLiveDeps requires the validated experiment config');
   if(!['measured','non_counted_pilot'].includes(mode)) throw new Error('invalid live dependency mode');
   const pilotMode=mode==='non_counted_pilot';
+  const selectedRoutes=routeKeys?new Set(routeKeys):new Set(config.routes.map(route=>`${route.deployment}:${route.profile}`));
+  const selects=(deployment,profile)=>selectedRoutes.has(`${deployment}:${profile}`);
+  const needsVmDenial=selects('azure_vm','P3');
+  const needsFlexDenial=selects('azure_functions_flex','P3');
+  const needsSessions=config.routes.some(route=>route.deployment==='azure_custom_sessions_hyperv' &&
+    selectedRoutes.has(`${route.deployment}:${route.profile}`));
+  const tokenMode=env.THESIS_TOKEN_PROVIDER_MODE??'azure_cli';
+  if(!['azure_cli','managed_identity'].includes(tokenMode)) throw new Error('THESIS_TOKEN_PROVIDER_MODE must be azure_cli or managed_identity');
   const missing=new Set();
   const notes=[];
 
   const workspaceId=reader(env,missing,'THESIS_LOG_ANALYTICS_WORKSPACE_ID');
   if(workspaceId && !GUID.test(workspaceId)) throw new Error('THESIS_LOG_ANALYTICS_WORKSPACE_ID must be a workspace GUID');
-  const destinationIp=ip(env,missing,'THESIS_DENIAL_DESTINATION_IP');
+  const destinationIp=needsVmDenial||needsFlexDenial?ip(env,missing,'THESIS_DENIAL_DESTINATION_IP'):undefined;
   const vmSource=overrides.azure_vm?.sourceIp ?? ip(env,missing,'THESIS_VM_SOURCE_IP',{optional:true});
   // Scoping the VM arm's flow-log query on the VM's IP would return nothing for
   // internet egress, because SrcIp is blank for AzurePublic/ExternalPublic flows.
   // The resource ID is populated for every flow type, so it is the primary scope.
-  const vmTargetResourceId=reader(env,missing,'THESIS_VM_TARGET_RESOURCE_ID');
+  const vmTargetResourceId=needsVmDenial?reader(env,missing,'THESIS_VM_TARGET_RESOURCE_ID'):undefined;
   const flexSource=overrides.azure_functions_flex?.sourceIp ?? ip(env,missing,'THESIS_FLEX_SOURCE_IP',{optional:true});
+  const storageIdentityClientId=tokenMode==='managed_identity'?reader(env,missing,'THESIS_STORAGE_IDENTITY_CLIENT_ID'):undefined;
+  const logsIdentityClientId=tokenMode==='managed_identity'?reader(env,missing,'THESIS_LOGS_IDENTITY_CLIENT_ID'):undefined;
+  const sessionIdentityClientId=tokenMode==='managed_identity'&&needsSessions?reader(env,missing,'THESIS_SESSION_IDENTITY_CLIENT_ID'):undefined;
 
   // Fail before constructing anything, so the operator sees every missing variable
   // at once rather than one constructor's message at a time.
   if(missing.size) throw new Error(`missing live dependency environment: ${[...missing].sort().join(', ')}`);
 
-  const getLogsToken=createAzureCliLogsTokenProvider({});
-  const getSessionToken=createAzureCliSessionsTokenProvider({});
-  const getStorageToken=createAzureCliStorageTokenProvider({});
+  const getStorageToken=tokenMode==='managed_identity'
+    ?createManagedStorageTokenProvider({clientId:storageIdentityClientId})
+    :createAzureCliStorageTokenProvider({});
+  const getLogsToken=tokenMode==='managed_identity'
+    ?createManagedLogsTokenProvider({clientId:logsIdentityClientId})
+    :createAzureCliLogsTokenProvider({});
+  const getSessionToken=needsSessions
+    ?tokenMode==='managed_identity'
+      ?createManagedSessionsTokenProvider({clientId:sessionIdentityClientId})
+      :createAzureCliSessionsTokenProvider({})
+    :undefined;
 
   // ---- independent network-denial evidence -------------------------------
   const denialReader=missing.size?undefined:createDenialReader({
     deployments:{
-      azure_vm:{telemetry:'vnet_flow_log',sourceIp:vmSource,targetResourceId:vmTargetResourceId,destinationIp},
+      azure_vm:{telemetry:needsVmDenial?'vnet_flow_log':'none',sourceIp:vmSource,targetResourceId:vmTargetResourceId,destinationIp:needsVmDenial?destinationIp:undefined},
       // Microsoft lists Azure Functions as incompatible with VNet flow logs, so the
       // strongest available attribution for this arm is the firewall.
-      azure_functions_flex:{telemetry:flexSource?'firewall':'none',sourceIp:flexSource,destinationIp},
+      azure_functions_flex:{telemetry:needsFlexDenial&&flexSource?'firewall':'none',sourceIp:flexSource,destinationIp:needsFlexDenial?destinationIp:undefined},
       // Session pools expose only EgressEnabled/EgressDisabled: no VNet path, no
       // attributable deny record. Saying so is the honest answer.
       azure_custom_sessions_hyperv:{telemetry:'none'}
@@ -148,7 +170,7 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
   // ---- Blob-backed scenarios ---------------------------------------------
   const blobDeployment=config.deployments.azure_vm;
   const blobVerifier=createAzureBlobVerifier({
-    readAudit:createStorageAuditReader({workspaceId,getToken:getStorageToken}),
+    readAudit:createStorageAuditReader({workspaceId,getToken:getLogsToken}),
     principalForTrial:trial=>{
       const route=config.routes.find(entry=>entry.deployment===trial.deployment && entry.profile===trial.profile);
       if(!route) throw new Error('no configured principal for this trial');
@@ -168,14 +190,15 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
     pollIntervalMs:Number(env.THESIS_AUDIT_POLL_MS??10000)});
 
   // ---- custom container sessions -----------------------------------------
-  const sessionDeployment=config.deployments.azure_custom_sessions_hyperv;
+  const sessionDeployment=needsSessions?config.deployments.azure_custom_sessions_hyperv:undefined;
   let sessionFactory;
   if(sessionDeployment) {
     const controllerTokenFor=route=>{
       if(!route?.credentials?.controller) throw new Error('session route has no controller credential');
       return route.credentials.controller;
     };
-    const registryContainerUrl=reader(env,missing,'THESIS_SESSION_REGISTRY_URL')??sessionDeployment.sessionRegistryUrl;
+    const registryContainerUrl=typeof env.THESIS_SESSION_REGISTRY_URL==='string' && env.THESIS_SESSION_REGISTRY_URL.trim()
+      ?env.THESIS_SESSION_REGISTRY_URL.trim():sessionDeployment.sessionRegistryUrl;
     const sessionRegistry=createAzureSessionRegistry({containerUrl:registryContainerUrl,getToken:getStorageToken,timeoutMs:15000});
     const lifecycleObserver=createSessionLifecycleObserver({managementEndpoint:sessionDeployment.managementEndpoint,
       poolName:sessionDeployment.poolName,region:sessionDeployment.region,getAccessToken:getSessionToken,
@@ -196,7 +219,7 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
         controlPrincipalId:env.THESIS_SESSION_CONTROL_PRINCIPAL_ID,
         getOwnerToken:getSessionToken,ownerPrincipalId:env.THESIS_SESSION_FIXTURE_OWNER_PRINCIPAL_ID,
         sessionRegistry,lifecycleObserver,
-        readAudit:createStorageAuditReader({workspaceId,getToken:getStorageToken})});
+        readAudit:createStorageAuditReader({workspaceId,getToken:getLogsToken})});
       const fixtureAdapter=createAzureFixtureAdapter({base,
         blobEndpoint:sessionDeployment.fixtureBlobEndpoint,getControllerToken:getStorageToken,
         getVerifierToken:getStorageToken,prepareSessionFixture:fixturePreparer,

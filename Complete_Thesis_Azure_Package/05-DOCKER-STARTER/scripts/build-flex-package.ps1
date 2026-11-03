@@ -16,6 +16,8 @@ try {
         Copy-Item -LiteralPath (Join-Path $projectRoot "functions\$name") -Destination $destination
     }
     Copy-Item -LiteralPath (Join-Path $projectRoot 'dist') -Destination $destination -Recurse
+    New-Item -ItemType Directory -Path (Join-Path $destination 'certs') | Out-Null
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'certs\thesis-pilot-ca.pem') -Destination (Join-Path $destination 'certs\thesis-pilot-ca.pem')
     Push-Location $destination
     try {
         npm ci --omit=dev --no-audit --no-fund

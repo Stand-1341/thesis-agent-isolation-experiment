@@ -86,12 +86,15 @@ export function validateExperimentConfig(raw) {
         try {return validateCustomSessionEndpoint(`${url}/`,{poolName:entry.poolName,region:entry.region}).href.replace(/\/$/,'');}
         catch (error) {throw new Error(`deployments.${name}.managementEndpoint ${error.message}`);}
       })();
+      const sessionRegistryUrl=httpsUrl(entry.sessionRegistryUrl,`deployments.${name}.sessionRegistryUrl`);
+      if(new URL(sessionRegistryUrl).pathname!=='/session-mappings')
+        throw new Error(`deployments.${name}.sessionRegistryUrl must target the dedicated /session-mappings container`);
       deployments[name]={kind:'session',
         managementEndpoint,
         resourceUrl:httpsUrl(entry.resourceUrl,`deployments.${name}.resourceUrl`),
         collectorUrl:httpsUrl(entry.collectorUrl,`deployments.${name}.collectorUrl`),
         poolName:entry.poolName, region:entry.region,
-        sessionRegistryUrl:httpsUrl(entry.sessionRegistryUrl,`deployments.${name}.sessionRegistryUrl`),
+        sessionRegistryUrl,
         fixtureBlobEndpoint:httpsUrl(entry.fixtureBlobEndpoint,`deployments.${name}.fixtureBlobEndpoint`),
         headerIsolationVerified:entry.headerIsolationVerified===true,
         ...(Number.isInteger(entry.timeoutMs)?{timeoutMs:entry.timeoutMs}:{})};

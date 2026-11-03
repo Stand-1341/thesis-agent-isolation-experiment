@@ -117,12 +117,13 @@ async function readDeclaredMatrix(pilot=false) {
  * denial telemetry. A structural preflight still has to report scope honestly, so it
  * imports the module when one is supplied and reports why it could not when it can't.
  */
-async function resolveNetworkCapabilities(options,configShape) {
+async function resolveNetworkCapabilities(options,configShape,routeKeys) {
   if(!options.deps) return {capabilities:{},source:'no --deps supplied'};
   try {
     const module=await import(pathToFileURL(resolve(options.deps)).href);
     const exported=module.default ?? module;
-    const deps=typeof exported==='function'?await exported({config:configShape,env:process.env,mode:options.pilot?'non_counted_pilot':'measured'}):exported;
+    const deps=typeof exported==='function'?await exported({config:configShape,env:process.env,
+      mode:options.pilot?'non_counted_pilot':'measured',routeKeys}):exported;
     const capabilities=deps?.denialReader?.capabilities;
     if(!capabilities || typeof capabilities!=='object')
       return {capabilities:{},source:'deps.denialReader advertises no capabilities'};
@@ -180,7 +181,7 @@ async function main(argv) {
   // Scope must be reported with the same network capability the run would use, or the
   // preflight claims rows are unsupported that the operator has already configured.
   // Without this the BLOCKER lines for VM/Flex P3 were unclearable by any correct setup.
-  const {capabilities:networkCapabilities,source:capabilitySource}=await resolveNetworkCapabilities(options,configShape);
+  const {capabilities:networkCapabilities,source:capabilitySource}=await resolveNetworkCapabilities(options,configShape,routeKeys);
   const scope=analyzeTrialScope(selected,{networkCapabilities});
   const missingCredentials=missingCredentialVariables(configShape,process.env,routeKeys);
   const matrixSha256=createHash('sha256').update(matrix).digest('hex');
@@ -229,7 +230,8 @@ async function main(argv) {
     try {
       const module=await import(pathToFileURL(resolve(options.deps)).href);
       const exported=module.default ?? module;
-      deps=typeof exported==='function'?await exported({config,env:process.env,mode:options.pilot?'non_counted_pilot':'measured'}):exported;
+    deps=typeof exported==='function'?await exported({config,env:process.env,
+      mode:options.pilot?'non_counted_pilot':'measured',routeKeys}):exported;
       if(!deps || typeof deps!=='object') throw new Error('deps module must export an object or a factory returning one');
     } catch(error) { process.stderr.write(`deps error: ${error.message}\n`); return EXIT.config; }
   }

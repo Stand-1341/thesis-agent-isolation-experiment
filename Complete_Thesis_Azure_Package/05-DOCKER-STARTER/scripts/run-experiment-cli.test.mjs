@@ -49,7 +49,7 @@ test('a missing configuration file exits 4',()=>{
 test('missing credential variables are named, never printed as values',()=>{
   const {code,out}=run(['--config',EXAMPLE,'--dry-run'],{});
   assert.equal(code,4);
-  assert.match(out,/missing credential environment variables: THESIS_FN_P1_COLLECTOR_ADMIN_KEY/);
+  assert.match(out,/missing credential environment variables: THESIS_COLLECTOR_ADMIN_KEY/);
 });
 
 test('a dry run over the frozen matrix reports the real digest and its blockers',()=>{

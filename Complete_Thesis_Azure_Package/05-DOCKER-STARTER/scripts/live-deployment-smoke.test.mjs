@@ -17,7 +17,7 @@ async function fixture(t) {
   for(const route of raw.routes.filter(route=>route.deployment==='azure_functions_flex'))
     route.agentUrl=`https://${route.profile.toLowerCase()}-functions.example.test/api`;
   raw.deployments.azure_custom_sessions_hyperv.managementEndpoint='https://thesis-diag-pool.testenv.eastus.azurecontainerapps.io';
-  raw.deployments.azure_custom_sessions_hyperv.sessionRegistryUrl='https://registry.example.test/session-map';
+  raw.deployments.azure_custom_sessions_hyperv.sessionRegistryUrl='https://registry.example.test/session-mappings';
   raw.deployments.azure_custom_sessions_hyperv.fixtureBlobEndpoint='https://fixture.example.test';
   const configPath=join(directory,'experiment.json');
   await writeFile(configPath,JSON.stringify(raw));

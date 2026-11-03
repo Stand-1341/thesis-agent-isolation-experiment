@@ -20,11 +20,11 @@ test('unverified live verifiers are constructible only in explicitly non-counted
   config.deployments.azure_custom_sessions_hyperv.fixtureBlobEndpoint='https://fixture123.blob.core.windows.net/';
   config.deployments.azure_custom_sessions_hyperv.resourceUrl='https://resource.example.test';
   config.deployments.azure_custom_sessions_hyperv.collectorUrl='https://collector.example.test';
+  config.deployments.azure_custom_sessions_hyperv.sessionRegistryUrl='https://fixture123.blob.core.windows.net/session-mappings';
   const env={THESIS_LOG_ANALYTICS_WORKSPACE_ID:'00000000-0000-0000-0000-000000000001',
     THESIS_DENIAL_DESTINATION_IP:'192.0.2.88',THESIS_VM_SOURCE_IP:'10.0.0.3',THESIS_FLEX_SOURCE_IP:'10.0.1.4',
     THESIS_VM_TARGET_RESOURCE_ID:'/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet',
     THESIS_BLOB_RESOURCE_ID:'/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture/blobServices/default',
-    THESIS_SESSION_REGISTRY_URL:'https://fixture123.blob.core.windows.net/session-mappings',
     THESIS_SESSION_CONTROL_PRINCIPAL_ID:'00000000-0000-0000-0000-000000000007',
     THESIS_SESSION_FIXTURE_OWNER_PRINCIPAL_ID:'00000000-0000-0000-0000-000000000008',
     THESIS_SESSION_HEADER_ISOLATION_VERIFIED:'true'};
@@ -39,5 +39,16 @@ test('unverified live verifiers are constructible only in explicitly non-counted
   assert.equal(typeof session.execute,'function');
   assert.equal(typeof session.collect,'function');
   assert.match(pilot.notes.join('\n'),/NON-COUNTED PILOT/);
+  const scopedEnv={...env};
+  for(const name of ['THESIS_DENIAL_DESTINATION_IP','THESIS_VM_TARGET_RESOURCE_ID','THESIS_SESSION_CONTROL_PRINCIPAL_ID',
+    'THESIS_SESSION_FIXTURE_OWNER_PRINCIPAL_ID','THESIS_SESSION_HEADER_ISOLATION_VERIFIED']) delete scopedEnv[name];
+  const scoped=createLiveDeps({config:resolved,env:scopedEnv,mode:'non_counted_pilot',routeKeys:new Set(['azure_vm:P1'])});
+  assert.equal(scoped.sessionFactory,undefined);
+  assert.equal(scoped.denialReader.capabilities.azure_vm,false);
+  const managedEnv={...scopedEnv,THESIS_TOKEN_PROVIDER_MODE:'managed_identity',
+    THESIS_STORAGE_IDENTITY_CLIENT_ID:'00000000-0000-4000-8000-000000000009',
+    THESIS_LOGS_IDENTITY_CLIENT_ID:'00000000-0000-4000-8000-000000000010'};
+  const managed=createLiveDeps({config:resolved,env:managedEnv,mode:'non_counted_pilot',routeKeys:new Set(['azure_vm:P1'])});
+  assert.equal(typeof managed.blobVerifier,'function');
   assert.throws(()=>createLiveDeps({config,env,mode:'measured'}),/verifier pilot gates have not been established/);
 });

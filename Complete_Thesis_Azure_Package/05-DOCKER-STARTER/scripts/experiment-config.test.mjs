@@ -26,7 +26,7 @@ function baseConfig(){
       azure_functions_flex:{kind:'http',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
       azure_custom_sessions_hyperv:{kind:'session',managementEndpoint:'https://thesissessionpool.envabc123.eastus.azurecontainerapps.io',
         resourceUrl:'https://res.example',collectorUrl:'https://col.example',
-        poolName:'thesissessionpool',region:'eastus',sessionRegistryUrl:'https://reg.blob.core.windows.net/map',
+        poolName:'thesissessionpool',region:'eastus',sessionRegistryUrl:'https://reg.blob.core.windows.net/session-mappings',
         fixtureBlobEndpoint:'https://fixture.blob.core.windows.net'}
     },
     routes
@@ -92,6 +92,12 @@ test('plain HTTP is refused for anything but loopback',()=>{
   const config=baseConfig();
   config.deployments.azure_vm.agentUrl='http://vm.example';
   assert.throws(()=>validateExperimentConfig(config),/must use HTTPS/);
+});
+
+test('session registry must use the dedicated mapping container',()=>{
+  const config=baseConfig();
+  config.deployments.azure_custom_sessions_hyperv.sessionRegistryUrl='https://reg.blob.core.windows.net/session-map';
+  assert.throws(()=>validateExperimentConfig(config),/dedicated \/session-mappings container/);
 });
 
 test('an out-of-range audit window is rejected',()=>{
