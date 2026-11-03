@@ -1,5 +1,5 @@
 UNDERGRADUATE THESIS + AZURE BUILD INSTRUCTIONS + DOCKER STARTER
-Prepared: 2026-10-28 | Updated package: 2026-10-29
+Prepared: 2026-10-28 | Updated package: 2026-11-03 (pre-deployment readiness audit)
 
 START HERE
 1. 01-FULL-THESIS-ORIGINAL.docx is the complete original undergraduate thesis.
@@ -10,6 +10,14 @@ START HERE
 4. 05-DOCKER-STARTER/TESTING.md documents what was and was not verified.
 5. 04-AZURE-THESIS-REVISION-CHECKLIST.md lists required thesis edits.
 6. 03-PLANNED-TRIAL-MATRIX-450.csv is a plan, NOT collected results.
+7. Also in this directory: 06-PROPOSED-AZURE-METHOD.md,
+   08-AZURE-IDENTITY-DESIGN-DRAFT.md, 09-SESSION-POOL-PILOT.md,
+   10-GPT5-MINI-LIVE-AGENT-PHASE-DRAFT.md, 11-AZURE-COST-AND-CREDIT-PLAN.md.
+   07-PILOT-ACCEPTANCE.md is SUPERSEDED and is kept only as history: the release
+   gate is 05-DOCKER-STARTER/PILOT-ACCEPTANCE.md, which is what every other
+   document points at. Do not run trials against the 07 checklist.
+8. READINESS-AUDIT.md (repository root) records what was verified against current
+   Azure documentation before deployment, and what is still blocked.
 
 DOCKER STARTER QUICK START (OPTIONAL)
   cd 05-DOCKER-STARTER
@@ -18,6 +26,11 @@ DOCKER STARTER QUICK START (OPTIONAL)
   npm run smoke                  # requires local Node.js 22
   npm run plan                   # generates planned trial matrix only
   docker compose down
+
+  npm run plan is a legacy planning sketch, not the study schedule. Its 6-column
+  output is rejected by the only schedule loader ("matrix header does not match").
+  The authoritative schedule is 03-PLANNED-TRIAL-MATRIX-450.csv. The command
+  prints a warning saying so; do not treat its output as the plan of record.
 
 If you do not want local Docker, use Azure Container Registry remote builds:
   az acr build --registry YOUR_ACR --image thesis-agent:starter-v1 \
@@ -46,4 +59,16 @@ ACADEMIC CAUTIONS
   have no documented purpose and are not included as fabricated observations.
 - Chapters 4 and 5 still contain template placeholders; don't claim trials
   happened until collected data supports them.
-- No live cloud resources have been created by this package.
+- Live cloud resources HAVE been created from this package. EXPERIMENT-STATUS.md
+  records a research VM and a Flex Consumption Functions app both Running, the
+  custom session pool thesis-diag-pool Succeeded with one ready session (maximum
+  concurrency two), a Premium registry holding a pushed probe image, private
+  endpoints, an Azure Firewall, a Log Analytics workspace and a Network Watcher
+  VNet flow log. Cost Management reported USD 16.6029 month-to-date at the last
+  check; the subscription budget's alerts are not a hard cap. Some earlier resources were deleted and rebuilt; the latest log
+  entry still records infrastructure incurring charges. No measured trial has run.
+  Cleanup is not one action: the VNet flow log in NetworkWatcherRG, the
+  subscription-scoped synthetic-record custom role, the managed identities, the
+  registry's private endpoints and the resource groups are separate items, and the
+  03 log entry of 2026-11-03 says to remove the flow log separately. Verify what
+  still exists with your own Azure credentials before assuming anything is gone.

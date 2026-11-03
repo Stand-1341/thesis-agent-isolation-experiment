@@ -40,7 +40,7 @@ From `Complete_Thesis_Azure_Package/05-DOCKER-STARTER`:
 npm ci
 npm test
 npm run build
-python scripts/validate_supplied_plan.py
+python3 scripts/validate_supplied_plan.py
 ```
 
 Passing local checks do not qualify the cloud experiment for execution. Keep

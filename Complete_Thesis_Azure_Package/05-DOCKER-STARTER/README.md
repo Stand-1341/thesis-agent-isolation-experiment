@@ -12,7 +12,7 @@
 - A previous local topology allowed a direct-IP TCP connection to the collector despite failing Docker DNS. The revised internal network and fixed control proxy produced a network-unreachable result for that IP while the research health endpoint remained reachable. This is local-only evidence; it does not prove Azure enforcement or replace network-enforcer logs.
 - **450-row trial plan** (`npm run plan`). These are planned rows only, not results.
 
-The generator uses `TRIAL_PLAN_SEED` (default `azure-thesis-planning-v1`) to produce a reproducible permutation within each 90-cell block. It writes the seed, algorithm and protocol hash to `results/plan-metadata.json`. This generated order differs from the separately supplied `03-PLANNED-TRIAL-MATRIX-450.csv`. Preserve the supplied schedule as the intended starting schedule; run `python scripts/validate_supplied_plan.py` to check its structure and hash before any formal freeze. Neither file is evidence of completed trials.
+The generator uses `TRIAL_PLAN_SEED` (default `azure-thesis-planning-v1`) to produce a reproducible permutation within each 90-cell block. It writes the seed, algorithm and protocol hash to `results/plan-metadata.json`. This generated order differs from the separately supplied `03-PLANNED-TRIAL-MATRIX-450.csv`. Preserve the supplied schedule as the intended starting schedule; run `python3 scripts/validate_supplied_plan.py` to check its structure and hash before any formal freeze. Neither file is evidence of completed trials.
 
 `scripts/verify-local.mjs` checks only the starter's local mock evidence. It requires an operation-specific audit event for resource outcomes and leaves network failures indeterminate. It is not a cloud verifier or proof of P3 enforcement.
 

@@ -19,8 +19,9 @@ deployable, and no code change can make it so.**
 
 Two blockers sit outside the repository:
 
-1. **The subscription cannot create a session pool.** The enforced limit is one
-   pool in East US, and creation still fails with
+1. **The subscription cannot create a second session pool.** One pool was created
+   earlier and is reported `Succeeded` with one ready instance; every attempt to
+   create or replace another fails with
    `MaxNumberOfGlobalSessionPoolsInSubExceeded` while regional usage reports zero
    pools. Microsoft documents the quota as *subscription and region* scoped and
    reversible only through the Azure Quota Management System or a support case —
@@ -40,7 +41,16 @@ Two blockers sit outside the repository:
    session pools do not.
 
 150 of the 450 planned trials — the entire sessions arm — have no valid
-configuration today. The remaining 300 (VM, Functions) are unaffected by both
+configuration today. The live pool does not change that: the blocker is the
+network model, not the resource existing.
+
+**Live infrastructure is billing right now.** The most recent `EXPERIMENT-STATUS.md`
+entry records the research VM `Running`, the session pool up with one ready
+instance, a Premium registry holding a pushed probe image, private endpoints, a
+firewall, a Log Analytics workspace and a Network Watcher VNet flow log, with
+"pilot infrastructure continues to incur charges". `README-FIRST.txt` used to
+claim that no cloud resources had been created; that was false and has been
+corrected here. The remaining 300 (VM, Functions) are unaffected by both
 blockers and can produce P1/P2 evidence.
 
 **Deadline: the subscription credit expires 2026-11-28 02:41:46 UTC.** At the
