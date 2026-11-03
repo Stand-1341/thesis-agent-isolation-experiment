@@ -58,10 +58,12 @@ must not be used to assert a gate without review.
 - A separately credentialed Log Analytics reader matched one controlled Blob
   denial. Evidence immutability, complete audit coverage, and independent
   administration are still unproven.
-- A diagnostic Azure Functions Flex app exists and is Running, but it is not a
-  validated P1/P2/P3 deployment matrix. Its current host identity also carries
-  scoped host-storage permissions; per-profile workload identities are not
-  fully wired and verified.
+- One Azure Functions Flex app exists with `network-probe`, `run`, and
+  `session-seed` triggers and VNet integration. Its P1 user-assigned workload
+  identity is now attached and selected by `AZURE_CLIENT_ID`; fixture RBAC is
+  configured. This one app is not a validated P1/P2/P3 deployment matrix, and
+  effective identity behavior through an actual verifier-backed trial is not
+  yet proven.
 - A live Functions diagnostic initially timed out because the research host's
   inbound NSG omitted the app's dedicated `10.48.1.0/24` subnet. Adding that
   subnet to the 443 and 8443 source rules restored TCP connectivity. HTTPS then
@@ -95,23 +97,39 @@ Azure budget alerts are not hard spending caps. Azure usage, pending charges,
 and credit balances can lag. Deployed VM, firewall, managed environment/session
 pool, storage, registry, and logging resources can continue to incur charges.
 
-## Latest verification — 2026-11-03
+## Latest verification — 2026-11-03 (updated 09:55 UTC)
 
-- Full local verification: **190 tests passed, 0 failed**. New checks cover
+- Full local verification: **196 tests passed, 0 failed**. New checks cover
   the separate frozen non-counted pilot schedule, pilot record labels,
   selected-route dependency construction, session route adapter wiring,
   managed-identity token scopes, and rejection of custom schedules or measured
-  gates in pilot mode.
+  gates in pilot mode. Five controller-infrastructure checks cover subnet
+  separation, no public ingress, forced firewall egress, and scoped identity
+  assignments.
 - `infra/functions-route.bicep`, `infra/vm-route.bicep`,
   `infra/functions-p3-egress-candidate.bicep`, and
-  `infra/research-host-pilot.bicep` compile.
+  `infra/research-host-pilot.bicep` compile. The new
+  `infra/controller-vm-pilot.bicep` also compiles and is deployed. The private
+  controller VM is running at `10.48.11.4` with no public IP.
+- The controller image was pushed to the private ACR as
+  `thesis-controller-pilot:1adac43`. Docker 29.1.3 and Azure CLI 2.92.0 are
+  installed on the VM. Managed-identity sign-in, `az acr login`, image pull,
+  CLI help, and the structural non-counted pilot dry-run succeeded. The dry-run
+  reports 80 planned rows, 64 measurable by scope rules, 12 N/A, 4 unsupported
+  P3, all 13 route credential variables missing, runtime dependencies
+  unchecked, and all four readiness gates unverified. It invoked no trial
+  route.
+- Key Vault `thesisexpkv20261103` is deployed with firewall-IP access and a
+  controller Secrets User assignment, but contains no secrets. Credentials
+  must be securely provisioned before invoking a pilot scenario.
 - Docker builds passed for both `Dockerfile.node` and
   `Dockerfile.functions`. Each built image parsed the CA and reported the
   expected CA fingerprint.
 - The existing Functions diagnostic app was redeployed with the explicit CA
   trust path and the updated connectivity-only probe. Its live research and
-  collector checks returned HTTP 200. No `/run` endpoint, scenario, session
-  lifecycle, or measured trial was invoked.
+  collector checks returned HTTP 200. A later connectivity-only probe also
+  received HTTP 200 from the restricted destination, so it does not prove P3
+  prevention. No scenario, session lifecycle, or measured trial was invoked.
 - Azure GPT-5 mini (`2025-08-07`, GlobalStandard capacity 25) answered one
   Entra-authenticated setup request with `READY`. The call used 148 input and
   66 output tokens, estimated at **$0.000169** by the study cost code. It was

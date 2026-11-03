@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "value": "eastus" },
+    "vnetName": { "value": "vnet-thesis-pilot-eus" },
+    "firewallName": { "value": "thesis-p3-fw" },
+    "firewallPolicyName": { "value": "thesis-p3-fw-policy" },
+    "researchNsgName": { "value": "thesis-p3-targets-nsg" },
+    "serviceReturnRouteTableName": { "value": "thesis-p3-svc-return-routes" },
+    "privateEndpointReturnRouteTableName": { "value": "thesis-p3-pe-return-routes" },
+    "controllerName": { "value": "thesis-controller-pilot" },
+    "controllerSubnetPrefix": { "value": "10.48.11.0/24" },
+    "researchServicePrivateIp": { "value": "10.48.9.4" },
+    "collectorPrivateIp": { "value": "10.48.9.5" },
+    "allowedApplicationFqdns": {
+      "value": [
+        "login.microsoftonline.com",
+        "login.microsoft.com",
+        "management.azure.com",
+        "api.loganalytics.azure.com",
+        "thesisexpkv20261103.vault.azure.net",
+        "thesisacr74a95224.azurecr.io",
+        "thesisacr74a95224.eastus.data.azurecr.io",
+        "thesisfixture20261103.blob.core.windows.net",
+        "thesispilotblob20261102.blob.core.windows.net",
+        "archive.ubuntu.com",
+        "security.ubuntu.com",
+        "packages.microsoft.com",
+        "azurecliprod.blob.core.windows.net",
+        "nodejs.org",
+        "registry.npmjs.org",
+        "thesis-flex-pilot-20261103.azurewebsites.net"
+      ]
+    },
+    "vmSize": { "value": "Standard_F1as_v7" },
+    "imageVersion": { "value": "REPLACE-WITH-EXACT-UBUNTU-IMAGE-VERSION" },
+    "sshPublicKey": { "value": "REPLACE-WITH-SSH-PUBLIC-KEY" }
+  }
+}

@@ -1,0 +1,17 @@
+# Non-counted pilot controller image. Build from the package root:
+# docker build -f 05-DOCKER-STARTER/Dockerfile.controller -t thesis-controller-pilot:local .
+FROM node:22-bookworm-slim
+WORKDIR /app/Complete_Thesis_Azure_Package/05-DOCKER-STARTER
+ENV NODE_ENV=production NODE_EXTRA_CA_CERTS=/usr/local/share/thesis-pilot-ca.pem
+
+COPY --chown=node:node 05-DOCKER-STARTER/package.json 05-DOCKER-STARTER/package-lock.json ./
+COPY --chown=node:node 05-DOCKER-STARTER/certs/thesis-pilot-ca.pem /usr/local/share/thesis-pilot-ca.pem
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+COPY --chown=node:node 05-DOCKER-STARTER/config ./config
+COPY --chown=node:node 05-DOCKER-STARTER/dist ./dist
+COPY --chown=node:node 05-DOCKER-STARTER/scripts ./scripts
+COPY --chown=node:node 03-PILOT-TRIAL-MATRIX-80.csv /app/Complete_Thesis_Azure_Package/03-PILOT-TRIAL-MATRIX-80.csv
+RUN mkdir -p results/non-counted-pilot && chown -R node:node /app
+
+USER node
+ENTRYPOINT ["node", "scripts/run-experiment-cli.mjs"]

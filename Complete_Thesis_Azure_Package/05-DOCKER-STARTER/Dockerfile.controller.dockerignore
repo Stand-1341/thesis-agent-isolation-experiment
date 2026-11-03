@@ -1,0 +1,15 @@
+**
+!03-PILOT-TRIAL-MATRIX-80.csv
+!05-DOCKER-STARTER/
+!05-DOCKER-STARTER/package.json
+!05-DOCKER-STARTER/package-lock.json
+!05-DOCKER-STARTER/config/
+!05-DOCKER-STARTER/config/**
+!05-DOCKER-STARTER/dist/
+!05-DOCKER-STARTER/dist/**
+!05-DOCKER-STARTER/scripts/
+!05-DOCKER-STARTER/scripts/**
+!05-DOCKER-STARTER/certs/
+!05-DOCKER-STARTER/certs/thesis-pilot-ca.pem
+05-DOCKER-STARTER/config/experiment.json
+05-DOCKER-STARTER/scripts/*.test.mjs
