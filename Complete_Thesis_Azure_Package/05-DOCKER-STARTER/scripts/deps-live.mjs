@@ -62,9 +62,6 @@ export default function createLiveDeps({config,env=process.env,overrides={}}={})
 
   const workspaceId=reader(env,missing,'THESIS_LOG_ANALYTICS_WORKSPACE_ID');
   if(workspaceId && !GUID.test(workspaceId)) throw new Error('THESIS_LOG_ANALYTICS_WORKSPACE_ID must be a workspace GUID');
-  const subscriptions=reader(env,missing,'THESIS_SUBSCRIPTION_ID');
-  if(subscriptions && !GUID.test(subscriptions)) throw new Error('THESIS_SUBSCRIPTION_ID must be a GUID');
-
   const destinationIp=ip(env,missing,'THESIS_DENIAL_DESTINATION_IP');
   const vmSource=overrides.azure_vm?.sourceIp ?? ip(env,missing,'THESIS_VM_SOURCE_IP',{optional:true});
   // Scoping the VM arm's flow-log query on the VM's IP would return nothing for

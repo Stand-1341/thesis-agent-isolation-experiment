@@ -4,11 +4,12 @@ import {spawnSync} from 'node:child_process';
 import {mkdtempSync,writeFileSync,readdirSync,existsSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 /**
  * The exit code has to have a success path.
  *
- * `complete` required matrixComplete, matrixComplete required a full 450-row
+ * `complete` required matrixComplete, matrixComplete required a full 400-row
  * selection, and a full selection is refused because the session P3 cells have no
  * selective-egress design. Every executable run is therefore a scoped subset that
  * could never exit 0, so a flawless run reported the same code as a halt.
@@ -16,8 +17,8 @@ import {join} from 'node:path';
  * This drives the real CLI as a child process against a fake dependency module and
  * asserts the success path, the halt path, and that the refused path writes nothing.
  */
-const CONFIG=new URL('../config/experiment.example.json',import.meta.url).pathname;
-const CLI=new URL('./run-experiment-cli.mjs',import.meta.url).pathname;
+const CONFIG=fileURLToPath(new URL('../config/experiment.example.json',import.meta.url));
+const CLI=fileURLToPath(new URL('./run-experiment-cli.mjs',import.meta.url));
 const GATES='protocolFrozen,deploymentValidated,isolationValidated,verifierValidated';
 
 const PASSING_DEPS=`

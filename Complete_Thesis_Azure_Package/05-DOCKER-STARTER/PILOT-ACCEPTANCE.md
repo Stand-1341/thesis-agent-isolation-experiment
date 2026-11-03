@@ -1,15 +1,16 @@
 # Cloud pilot acceptance gate
 
-Status as of 2026-11-03: **BLOCKED — do not run the 450 measured trials.**
-The project contains a 450-row planned matrix; there is no evidence that any
+Status as of 2026-11-03: **BLOCKED — do not run the 400 measured trials.**
+Revision 2 contains a 400-row planned matrix; there is no evidence that any
 measured trial has run.
 
 ## Required before schedule freeze
 
-- [ ] Approve and freeze the supplied 450-row deterministic matrix, its byte
+- [ ] Approve and freeze the revision-2 400-row deterministic matrix, its byte
   digest, protocol, image digests, prompt/config hashes, and execution order.
-- [ ] Deploy and verify all nine distinct deployment/profile routes:
-  VM P1/P2/P3, Functions P1/P2/P3, and custom sessions P1/P2/P3. Each route
+- [ ] Deploy and verify all eight revision-2 deployment/profile routes:
+  VM P1/P2/P3, Functions P1/P2/P3, and custom sessions P1/P2. The custom-session
+  P3 cells were withdrawn from revision 2. Each route
   must use its own workload principal and only the controller/verifier
   identities needed for fixture setup and evidence collection.
 - [ ] Demonstrate all 10 scenarios in their intended profile. Verify authorized
@@ -54,19 +55,19 @@ measured trial has run.
   Azure Container Apps as an unsupported VNet flow-log capture target.
 - Azure GPT-5 mini passed setup-only inference and a harmless one-tool loop.
   The live-model schedule remains a separate unfrozen draft and is not the
-  deterministic 450-trial matrix.
+  deterministic 400-trial matrix.
 
 ## Remaining blockers
 
-1. **P3 session containment:** current `EgressEnabled` sessions can reach a
-   public IP even with the firewall-observation routing setup; current
-   `EgressDisabled` sessions cannot reach research. Find a supported network
-   design that produces independently attributable denies, or revise the
-   research design and disclose that this profile cannot be tested. No P3
-   session trials are valid until then.
+1. **P3 session containment was removed from revision 2.** Session P3 remains
+   unsupported and must not be reintroduced without a supported selective
+   egress design and attributable deny evidence. The active P3 network trials
+   are VM and Functions U5/U7; their network telemetry still requires pilot
+   validation.
 2. **Deployment matrix:** only selected VM P1/P2 Blob checks and a single
-   diagnostic Functions app have been exercised. Nine routes, their actual
-   identities, all profiles, and all three deployment types are not validated.
+   diagnostic Functions app have been exercised. The eight active routes,
+   their actual identities, all profiles, and all three deployment types are
+   not validated.
 3. **Scenario coverage:** cloud U4 research-service evidence and U5/U7
    collector evidence are not wired and verified across profiles. U6/U8 session
    Blob verifier logic now exists locally, but has not passed an Azure end-to-end

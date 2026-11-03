@@ -1,25 +1,22 @@
 # Deployment preflight report — 2026-11-03
 
-## Result
+## Current result
 
-**BLOCKED — no deployment or experiment trials were started.** This report records a local structural preflight of the frozen 450-row schedule and `config/experiment.example.json`. It did not contact Azure, prove the Azure readiness gates, test endpoint reachability, or validate live telemetry.
-
-The schedule digest was `39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298`.
+**BLOCKED — no trial execution.** This preflight was run locally against revision 2, using the frozen 400-row schedule and `config/experiment.example.json`. Its digest is `d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863`.
 
 | Scope result | Rows | Meaning |
 | --- | ---: | --- |
-| Measurable by the current scope rules | 320 | Structurally in scope; this does not mean cloud validation passed. |
-| Not applicable | 60 | U6/U8 on the VM and Functions deployments; these can be recorded as N/A without invoking the workload. |
-| Unsupported | 70 | The runner refuses to claim or execute these rows. |
+| Measurable by the declared scope rules | 320 | Structurally in scope; Azure pilot validation is still required. |
+| Not applicable | 60 | U6/U8 on VM and Functions, recorded without invoking a workload. |
+| Unsupported pending network-denial capability | 20 | VM and Functions P3 U5/U7; the run is refused until `--deps` advertises validated evidence capability. |
 
-The 70 unsupported rows are:
+The base preflight was run without `--deps`, so its network-capability source was unknown. A second structural pass with `--deps scripts/deps-live.mjs` found three absent live inputs: `THESIS_DENIAL_DESTINATION_IP`, `THESIS_LOG_ANALYTICS_WORKSPACE_ID`, and `THESIS_VM_TARGET_RESOURCE_ID`. The Functions capability also needs `THESIS_FLEX_SOURCE_IP` to be configured. `deps-live.mjs` can advertise VM flow-log and Functions firewall capabilities only when their inputs are available; that declaration is configuration readiness, not proof that deny records arrive. Pilot evidence is still required.
 
-- **50 custom-session P3 rows:** the current session-pool design cannot provide the study's selective egress restriction with independently attributable denial evidence.
-- **10 VM P3 U5/U7 rows** and **10 Functions P3 U5/U7 rows:** no independent network-denial telemetry capability is configured for those deployment routes.
+The example config has eight active revision-2 routes and names **23 route credential environment variables**. None were populated in the Codex process during inspection, and there is no local `config/experiment.json`. The values must be supplied securely by the operator; this report does not store them. The four readiness gates and seven live verifier pilot assertions remain unverified.
 
-The example configuration also refers to **24 credential environment variables** that were not present during this check. The check printed their names only; it did not read or reveal credential values. The four readiness gates—protocol frozen, deployment validated, isolation validated, and verifier validated—remain unverified. A structural preflight cannot establish them.
+Read-only Azure inspection confirmed the CLI is signed in to an enabled subscription. The research VM is running with private IPs only and no public IP/FQDN. The Functions app query returned no default host name and showed one system-assigned identity. These facts do not provide the required eight validated routes or independently verified evidence paths. Docker Engine is installed and running.
 
-## How to reproduce
+## Reproduce the structural preflight
 
 From `Complete_Thesis_Azure_Package/05-DOCKER-STARTER`:
 
@@ -27,22 +24,28 @@ From `Complete_Thesis_Azure_Package/05-DOCKER-STARTER`:
 npm run check:deploy
 ```
 
-This runs `node scripts/run-experiment-cli.mjs --config config/experiment.example.json --dry-run`. The dry run validates the config shape and frozen matrix digest, selects the planned rows, and reports applicability, unsupported scope, and missing credential variable names. It does not load runtime adapter/verifier modules or connect to Azure. Exit code **4** is expected here because this structural report is not deployment readiness and the required credentials/scope support are missing.
+This runs the CLI with the example config and revision-2 matrix. It checks local configuration shape, the declared matrix digest, row applicability, and missing credential variable names. It does not execute trials or prove endpoint reachability, telemetry delivery, or readiness gates. A nonzero exit is expected while the config is a template and readiness is incomplete.
 
-To verify the local runner implementation and tests separately:
+To run it against a real operator-managed config and live dependency module after securely providing required inputs:
+
+```powershell
+node scripts/run-experiment-cli.mjs --config config/experiment.json --deps scripts/deps-live.mjs --dry-run
+```
+
+To verify runner implementation separately:
 
 ```powershell
 npm run verify
 ```
 
-At the time of this report, build and tests passed: **156 tests, 156 passed**. That verifies local code behavior only, not Azure deployment or isolation.
+After fixing a Windows file-URL bug in a new CLI test, the current local build and suite passed: **164 tests, 164 passed**. This is software verification, not cloud experiment validation.
 
-## Required before a valid full run
+## Still required before running the 400-row study
 
-1. Resolve the unsupported P3 network-evidence design. In particular, select and pilot a supported design for custom sessions, and configure independently attributable denial telemetry for VM and Functions U5/U7.
-2. Create and validate the real deployment config, including nine distinct workload identities/routes and the required credential variables. Do not place secret values in this repository.
-3. Deploy and exercise the selected Azure routes and injected runtime adapters/verifiers. The example config is not a deployable config.
-4. Collect evidence that each readiness gate and every required pilot assertion passes, then freeze the approved protocol and schedule.
-5. Rerun preflight and review the resulting report before starting trials. The runner will reject unsupported P3 rows before any run ID is claimed.
+1. Supply a real eight-route configuration with eight distinct active workload principals and the 23 selected-route credentials, kept outside Git.
+2. Supply the live dependency inputs, including workspace ID, VM flow-log target, controlled denial destination, and Functions outbound source address. `deps-live.mjs` does not consume a subscription ID, so it is not required as an environment variable. Validate that each query returns complete, correctly attributed records; capability metadata alone is insufficient.
+3. Resolve live routes: the VM currently has no public endpoint, and the Functions app returned no default hostname. Provide supported controller-to-workload connectivity and validate each adapter.
+4. Run the non-counted pilot, prove the seven verifier assertions and four readiness gates with evidence, protect the evidence independently, and freeze the approved schedule and protocol.
+5. Rerun preflight with the real config and `deps-live.mjs`; review it before launching the measured schedule.
 
-No trial evidence or outcome is reported by this preflight.
+No measured trial was run and no trial outcome is reported here.

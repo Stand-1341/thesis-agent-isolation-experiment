@@ -5,17 +5,17 @@ templates, source code, tests, and the latest status notes.
 
 ## Readiness
 
-**Not ready for measured trials.** The 450-row matrix is a planned schedule,
+**Not ready for measured trials.** The revision-2 400-row matrix is a planned schedule,
 not a result set. Local tests and deployment smoke checks have passed, but the
 full Azure pilot has not.
 
-The immediate hard blocker is P3 selective egress for Azure Container Apps
-custom sessions. Under `EgressEnabled`, a diagnostic session reached a public
-IPv4 address; the firewall did not produce attributable denial evidence.
-Under `EgressDisabled`, the approved research service was unreachable. The P3
-network path therefore does not meet the study requirements.
+Revision 2 withdraws P3 for Azure Container Apps custom sessions because its
+binary egress control cannot meet the study's selective-containment requirement.
+The remaining active P3 network cells are on VM and Functions; they still need
+independent, attributable denial telemetry and a passing pilot before they are
+measurable.
 
-Other open gates include end-to-end validation of all nine
+Other open gates include end-to-end validation of all eight active
 deployment/profile routes, cloud U4/U5/U7 scenario evidence, U6/U8 lifecycle
 verification, independently protected evidence, and a complete reviewed pilot.
 See [`PILOT-ACCEPTANCE.md`](Complete_Thesis_Azure_Package/05-DOCKER-STARTER/PILOT-ACCEPTANCE.md)

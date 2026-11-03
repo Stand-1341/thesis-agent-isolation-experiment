@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {validateExperimentConfig,resolveCredentials,loadExperimentConfig,DEPLOYMENTS,PROFILES} from './experiment-config.mjs';
+import {validateExperimentConfig,resolveCredentials,loadExperimentConfig,EXPERIMENT_ROUTES} from './experiment-config.mjs';
 
 const guid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 
 function baseConfig(){
   const routes=[];
   let n=1;
-  for(const deployment of DEPLOYMENTS) for(const profile of PROFILES) {
+  for(const key of EXPERIMENT_ROUTES) {
+    const [deployment,profile]=key.split(':');
     const credentials={controller:`KEY_CONTROLLER_${n}`,resourceAdmin:`KEY_RESOURCE_${n}`,collectorAdmin:`KEY_COLLECTOR_${n}`};
     if(deployment==='azure_functions_flex') credentials.functionKey=`KEY_FUNCTION_${n}`;
     routes.push({deployment,profile,principalObjectId:guid(n),credentials});
@@ -30,9 +31,9 @@ function baseConfig(){
   };
 }
 
-test('a complete nine-route configuration validates',()=>{
+test('the revision-2 eight-route configuration validates',()=>{
   const config=validateExperimentConfig(baseConfig());
-  assert.equal(config.routes.length,9);
+  assert.equal(config.routes.length,8);
   assert.equal(config.auditWindowSeconds,300);
 });
 
@@ -51,7 +52,14 @@ test('a reused workload principal is rejected',()=>{
 test('a missing route is rejected',()=>{
   const config=baseConfig();
   config.routes.pop();
-  assert.throws(()=>validateExperimentConfig(config),/exactly 9 routes/);
+  assert.throws(()=>validateExperimentConfig(config),/exactly 8 revision-2 routes/);
+});
+
+test('a withdrawn custom-session P3 route is rejected by revision 2',()=>{
+  const config=baseConfig();
+  config.routes.push({...config.routes.find(route=>route.deployment==='azure_custom_sessions_hyperv' && route.profile==='P2'),
+    profile:'P3',principalObjectId:guid(99),credentials:{controller:'SESSION_P3_KEY'}});
+  assert.throws(()=>validateExperimentConfig(config),/exactly 8 revision-2 routes/);
 });
 
 test('a duplicate route is rejected',()=>{
@@ -76,7 +84,7 @@ test('credentials resolve from the environment and name what is missing',()=>{
   const config=validateExperimentConfig(baseConfig());
   const env={};
   for(const route of config.routes) for(const name of Object.values(route.credentials)) env[name]=`value-for-${name}`;
-  assert.equal(resolveCredentials(config,env).routes.length,9);
+  assert.equal(resolveCredentials(config,env).routes.length,8);
   delete env[config.routes[0].credentials.controller];
   assert.throws(()=>resolveCredentials(config,env),/missing credential environment variables: KEY_CONTROLLER_1/);
 });

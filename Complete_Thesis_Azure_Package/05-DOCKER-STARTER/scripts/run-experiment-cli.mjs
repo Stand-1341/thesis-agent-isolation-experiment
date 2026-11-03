@@ -8,7 +8,7 @@
  *
  * Exit codes are part of the interface; a wrapper script or a human watching a
  * terminal must be able to tell "finished" from "stopped":
- *   0  the full frozen matrix has a disposition and none was indeterminate
+ *   0  the selected scope completed and none was indeterminate (see matrixComplete for full-matrix status)
  *   2  the run halted on an indeterminate trial, or produced fewer records than
  *      the schedule asked for — the matrix is partial
  *   3  a readiness gate is not satisfied
@@ -318,7 +318,7 @@ async function main(argv) {
     for(const [name,count] of Object.entries(counts).sort()) say(`  ${name.padEnd(26)} ${count}`);
     if(summary.halted) say(`HALTED at ${summary.haltedAt} — investigate before resuming`);
     if(!summary.matrixComplete && summary.scopeComplete && !summary.halted)
-      say('Scope note: the selected rows all completed, but this is not the full 450-row matrix.');
+      say('Scope note: the selected rows all completed, but this is not the full 400-row matrix.');
     say('Note: the four readiness gates are operator assertions; this tool does not verify them.');
   }
   // The exit code describes the run that was asked for, not the matrix that was not.

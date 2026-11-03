@@ -17,8 +17,8 @@ the code cannot know and will not invent.
 ## 0. Order of operations
 
 1. Copy the template: `cp config/experiment.example.json config/experiment.json`
-2. Fill **§1** (the nine endpoints) and **§2** (nine principal object IDs).
-3. Fill **§3** (24 credential environment variables) into a mode-600 env file.
+2. Fill **§1** (the three deployment endpoint blocks) and **§2** (eight active route principal object IDs).
+3. Fill **§3** (23 credential environment variables) into a mode-600 env file.
 4. Fill **§4** (Azure identifiers) into the same env file.
 5. Establish **§5** (the seven pilot assertions). These are results, not switches.
 6. Verify: `npm run check:deploy -- --config config/experiment.json --deps scripts/deps-live.mjs`
@@ -27,7 +27,7 @@ the code cannot know and will not invent.
 
 ---
 
-## 1. Config file — nine endpoints
+## 1. Config file — three deployment endpoint blocks
 
 `config/experiment.json` → `deployments.<name>`. All URLs must be **HTTPS**
 (the only exception the validator allows is loopback HTTP), must not embed
@@ -74,18 +74,18 @@ credentials, and must not carry a query string or fragment.
 
 ---
 
-## 2. Config file — nine principal object IDs
+## 2. Config file — eight active route principal object IDs
 
 `config/experiment.json` → `routes[].principalObjectId`. **Every route must have a
 distinct principal**; the validator rejects a reused one. Nine GUIDs, one per
 `deployment:profile` pair.
 
-The set must be exactly these nine routes — no more, no fewer:
+The set must be exactly these eight revision-2 routes — no more, no fewer:
 
 ```
 azure_vm:P1  azure_vm:P2  azure_vm:P3
 azure_functions_flex:P1  azure_functions_flex:P2  azure_functions_flex:P3
-azure_custom_sessions_hyperv:P1  azure_custom_sessions_hyperv:P2  azure_custom_sessions_hyperv:P3
+azure_custom_sessions_hyperv:P1  azure_custom_sessions_hyperv:P2
 ```
 
 | Deployment | Where the object ID comes from |
@@ -96,7 +96,7 @@ azure_custom_sessions_hyperv:P1  azure_custom_sessions_hyperv:P2  azure_custom_s
 
 ---
 
-## 3. Credentials — 24 environment variables
+## 3. Credentials — 23 environment variables
 
 The config names these; it never contains them. Each variable's name is
 `THESIS_<DEPLOYMENT>_<PROFILE>_<SLOT>_KEY`. Values go in a **mode-600 env file**,
@@ -112,7 +112,6 @@ never in the config and never on a command line.
 | `azure_functions_flex` | P3 | `THESIS_FN_P3_CONTROLLER_KEY`, `THESIS_FN_P3_RESOURCE_ADMIN_KEY`, `THESIS_FN_P3_COLLECTOR_ADMIN_KEY`, `THESIS_FN_P3_FUNCTION_KEY` |
 | `azure_custom_sessions_hyperv` | P1 | `THESIS_SESSION_P1_CONTROLLER_KEY` |
 | `azure_custom_sessions_hyperv` | P2 | `THESIS_SESSION_P2_CONTROLLER_KEY` |
-| `azure_custom_sessions_hyperv` | P3 | `THESIS_SESSION_P3_CONTROLLER_KEY` |
 
 Function keys:
 
@@ -137,13 +136,12 @@ set -a; . ~/.thesis-run.env; set +a
 
 ---
 
-## 4. Azure identifiers — 13 environment variables (11 required, 2 optional)
+## 4. Azure identifiers — 12 environment variables (10 required, 2 optional)
 
 Read by `scripts/deps-live.mjs`. All required unless marked optional.
 
 | Variable | What it is | How to get it |
 |---|---|---|
-| `THESIS_SUBSCRIPTION_ID` | Subscription GUID | `az account show --query id -o tsv` |
 | `THESIS_LOG_ANALYTICS_WORKSPACE_ID` | Workspace **customer ID** (a GUID, not the ARM resource ID) | `az monitor log-analytics workspace show -g <RG> -n <WS> --query customerId -o tsv` |
 | `THESIS_VM_TARGET_RESOURCE_ID` | Resource ID whose flows the VNet flow log records (the NIC or subnet carrying the workload's egress) | `az vm show -g <RG> -n <VM> --query networkProfile.networkInterfaces[0].id -o tsv` |
 | `THESIS_VM_SOURCE_IP` *(optional)* | VM private IP, used only as a fallback scope | `az vm list-ip-addresses -g <RG> -n <VM> -o tsv` |
@@ -229,7 +227,7 @@ Exit codes on a real run:
 
 | Code | Meaning |
 |---|---|
-| `0` | Every selected row executed and none halted. A scoped run (`--deployment`) can reach this; the summary still reports `matrixComplete: false` because it was not all 450 |
+| `0` | Every selected row executed and none halted. A scoped run (`--deployment`) can reach this; the summary still reports `matrixComplete: false` because it was not all 400 |
 | `2` | Halted, or fewer rows executed than were selected |
 | `3` | Gates unmet |
 | `4` | Config or dependency error |

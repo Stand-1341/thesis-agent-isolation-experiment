@@ -103,12 +103,6 @@
       "profile": "P2",
       "principalObjectId": "00000000-0000-4000-8000-000000000008",
       "credentials": { "controller": "THESIS_SESSION_P2_CONTROLLER_KEY" }
-    },
-    {
-      "deployment": "azure_custom_sessions_hyperv",
-      "profile": "P3",
-      "principalObjectId": "00000000-0000-4000-8000-000000000009",
-      "credentials": { "controller": "THESIS_SESSION_P3_CONTROLLER_KEY" }
     }
   ]
 }

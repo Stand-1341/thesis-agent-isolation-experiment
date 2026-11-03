@@ -1,5 +1,14 @@
 # Readiness audit — 2026-11-03
 
+> **Superseded matrix snapshot:** this audit's initial verdict and counts were
+> written against revision 1 (450 rows). Revision 2 withdraws the 50
+> custom-session P3 cells and uses a 400-row matrix. Current local preflight
+> status is 320 measurable, 60 not applicable, and 20 unsupported VM/Functions
+> P3 U5/U7 rows pending independent telemetry. Use the top of
+> `EXPERIMENT-STATUS.md`, `PILOT-ACCEPTANCE.md`, and
+> `PREFLIGHT-2026-11-03.md` for current scope and status; this audit's later
+> historical analysis of session-P3 is not an active revision-2 matrix cell.
+
 Pre-deployment review of this repository against current Microsoft Azure
 documentation. **Nothing was deployed and no Azure API was called by this
 review.** Every claim below is either the output of a command run against this

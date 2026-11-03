@@ -1,7 +1,7 @@
 /**
- * Compose the nine deployment/profile routes the runner requires.
+ * Compose the active revision-2 deployment/profile routes the runner requires.
  *
- * `createTrialAdapterRouter` demands exactly nine routes, each with its own
+ * `createTrialAdapterRouter` demands exactly the active revision-2 routes, each with its own
  * workload principal and a reset/execute/collect adapter, and nothing in the
  * package built them — which is why no measured trial could ever start. This
  * module is that missing step and only that step: it does not decide whether the
@@ -10,7 +10,7 @@
 import {createHttpPilotAdapter} from './http-pilot-adapter.mjs';
 import {createSessionPilotAdapter} from './session-pilot-adapter.mjs';
 import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
-import {DEPLOYMENTS,PROFILES} from './experiment-config.mjs';
+import {EXPERIMENT_ROUTES} from './experiment-config.mjs';
 
 const required=(names,where)=>{
   const missing=names.filter(name=>!where || typeof where[name]!=='function');
@@ -26,8 +26,8 @@ const required=(names,where)=>{
  * @param deps.sessionFactory  (route, deployment) => reset/execute/collect/cleanup
  */
 export function buildRoutes(config, deps={}, {routeKeys}={}) {
-  if(!config || !Array.isArray(config.routes) || config.routes.length!==DEPLOYMENTS.length*PROFILES.length)
-    throw new Error('config must contain all nine routes; run validateExperimentConfig first');
+  if(!config || !Array.isArray(config.routes) || config.routes.length!==EXPERIMENT_ROUTES.length)
+    throw new Error(`config must contain all ${EXPERIMENT_ROUTES.length} revision-2 routes; run validateExperimentConfig first`);
   const routes={};
   for(const route of config.routes) {
     const key=`${route.deployment}:${route.profile}`;
@@ -82,7 +82,8 @@ export function createLaneSelector(config) {
 
 /** Build the router the runner consumes, so a bad route fails before spend. */
 export function buildAdapterRouter(config, deps={}) {
-  return createTrialAdapterRouter(buildRoutes(config,deps));
+  const routes=buildRoutes(config,deps);
+  return createTrialAdapterRouter(routes,{requiredRoutes:Object.keys(routes)});
 }
 
 /**

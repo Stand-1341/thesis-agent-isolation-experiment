@@ -2,28 +2,27 @@
 
 ## Current status — 2026-11-03
 
-**HOLD: no measured thesis trials have run; do not start the 450-row schedule.**
-The local implementation is materially more complete than the early history
-below: all 80 Node tests, the TypeScript build, and the supplied-plan validator
-passed. The Azure Functions Flex package was deployed successfully, and the
-plan validator confirmed 450 planned rows (360 unauthorized, 90 legitimate)
-with SHA-256 `39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298`.
-These checks are not measured experiment results.
+**HOLD: no measured thesis trials have run; do not start the 400-row revision-2 schedule.**
+The current authoritative matrix is `03-PLANNED-TRIAL-MATRIX-400-REV2.csv`,
+SHA-256 `d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863`.
+Revision 2 withdrew all 50 custom-session P3 rows from the former 450-row plan;
+that file remains historical. The current local runner build and tests pass
+(164/164), but no cloud experiment is ready or has run.
 
-The hard P3 blocker persists. In a setup-only Azure session probe,
-`EgressEnabled` allowed a direct TCP connection to `1.1.1.1:443`, and Azure
-Firewall produced no corresponding denial record. With `EgressDisabled`, the
-approved research service was also blocked. Neither setting meets the study's
-selective-egress requirement. The diagnostic firewall NSG is not attached as
-an accepted P3 control.
+Custom-session P3 remains unsupported and is excluded from revision 2. The
+active P3 network cells are VM and Functions U5/U7; their independent denial
+telemetry still needs configured inputs and a passing pilot. The latest local
+structural preflight reports 320 measurable rows, 60 not applicable rows, and
+20 unsupported rows until those capabilities are present.
 
 The VM P1/P2 synthetic Blob identity checks have passed selected operations,
 and one separately credentialed audit reader matched a controlled denial.
 That evidence does not validate all deployment/profile routes or prove
 independent evidence administration. U4/U5/U7 cloud coverage, U6/U8 Azure
 end-to-end validation, immutable/independently protected evidence, and the
-complete pilot remain open. Only a diagnostic Functions app has been deployed;
-the nine-route matrix is not validated.
+complete pilot remain open. The current config template has eight active
+revision-2 routes; no real `config/experiment.json` exists locally. The VM has
+private IPs only, and the Functions app query returned no default hostname.
 
 The VM and one-ready ACA session pool were reported running/ready in the last
 verified snapshot, with zero allocated sessions and no measured-trial job

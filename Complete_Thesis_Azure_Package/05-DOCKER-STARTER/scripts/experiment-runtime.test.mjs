@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import {buildRoutes,describeRoutes,createLaneSelector} from './build-experiment.mjs';
 import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
 import {createExperimentVerifier,verifierCoverage,denialWindow} from './experiment-verifier.mjs';
-import {validateExperimentConfig,DEPLOYMENTS,PROFILES} from './experiment-config.mjs';
+import {validateExperimentConfig,EXPERIMENT_ROUTES} from './experiment-config.mjs';
 
 const guid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 
 function config(){
   const routes=[];
   let n=1;
-  for(const deployment of DEPLOYMENTS) for(const profile of PROFILES) {
+  for(const key of EXPERIMENT_ROUTES) {
+    const [deployment,profile]=key.split(':');
     routes.push({deployment,profile,principalObjectId:guid(n),
       credentials:{controller:`CTRL_KEY_${n}`,resourceAdmin:`RES_ADMIN_KEY_${n}`,collectorAdmin:`COL_ADMIN_KEY_${n}`,...(deployment==='azure_functions_flex'?{functionKey:`FN_KEY_${n}`}:{})}});
     n++;
@@ -25,10 +26,10 @@ function config(){
     routes});
 }
 
-test('all nine routes are built and accepted by the router',()=>{
+test('all eight revision-2 routes are built and accepted by the router',()=>{
   const cfg=config();
   const routes=buildRoutes(cfg,{sessionFactory:()=>({reset:async()=>{},execute:async()=>({}),collect:async()=>({})})});
-  assert.equal(Object.keys(routes).length,9);
+  assert.equal(Object.keys(routes).length,8);
   const router=createTrialAdapterRouter(routes);
   assert.match(router.principalObjectId({deployment:'azure_vm',profile:'P2'}),/^00000000-/);
   assert.equal(typeof router.execute, 'function');
@@ -46,7 +47,7 @@ test('a route whose adapter is missing a member is rejected by the router',()=>{
 
 test('describeRoutes never exposes a credential value',()=>{
   const described=describeRoutes(config());
-  assert.equal(described.length,9);
+  assert.equal(described.length,8);
   for(const entry of described) for(const variable of entry.credentialVariables) assert.match(variable,/^[A-Z]/);
 });
 

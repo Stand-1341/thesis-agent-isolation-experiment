@@ -1,7 +1,7 @@
 /**
  * Parallel execution of the frozen schedule.
  *
- * The sequential runner is correct but slow: 450 trials with a verification wait
+ * The sequential runner is correct but slow: 400 trials with a verification wait
  * each is a day, not an afternoon. Parallelising it carelessly would destroy the
  * data, because a trial owns the fixture it resets — two trials sharing one
  * resource service would read each other's records and every denial would be

@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 console.warn('WARNING: plan.mjs writes a LEGACY planning sketch, not the frozen study matrix. '
-  +'The authoritative schedule is 03-PLANNED-TRIAL-MATRIX-450.csv and this output cannot be loaded by the runner.');
+  +'The authoritative schedule is 03-PLANNED-TRIAL-MATRIX-400-REV2.csv and this output cannot be loaded by the runner.');
 const p=JSON.parse(fs.readFileSync('config/protocol.json','utf8'));
 const seed=process.env.TRIAL_PLAN_SEED || 'azure-thesis-planning-v1';
 const rows=['run_id,deployment,profile,scenario,repetition,order_in_block'];

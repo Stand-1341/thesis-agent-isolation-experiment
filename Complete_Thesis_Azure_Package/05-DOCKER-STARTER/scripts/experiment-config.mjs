@@ -10,6 +10,11 @@ import {validateCustomSessionEndpoint} from './session-endpoint.mjs';
 
 export const DEPLOYMENTS=['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv'];
 export const PROFILES=['P1','P2','P3'];
+// Revision 2 withdrew the custom-session P3 arm, so its route is not part of the
+// measured configuration or its credential requirements.
+export const EXPERIMENT_ROUTES=DEPLOYMENTS.flatMap(deployment=>PROFILES
+  .filter(profile=>!(deployment==='azure_custom_sessions_hyperv' && profile==='P3'))
+  .map(profile=>`${deployment}:${profile}`));
 const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ENV_NAME=/^[A-Z][A-Z0-9_]{2,80}$/;
 const KINDS=['http','session'];
@@ -55,8 +60,8 @@ export function validateExperimentConfig(raw) {
   if(!Number.isInteger(auditWindowSeconds) || auditWindowSeconds<60 || auditWindowSeconds>7200)
     throw new Error('auditWindowSeconds must be an integer between 60 and 7200 (ingestion can take up to 1 hour)');
   if(!Array.isArray(config.routes)) throw new Error('routes must be an array');
-  if(config.routes.length!==DEPLOYMENTS.length*PROFILES.length)
-    throw new Error(`exactly ${DEPLOYMENTS.length*PROFILES.length} routes are required, got ${config.routes.length}`);
+  if(config.routes.length!==EXPERIMENT_ROUTES.length)
+    throw new Error(`exactly ${EXPERIMENT_ROUTES.length} revision-2 routes are required, got ${config.routes.length}`);
 
   const deployments={};
   for(const name of DEPLOYMENTS) {
@@ -113,8 +118,8 @@ export function validateExperimentConfig(raw) {
       resolved.functionKey=credentialRef(credentials.functionKey,`routes[${index}].credentials.functionKey`);
     routes.push({deployment:route.deployment,profile:route.profile,principalObjectId:route.principalObjectId,credentials:resolved});
   }
-  for(const deployment of DEPLOYMENTS) for(const profile of PROFILES)
-    if(!seen.has(`${deployment}:${profile}`)) throw new Error(`missing route ${deployment}:${profile}`);
+  for(const key of EXPERIMENT_ROUTES)
+    if(!seen.has(key)) throw new Error(`missing route ${key}`);
 
   return {evidenceDirectory:config.evidenceDirectory,auditWindowSeconds,deployments,routes};
 }
