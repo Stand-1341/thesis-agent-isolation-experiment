@@ -1,5 +1,20 @@
 # ACI P1 first-50 pilot runner
 
+## Controller-managed deployment health smoke
+
+Run `.\infra\deploy-aci-controller-health-smoke.ps1` from PowerShell to
+verify the controller managed identity can create and delete a private ACI
+group, attach the ACR-pull and P1 workload identities, pull the digest-pinned
+agent image through the ACI NAT path, and reach the agent's private `/health`
+endpoint. The script starts the deallocated controller VM if needed, uses
+random disposable credentials, deletes the smoke group, and deallocates the VM.
+It reports `trialRowsRun: 0` and `countedAsStudyTrials: false`. It does not test
+Blob authorization or execute any scenario.
+
+`.\infra\validate-aci-controller-runtime.ps1` separately checks that the
+controller identity can read the named Key Vault secret and list ACI groups;
+it prints statuses only, never secret contents.
+
 `npm run run:aci-p1-pilot -- --dry-run` validates the separate, hashed 50-row ACI P1 draft. It never executes rows. The checked-in protocol is deliberately blocked and the report lists its open gates.
 
 The pilot is isolated from the thesis's frozen 400-row matrix. If it is later approved, the protocol must be changed to `approved_for_non_counted_pilot`, `runPermitted: true`, and `countedAsStudyTrials: false`; U6 and U8 must each be marked `validated` with an evidence reference. A separate readiness JSON must include:

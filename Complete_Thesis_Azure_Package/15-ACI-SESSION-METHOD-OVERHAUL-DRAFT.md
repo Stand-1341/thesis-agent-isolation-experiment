@@ -125,7 +125,13 @@ exception was removed. New ACI P1/P2 user-assigned identities exist. P1 has the
 same eight container-scoped Blob role assignments as VM P1; P2 currently has
 none. The controller has narrow group lifecycle, subnet join, and selected
 identity-attach roles. These assignments are configured, but controller
-managed-identity access to Key Vault and ACI ARM has not yet been verified.
+managed-identity access was verified for reading the controller secret from
+Key Vault and listing ACI groups through ARM (zero groups returned); no secret
+value was displayed. A subsequent controller-identity health-only smoke
+successfully created and deleted an ACI group, pulled the pinned image through
+the NAT-backed ACR path, and received the private agent health response. This
+proves controller group create/delete and identity attach for this deployment,
+but not Blob workload access, scenario execution, or experiment readiness.
 Both VMs are deallocated. The 50-row ACI draft remains
 non-runnable pending method approval, U6/U8 analogs, and a live Azure adapter/
 verifier/protected evidence store. A fail-closed sequential runner and dry-run

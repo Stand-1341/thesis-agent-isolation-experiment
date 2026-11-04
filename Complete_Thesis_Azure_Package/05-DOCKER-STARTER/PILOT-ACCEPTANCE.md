@@ -421,9 +421,10 @@ and has no route table. ACR is default-deny and allows the NAT IP. The image is
 pinned to digest
 `sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b`.
 The current container-group inventory is empty, and both the controller and
-research VMs are deallocated. Five health-only smoke attempts produced two
-passes and three failures; all groups were cleaned up. The latest pass used
-private IP `10.48.13.4` and confirmed `trials=0`. These were not trials.
+research VMs are deallocated. Eight health-only ACI groups have been attempted:
+three health probes passed and five failed; all groups were cleaned up. The
+latest controller-identity pass is recorded below. The earlier user-CLI pass
+used private IP `10.48.13.4`; all health smokes ran zero trials.
 
 The checked-in 50-row ACI schedule remains explicitly non-runnable and
 non-counted. The dedicated runner's dry run reports `executionStarted:false`;
@@ -435,9 +436,16 @@ research host token and matched without revealing either value. Dedicated ACI
 workload and controller secrets are stored in Key Vault; the workstation's
 temporary firewall exception was removed. Separate ACI identities now exist,
 with VM P1's eight Blob role scopes mirrored to the ACI P1 identity and no
-workload roles on P2. Controller lifecycle/subnet/identity-attach roles are
-deployed, but a controller-identity Key Vault/ARM probe returned no parseable
-status; treat runtime permission as unverified. The live adapter, independent verifier/evidence validation, U6/U8
+workload roles on P2. The controller managed identity successfully read the
+ACI controller secret from Key Vault and listed its ACI container groups via
+ARM (zero groups returned); values were not displayed. A subsequent
+controller-identity health-only smoke created and deleted
+`thesis-aci-health-mi-dc157b68adf4eeceb4e1`, pulled the pinned image through
+the ACI NAT path, and received a successful private `/health` response. The
+controller VM was deallocated and the ACI inventory was empty after cleanup.
+This verified controller create/delete and identity-attach for this deployment,
+but did not test Blob workload access or execute a scenario. The live adapter,
+independent verifier/evidence validation, U6/U8
 analogs, and institutional method approval remain incomplete. No measured trial
 has run; no experiment is currently running. The ACI runtime now rejects U6/U8
 before fixture reset, preventing those unsupported cases from writing setup
