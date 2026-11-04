@@ -245,9 +245,12 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
   the long-running delete later completed and Azure now lists no Container Apps
   environments. The attached manual diagnostic job had no running executions
   and was removed. The dedicated old subnet `sessions-pilot` (`10.48.2.0/23`)
-  had zero NIC/IP-configuration attachments; it was removed and recreated with
-  only the `Microsoft.App/environments` delegation. Its previous P3 candidate
-  NSG and route-table associations are not currently attached. The shared VNet
+  had zero NIC/IP-configuration attachments; it was removed and recreated, then
+  its former P3 candidate NSG `thesis-session-p3-candidate` and route table
+  `thesis-p3-routes` were restored at the user's direction. The NSG explicitly
+  denies collector traffic, so this subnet is not a valid P1/P2 session route.
+  The replacement environment remains targeted at the separate
+  `sessions-experiment` subnet, which has no NSG or route table. The shared VNet
   and all unrelated subnets were kept.
 - A replacement deployment in East US failed preflight with
   `MaxNumberOfRegionalEnvironmentsInSubExceeded`. A zero-E16-minimum
@@ -267,6 +270,12 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
   failures. No E16 node, session pool, replacement environment, or trial was
   created. The user declined both a Microsoft support case and a 16-core E16
   quota request; neither was submitted.
+- After restoring the old subnet associations, the user requested a new East US
+  environment deployment on `sessions-experiment` with E16 minimum zero and
+  maximum one. Azure again rejected preflight with
+  `WorkloadProfileMaximumCoresConstraint` (E16 maximum cores must be zero).
+  Final readback shows both subnets `Succeeded`, no ACA environment, and no
+  session pool. No paid E16 compute or trial was created.
 - Microsoft troubleshooting guidance recommends removing the associated VNet
   for a stuck deletion, but this VNet contains the rest of the experiment
   infrastructure and was not deleted. Microsoft Q&A guidance for a
