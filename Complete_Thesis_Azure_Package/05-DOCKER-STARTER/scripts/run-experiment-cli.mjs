@@ -31,8 +31,8 @@ const EXIT={complete:0,partial:2,gates:3,config:4,usage:5};
 const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
 
   --config <file>        deployment configuration (no secrets; see experiment-config.mjs)
-  --evidence <dir>       evidence directory (default: config evidenceDirectory)
   --pilot                run the separate frozen 80-row non-counted pilot schedule
+  --pilot-retry          run the versioned non-counted Functions P1 retry schedule
   --pilot-evidence <dir> isolated evidence directory for --pilot (default: results/non-counted-pilot)
   --limit <n>            limit a run to an initial subset (with --pilot this is non-counted)
   --offset <n>           skip the first n rows after route filters (useful to avoid a prior claim)
@@ -51,7 +51,9 @@ const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
 
 A measured run is refused unless all four gates are asserted. A non-counted pilot
 uses a separately frozen schedule, its own evidence directory, and never asserts
-measured-study gates. The gates are operator assertions: this tool cannot verify them.`;
+measured-study gates. Measured evidence requires a locked Azure Blob immutability
+policy and an institution-approved retention period. The gates are operator
+assertions: this tool cannot verify them.`;
 
 function parseArgs(argv) {
   const options={dryRun:false,json:false};
@@ -61,14 +63,19 @@ function parseArgs(argv) {
     switch(arg) {
       case '--config': options.config=value(); break;
       case '--deps': options.deps=value(); break;
-      case '--pilot': options.pilot=true; break;
+      case '--pilot':
+        if(options.pilotSchedule) throw new Error('choose only one pilot schedule');
+        options.pilot=true; options.pilotSchedule='standard'; break;
+      case '--pilot-retry':
+        if(options.pilotSchedule) throw new Error('choose only one pilot schedule');
+        options.pilot=true; options.pilotSchedule='retry'; break;
       case '--pilot-evidence': options.pilotEvidence=value(); break;
+      case '--evidence': options.evidence=value(); break;
       case '--concurrency': {
         const raw=value();
         if(!/^\d+$/.test(raw) || Number(raw)<1 || Number(raw)>32) throw new Error('--concurrency must be 1..32');
         options.concurrency=Number(raw); break;
       }
-      case '--evidence': options.evidence=value(); break;
       case '--limit': {
         const raw=value();
         if(!/^\d+$/.test(raw) || Number(raw)<1) throw new Error('--limit must be a positive integer');
@@ -108,11 +115,11 @@ function gatesFrom(values) {
 const abilityUnknown=source=>source!=='deps.denialReader';
 
 /** The frozen digest, as declared by the protocol rather than derived from the file. */
-async function readDeclaredMatrix(pilot=false) {
+async function readDeclaredMatrix(schedule='measured') {
   try {
     const text=await readFile(new URL('../config/protocol.json',import.meta.url),'utf8');
     const protocol=JSON.parse(text);
-    const matrix=pilot?protocol.pilotPlan:protocol.matrix;
+    const matrix=schedule==='retry'?protocol.pilotRetryPlan:schedule==='standard'?protocol.pilotPlan:protocol.matrix;
     if(!matrix || typeof matrix.sha256!=='string' || !/^[0-9a-f]{64}$/.test(matrix.sha256)) return null;
     return matrix;
   } catch (error) { return null; }
@@ -158,13 +165,13 @@ async function main(argv) {
   }
   if(options.help) { process.stdout.write(`${USAGE}\n`); return EXIT.complete; }
 
-  if(options.pilot && options.evidence) { process.stderr.write('--evidence cannot be used with --pilot; use --pilot-evidence to keep records separate\n'); return EXIT.usage; }
+  if(options.evidence) { process.stderr.write('--evidence is local-only and no longer accepted; use --pilot-evidence for non-counted pilot records. Measured evidence uses locked Azure Blob storage.\n'); return EXIT.usage; }
   if(!options.pilot && options.pilotEvidence) { process.stderr.write('--pilot-evidence requires --pilot\n'); return EXIT.usage; }
   if(options.pilot && options.gates?.length) { process.stderr.write('--pilot never accepts measured-study readiness gates\n'); return EXIT.usage; }
 
   const say=message=>{ if(!options.json) process.stdout.write(`${message}\n`); };
 
-  const declared=await readDeclaredMatrix(options.pilot);
+  const declared=await readDeclaredMatrix(options.pilotSchedule??'measured');
   if(!declared) { process.stderr.write('protocol error: frozen schedule metadata is missing or invalid\n'); return EXIT.config; }
   const matrixPath=resolve(fileURLToPath(new URL(`../../${declared.file}`,import.meta.url)));
   let matrix,rows;
@@ -247,7 +254,7 @@ async function main(argv) {
   say(`             ${rows.length} planned trials, ${selected.length} selected`);
   say(`matrix hash ${matrixSha256}`);
   const defaultPilotEvidence=fileURLToPath(new URL('../results/non-counted-pilot',import.meta.url));
-  const evidenceDirectory=resolve(options.pilot?(options.pilotEvidence ?? defaultPilotEvidence):(options.evidence ?? config.evidenceDirectory));
+  const evidenceDirectory=options.pilot?resolve(options.pilotEvidence ?? defaultPilotEvidence):undefined;
   if(options.pilot) {
     const studyEvidence=resolve(config.evidenceDirectory);
     const overlaps=(a,b)=>{const rel=relative(a,b);return rel==='' || (rel!=='..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));};
@@ -256,7 +263,7 @@ async function main(argv) {
     }
   }
   say(`mode        ${options.pilot?'NON-COUNTED PILOT':'MEASURED STUDY'}`);
-  say(`evidence    ${evidenceDirectory}`);
+  say(`evidence    ${options.pilot?evidenceDirectory:'locked Azure Blob container (policy checked before first claim)'}`);
 
   // Build the routes even for a dry run: a missing dependency or a reused
   // workload principal must surface now, not after the first trial.
@@ -283,7 +290,6 @@ async function main(argv) {
     return EXIT.config;
   }
 
-  const evidenceStore=await buildEvidenceStore(evidenceDirectory);
   const selectedIds=new Set(selected.map(row=>row.planned_run_id));
   // Refuse to start without a real verifier. A placeholder that returns
   // 'indeterminate' would halt the schedule at trial 1, and one that guesses would
@@ -310,6 +316,19 @@ async function main(argv) {
       `${gaps.map(gap=>`  ${gap}`).join('\n')}\n`+
       'A measured run that halts at the first unclassifiable trial wastes the spend.\n'+
       'No measured or pilot trials were claimed.\n');
+    return EXIT.gates;
+  }
+  let evidenceStore;
+  try {
+    if(options.pilot) evidenceStore=await buildEvidenceStore(evidenceDirectory);
+    else if(deps.evidenceStore && typeof deps.evidenceStore.claim==='function' && typeof deps.evidenceStore.save==='function')
+      evidenceStore=deps.evidenceStore;
+    else {
+      const {createMeasuredEvidenceStoreFromEnvironment}=await import('./azure-measured-evidence-store.mjs');
+      evidenceStore=await createMeasuredEvidenceStoreFromEnvironment({env:process.env});
+    }
+  } catch(error) {
+    process.stderr.write(`evidence store error: ${error.message}\nNo trials were claimed or executed.\n`);
     return EXIT.gates;
   }
   let results;

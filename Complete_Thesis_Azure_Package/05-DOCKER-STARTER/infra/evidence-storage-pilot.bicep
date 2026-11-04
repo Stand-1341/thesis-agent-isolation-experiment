@@ -13,6 +13,9 @@ param readerPrincipalId string
 @description('Object ID allowed to read sensitive run-to-session mappings; never a workload principal.')
 param sessionRegistryReaderPrincipalId string
 param containerName string = 'trial-evidence'
+@minValue(1)
+@description('Retention duration in days approved for this research evidence by the institutional records policy. This value is required; do not guess it.')
+param evidenceRetentionDays int
 @description('Optional public IPv4 addresses or CIDRs for trusted controller/verifier access; do not include workloads.')
 param trustedPublicIpRules array = []
 
@@ -47,6 +50,17 @@ resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@20
   parent: service
   name: containerName
   properties: { publicAccess: 'None' }
+}
+// The policy is initially Unlocked. Before measured collection, lock it with
+// an ETag after verifying writer/read access and overwrite/delete rejection.
+// A Locked policy cannot be shortened or deleted before expiration.
+resource evidenceImmutability 'Microsoft.Storage/storageAccounts/blobServices/containers/immutabilityPolicies@2023-05-01' = {
+  parent: container
+  name: 'default'
+  properties: {
+    allowProtectedAppendWrites: false
+    immutabilityPeriodSinceCreationInDays: evidenceRetentionDays
+  }
 }
 resource sessionRegistry 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
   parent: service
@@ -87,4 +101,6 @@ resource sessionReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 }
 output accountId string = account.id
 output containerUrl string = '${account.properties.primaryEndpoints.blob}${containerName}'
+output containerResourceId string = container.id
+output immutabilityPolicyId string = evidenceImmutability.id
 output sessionRegistryUrl string = '${account.properties.primaryEndpoints.blob}${sessionRegistry.name}'

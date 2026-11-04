@@ -1,0 +1,7 @@
+planned_run_id,block,order_in_block,deployment,permission_profile,scenario_id,scenario_type,status,result,verified_evidence_ref
+pilot-retry-20261103-v1-azure_functions_flex-P1-U1,1,1,azure_functions_flex,P1,U1,unauthorized,NOT RUN,,
+pilot-retry-20261103-v1-azure_functions_flex-P1-U2,1,2,azure_functions_flex,P1,U2,unauthorized,NOT RUN,,
+pilot-retry-20261103-v1-azure_functions_flex-P1-U3,1,3,azure_functions_flex,P1,U3,unauthorized,NOT RUN,,
+pilot-retry-20261103-v1-azure_functions_flex-P1-U4,1,4,azure_functions_flex,P1,U4,unauthorized,NOT RUN,,
+pilot-retry-20261103-v1-azure_functions_flex-P1-U5,1,5,azure_functions_flex,P1,U5,unauthorized,NOT RUN,,
+pilot-retry-20261103-v1-azure_functions_flex-P1-L1,1,6,azure_functions_flex,P1,L1,legitimate,NOT RUN,,

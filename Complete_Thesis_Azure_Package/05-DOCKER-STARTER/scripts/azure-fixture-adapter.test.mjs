@@ -23,6 +23,7 @@ test('seeds synchronized markers and uses separate controller, workload and veri
     const trial={runId:'run-1',scenario:'U2'};
     const reset=await adapter.reset(trial);
     assert.equal(reset.azureFixturesSeeded,true);
+    assert.equal(reset.u5Marker,source.protected,'U5 must transmit the protected U1 marker for a faithful injection test');
     const workload=createBlobWorkload({blobEndpoint:'https://fixture123.blob.core.windows.net/',getToken:async()=> 'workload'});
     assert.equal((await workload(trial)).status,201);
     const result=await adapter.collect(trial,reset);

@@ -1,0 +1,510 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.48.1.52935",
+      "templateHash": "5769486854551338538"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "vnetName": {
+      "type": "string"
+    },
+    "firewallName": {
+      "type": "string"
+    },
+    "firewallPolicyName": {
+      "type": "string"
+    },
+    "researchNsgName": {
+      "type": "string"
+    },
+    "serviceReturnRouteTableName": {
+      "type": "string"
+    },
+    "privateEndpointReturnRouteTableName": {
+      "type": "string"
+    },
+    "controllerName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 50
+    },
+    "controllerIdentityName": {
+      "type": "string",
+      "defaultValue": "id-thesis-fixture-controller"
+    },
+    "auditIdentityName": {
+      "type": "string",
+      "defaultValue": "id-thesis-audit-verifier"
+    },
+    "sessionIdentityName": {
+      "type": "string",
+      "defaultValue": "id-thesis-session-reader"
+    },
+    "acrPullIdentityName": {
+      "type": "string",
+      "defaultValue": "id-thesis-acr-pull"
+    },
+    "sessionRegistryStorageAccountName": {
+      "type": "string",
+      "defaultValue": "thesispilotblob20261102",
+      "metadata": {
+        "description": "Existing private ACR registry used to distribute the runner image."
+      }
+    },
+    "controllerSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.48.11.0/24",
+      "metadata": {
+        "description": "New, unused range in the existing VNet. Keep this separate from sessions-pilot."
+      }
+    },
+    "researchServicePrivateIp": {
+      "type": "string",
+      "defaultValue": "10.48.9.4"
+    },
+    "collectorPrivateIp": {
+      "type": "string",
+      "defaultValue": "10.48.9.5"
+    },
+    "researchServicePort": {
+      "type": "int",
+      "defaultValue": 443
+    },
+    "collectorPort": {
+      "type": "int",
+      "defaultValue": 8443
+    },
+    "allowedApplicationFqdns": {
+      "type": "array",
+      "minLength": 1,
+      "metadata": {
+        "description": "Exact FQDNs required by the selected pilot routes and Entra/Log Analytics. Do not use wildcard entries."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_F1as_v7"
+    },
+    "imageVersion": {
+      "type": "string",
+      "metadata": {
+        "description": "An exact, available Ubuntu 22.04 Gen2 image version. Resolve before deployment."
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "thesisadmin"
+    },
+    "sshPublicKey": {
+      "type": "string",
+      "metadata": {
+        "description": "SSH public key; no SSH ingress is opened. Azure Run Command is the intended operator path."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "Study": "AzureThesisExperiment",
+        "Phase": "NonCountedPilot",
+        "Role": "Controller"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('sessionRegistryStorageAccountName'), 'default', 'session-mappings')]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('sessionRegistryStorageAccountName'), 'default', 'session-mappings'), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('controllerIdentityName')), 'controller-session-mapping-writer')]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('controllerIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}-nsg', parameters('controllerName'))]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "deny-all-inbound",
+            "properties": {
+              "priority": 100,
+              "direction": "Inbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "*"
+            }
+          },
+          {
+            "name": "allow-dns-outbound",
+            "properties": {
+              "priority": 100,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "168.63.129.16",
+              "destinationPortRanges": [
+                "53"
+              ]
+            }
+          },
+          {
+            "name": "allow-https-to-firewall-policy",
+            "properties": {
+              "priority": 110,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "443"
+            }
+          },
+          {
+            "name": "allow-collector-api-via-firewall",
+            "properties": {
+              "priority": 115,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourceAddressPrefix": "[parameters('controllerSubnetPrefix')]",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "[parameters('collectorPrivateIp')]",
+              "destinationPortRange": "8443"
+            }
+          },
+          {
+            "name": "deny-other-outbound",
+            "properties": {
+              "priority": 4000,
+              "direction": "Outbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "*"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/routeTables",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}-routes', parameters('controllerName'))]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "disableBgpRoutePropagation": true,
+        "routes": [
+          {
+            "name": "default-to-firewall",
+            "properties": {
+              "addressPrefix": "0.0.0.0/0",
+              "nextHopType": "VirtualAppliance",
+              "nextHopIpAddress": "[reference(resourceId('Microsoft.Network/azureFirewalls', parameters('firewallName')), '2023-09-01').ipConfigurations[0].properties.privateIPAddress]"
+            }
+          },
+          {
+            "name": "vnet-to-firewall",
+            "properties": {
+              "addressPrefix": "10.48.0.0/16",
+              "nextHopType": "VirtualAppliance",
+              "nextHopIpAddress": "[reference(resourceId('Microsoft.Network/azureFirewalls', parameters('firewallName')), '2023-09-01').ipConfigurations[0].properties.privateIPAddress]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}/{1}', parameters('vnetName'), 'experiment-controller')]",
+      "properties": {
+        "addressPrefix": "[parameters('controllerSubnetPrefix')]",
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', parameters('controllerName')))]"
+        },
+        "routeTable": {
+          "id": "[resourceId('Microsoft.Network/routeTables', format('{0}-routes', parameters('controllerName')))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-nsg', parameters('controllerName')))]",
+        "[resourceId('Microsoft.Network/routeTables', format('{0}-routes', parameters('controllerName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/routeTables/routes",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}/{1}', parameters('serviceReturnRouteTableName'), 'controller-return-via-firewall')]",
+      "properties": {
+        "addressPrefix": "[parameters('controllerSubnetPrefix')]",
+        "nextHopType": "VirtualAppliance",
+        "nextHopIpAddress": "[reference(resourceId('Microsoft.Network/azureFirewalls', parameters('firewallName')), '2023-09-01').ipConfigurations[0].properties.privateIPAddress]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/routeTables/routes",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}/{1}', parameters('privateEndpointReturnRouteTableName'), 'controller-return-via-firewall')]",
+      "properties": {
+        "addressPrefix": "[parameters('controllerSubnetPrefix')]",
+        "nextHopType": "VirtualAppliance",
+        "nextHopIpAddress": "[reference(resourceId('Microsoft.Network/azureFirewalls', parameters('firewallName')), '2023-09-01').ipConfigurations[0].properties.privateIPAddress]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}/{1}', parameters('researchNsgName'), 'controller-pilot-research-https')]",
+      "properties": {
+        "priority": 125,
+        "direction": "Inbound",
+        "access": "Allow",
+        "protocol": "Tcp",
+        "sourceAddressPrefix": "[parameters('controllerSubnetPrefix')]",
+        "sourcePortRange": "*",
+        "destinationAddressPrefix": "[parameters('researchServicePrivateIp')]",
+        "destinationPortRange": "[string(parameters('researchServicePort'))]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}/{1}', parameters('researchNsgName'), 'controller-pilot-collector-https')]",
+      "properties": {
+        "priority": 135,
+        "direction": "Inbound",
+        "access": "Allow",
+        "protocol": "Tcp",
+        "sourceAddressPrefix": "[parameters('controllerSubnetPrefix')]",
+        "sourcePortRange": "*",
+        "destinationAddressPrefix": "[parameters('collectorPrivateIp')]",
+        "destinationPortRange": "[string(parameters('collectorPort'))]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/firewallPolicies/ruleCollectionGroups",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}/{1}', parameters('firewallPolicyName'), format('{0}-egress', parameters('controllerName')))]",
+      "properties": {
+        "priority": 300,
+        "ruleCollections": [
+          {
+            "name": "controller-private-https",
+            "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+            "priority": 100,
+            "action": {
+              "type": "Allow"
+            },
+            "rules": [
+              {
+                "ruleType": "NetworkRule",
+                "name": "research-api",
+                "ipProtocols": [
+                  "TCP"
+                ],
+                "sourceAddresses": [
+                  "[parameters('controllerSubnetPrefix')]"
+                ],
+                "destinationAddresses": [
+                  "[parameters('researchServicePrivateIp')]"
+                ],
+                "destinationPorts": [
+                  "[string(parameters('researchServicePort'))]"
+                ]
+              },
+              {
+                "ruleType": "NetworkRule",
+                "name": "collector-api",
+                "ipProtocols": [
+                  "TCP"
+                ],
+                "sourceAddresses": [
+                  "[parameters('controllerSubnetPrefix')]"
+                ],
+                "destinationAddresses": [
+                  "[parameters('collectorPrivateIp')]"
+                ],
+                "destinationPorts": [
+                  "[string(parameters('collectorPort'))]"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "controller-public-https",
+            "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+            "priority": 110,
+            "action": {
+              "type": "Allow"
+            },
+            "rules": [
+              {
+                "ruleType": "ApplicationRule",
+                "name": "exact-required-fqdns",
+                "sourceAddresses": [
+                  "[parameters('controllerSubnetPrefix')]"
+                ],
+                "protocols": [
+                  {
+                    "protocolType": "Https",
+                    "port": 443
+                  }
+                ],
+                "targetFqdns": "[parameters('allowedApplicationFqdns')]"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2023-09-01",
+      "name": "[parameters('controllerName')]",
+      "location": "[parameters('location')]",
+      "tags": "[union(parameters('tags'), createObject('networkIsolationValidated', 'false'))]",
+      "identity": {
+        "type": "SystemAssigned, UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('controllerIdentityName')))]": {},
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('auditIdentityName')))]": {},
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sessionIdentityName')))]": {},
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('acrPullIdentityName')))]": {}
+        }
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "0001-com-ubuntu-server-jammy",
+            "sku": "22_04-lts-gen2",
+            "version": "[parameters('imageVersion')]"
+          },
+          "osDisk": {
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "StandardSSD_LRS"
+            }
+          }
+        },
+        "osProfile": {
+          "computerName": "[parameters('controllerName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": true,
+            "ssh": {
+              "publicKeys": [
+                {
+                  "path": "[format('/home/{0}/.ssh/authorized_keys', parameters('adminUsername'))]",
+                  "keyData": "[parameters('sshPublicKey')]"
+                }
+              ]
+            }
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', parameters('controllerName')))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups/securityRules', parameters('researchNsgName'), 'controller-pilot-collector-https')]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups/securityRules', parameters('researchNsgName'), 'controller-pilot-research-https')]",
+        "[resourceId('Microsoft.Network/firewallPolicies/ruleCollectionGroups', parameters('firewallPolicyName'), format('{0}-egress', parameters('controllerName')))]",
+        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', parameters('controllerName')))]",
+        "[resourceId('Microsoft.Network/routeTables/routes', parameters('privateEndpointReturnRouteTableName'), 'controller-return-via-firewall')]",
+        "[resourceId('Microsoft.Network/routeTables/routes', parameters('serviceReturnRouteTableName'), 'controller-return-via-firewall')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}-nic', parameters('controllerName'))]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "primary",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'experiment-controller')]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'experiment-controller')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "controllerId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Compute/virtualMachines', parameters('controllerName'))]"
+    },
+    "controllerPrivateIp": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', parameters('controllerName'))), '2023-09-01').ipConfigurations[0].properties.privateIPAddress]"
+    },
+    "controllerSystemPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Compute/virtualMachines', parameters('controllerName')), '2023-09-01', 'full').identity.principalId]"
+    },
+    "controllerIdentityClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('controllerIdentityName')), '2023-01-31').clientId]"
+    },
+    "auditIdentityClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('auditIdentityName')), '2023-01-31').clientId]"
+    },
+    "sessionIdentityClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('sessionIdentityName')), '2023-01-31').clientId]"
+    },
+    "acrPullIdentityClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('acrPullIdentityName')), '2023-01-31').clientId]"
+    },
+    "controllerSubnetId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'experiment-controller')]"
+    },
+    "controllerFirewallPrivateIp": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/azureFirewalls', parameters('firewallName')), '2023-09-01').ipConfigurations[0].properties.privateIPAddress]"
+    }
+  }
+}

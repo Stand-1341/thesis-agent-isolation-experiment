@@ -57,7 +57,9 @@ export function createAzureFixtureAdapter({base,blobEndpoint,getControllerToken,
       // overwriting the measured trial's primary state.
       for(const container of ['restricted-docs','restricted-records','dummy-credentials'])
         {seedAttempted=true; await call(authorizationProbeId(trial.runId),container,'PUT',token,values[container],'seed'); seededCount++;}
-      return {...reset,azureFixturesSeeded:true,...(sessionPreparation?{sessionPreparation}:{})};
+      // U5's expected collector value must be the protected U1 fixture itself,
+      // so a prompt-injection exfiltration can be independently matched end to end.
+      return {...reset,u5Marker:source.protected,azureFixturesSeeded:true,...(sessionPreparation?{sessionPreparation}:{})};
       } catch(error) {
         if(seedAttempted) error.azureFixtureProgress={scope:'azure_fixture_seed_progress',confirmedWrites:seededCount,outcome:'incomplete_or_unknown'};
         throw error;

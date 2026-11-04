@@ -57,9 +57,14 @@ test('pilot launcher fixes config, deployment, profile, one-at-a-time execution,
     '--pilot','--deployment','azure_functions_flex','--profile','P1','--concurrency','1','--deps','scripts/deps-live.mjs'
   ]);
   assert.ok(buildPilotArgs(['--limit','1']).includes('1'));
+  const retryArgs=buildPilotArgs(['--pilot-retry','--limit','6']);
+  assert.ok(retryArgs.includes('--pilot-retry'));
+  assert.equal(retryArgs.includes('--pilot'),false);
+  assert.ok(retryArgs.includes('6'));
   assert.ok(buildPilotArgs(['--offset','1','--limit','1']).includes('1'));
   for(const args of [
     ['--gates','protocolFrozen'],['--config','other.json'],['--deployment','azure_vm'],
-    ['--profile','P3'],['--pilot'],['--deps','fake.mjs'],['--limit','11'],['--limit','0'],['--offset','10'],['--offset','-1'],['--help']
+    ['--profile','P3'],['--pilot'],['--deps','fake.mjs'],['--limit','11'],['--limit','0'],['--offset','10'],['--offset','-1'],
+    ['--limit','1','--pilot-retry'],['--pilot-retry','--pilot-retry'],['--help']
   ]) assert.throws(()=>buildPilotArgs(args));
 });

@@ -1,5 +1,5 @@
 {
-  "_comment": "Template for a measured run. Copy to experiment.json and replace every value. Functions agentUrl is route-specific so P1/P2/P3 use separate apps; resourceUrl and collectorUrl stay deployment-scoped. NO SECRETS: each credential field names an environment variable.",
+  "_comment": "Template for a measured run. Copy to experiment.json and replace every value. evidenceDirectory is used only for non-counted local pilot records; measured evidence goes to the locked Azure Blob container configured by environment variables. Functions agentUrl is route-specific so P1/P2/P3 use separate apps; resourceUrl and collectorUrl stay deployment-scoped. NO SECRETS: each credential field names an environment variable.",
   "evidenceDirectory": "results/evidence",
   "auditWindowSeconds": 3600,
   "deployments": {
@@ -18,10 +18,10 @@
     },
     "azure_custom_sessions_hyperv": {
       "kind": "session",
-      "managementEndpoint": "https://thesis-diag-pool.REPLACE-ENVIRONMENT-ID.eastus.azurecontainerapps.io",
+      "managementEndpoint": "https://replace-session-pool.replace-environment-id.eastus.azurecontainerapps.io",
       "resourceUrl": "https://REPLACE-RESOURCE.REPLACE-REGION.cloudapp.azure.com",
       "collectorUrl": "https://REPLACE-COLLECTOR.REPLACE-REGION.cloudapp.azure.com",
-      "poolName": "thesis-diag-pool",
+      "poolName": "replace-session-pool",
       "region": "eastus",
       "sessionRegistryUrl": "https://REPLACE-REGISTRY.blob.core.windows.net/session-mappings",
       "fixtureBlobEndpoint": "https://REPLACE-FIXTURE.blob.core.windows.net",

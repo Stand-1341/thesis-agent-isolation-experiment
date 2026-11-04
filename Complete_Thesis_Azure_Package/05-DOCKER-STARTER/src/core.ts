@@ -2,19 +2,59 @@
  * The deliberately forbidden calls use ONLY research-owned synthetic fixtures.
  * The agent has no admin or verifier credentials. No shell or arbitrary URL input.
  */
+import https from 'node:https';
+import {readFile} from 'node:fs/promises';
 export const SCENARIOS = ['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2'] as const;
 export type Scenario = typeof SCENARIOS[number];
 export interface TrialInput { runId: string; scenario: Scenario; u5Marker?: string; }
 export interface TrialEnvironment { resourceUrl: string; collectorUrl: string; workloadToken: string; }
+const SAFE_TRANSPORT_CODES=new Set([
+  'DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'ERR_TLS_CERT_ALTNAME_INVALID','CERT_HAS_EXPIRED','ECONNREFUSED','ECONNRESET','ETIMEDOUT',
+  'EHOSTUNREACH','ENETUNREACH','ENOTFOUND','EAI_AGAIN','UND_ERR_CONNECT_TIMEOUT','UND_ERR_SOCKET'
+]);
+function safeTransportCode(error:unknown):string|undefined {
+  const pending=[error];
+  const visited=new Set<unknown>();
+  while(pending.length) {
+    const current=pending.shift();
+    if(!current || typeof current!=='object' || visited.has(current)) continue;
+    visited.add(current);
+    const value=current as {code?:unknown;cause?:unknown;errors?:unknown};
+    if(typeof value.code==='string' && SAFE_TRANSPORT_CODES.has(value.code)) return value.code;
+    if(value.cause) pending.push(value.cause);
+    if(Array.isArray(value.errors)) pending.push(...value.errors);
+  }
+}
+
+async function requestWithPilotCa(url:string,method:string,headers:Record<string,string>,body:string|undefined) {
+  const caPath=process.env.NODE_EXTRA_CA_CERTS;
+  if(!caPath || !url.startsWith('https:')) {
+    const response=await fetch(url,{method,headers,body,redirect:'error',signal:AbortSignal.timeout(8_000)});
+    return {status:response.status,raw:await response.text()};
+  }
+  const ca=await readFile(caPath);
+  return await new Promise<{status:number;raw:string}>((resolve,reject)=>{
+    const request=https.request(url,{method,headers,ca,rejectUnauthorized:true,signal:AbortSignal.timeout(8_000)},response=>{
+      const chunks:Buffer[]=[];
+      response.on('data',chunk=>chunks.push(Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk)));
+      response.on('error',reject);
+      response.on('end',()=>resolve({status:response.statusCode??0,raw:Buffer.concat(chunks).toString('utf8')}));
+    });
+    request.once('error',reject);
+    request.end(body);
+  });
+}
 
 export async function runScenario(input: TrialInput, env: TrialEnvironment) {
   if (!SCENARIOS.includes(input.scenario)) throw new Error('unknown scenario');
   if (!/^[a-zA-Z0-9_-]{1,150}$/.test(input.runId)) throw new Error('invalid runId');
   const common = { 'x-run-id': input.runId, 'x-workload-token': env.workloadToken, 'content-type': 'application/json' };
   const call = async (base: string, path: string, method = 'GET', payload?: unknown) => {
-    const response = await fetch(`${base}${path}`, { method, headers: common,
-      body: payload === undefined ? undefined : JSON.stringify(payload), signal: AbortSignal.timeout(8_000) });
-    const raw = await response.text();
+    const requestBody=payload===undefined?undefined:JSON.stringify(payload);
+    const headers=requestBody===undefined?common:{...common,'content-length':String(Buffer.byteLength(requestBody))};
+    const response=await requestWithPilotCa(`${base}${path}`,method,headers,requestBody);
+    const raw=response.raw;
     let body: unknown = raw;
     try { body = JSON.parse(raw); } catch { /* retain text */ }
     return { status: response.status, body };
@@ -48,6 +88,7 @@ export async function runScenario(input: TrialInput, env: TrialEnvironment) {
     return {runId: input.runId, scenario: input.scenario, transportOk: true, ...result};
   } catch (error) {
     return {runId: input.runId, scenario: input.scenario, transportOk: false,
-      error: error instanceof Error ? error.message : String(error)};
+      error: error instanceof Error ? error.message : String(error),
+      ...(safeTransportCode(error)?{errorCode:safeTransportCode(error)}:{})};
   }
 }

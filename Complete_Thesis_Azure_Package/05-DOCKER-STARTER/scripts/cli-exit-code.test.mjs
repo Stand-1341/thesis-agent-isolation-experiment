@@ -32,6 +32,7 @@ const httpFactory=()=>({
     cleanup:async()=>{}
   });
 export default {
+  evidenceStore:{claim:async()=>{},save:async()=>{}},
   denialReader:Object.assign(async()=>({verdict:'observed_allow',evidence:{}}),
     {capabilities:{azure_vm:true,azure_functions_flex:true}}),
   blobVerifier:ok,collectorVerifier:ok,resourceVerifier:ok,
@@ -47,6 +48,7 @@ const httpFactory=()=>({
     cleanup:async()=>{}
   });
 export default {
+  evidenceStore:{claim:async()=>{},save:async()=>{}},
   denialReader:Object.assign(async()=>({verdict:'observed_allow',evidence:{}}),
     {capabilities:{azure_vm:true,azure_functions_flex:true}}),
   blobVerifier:indeterminate,collectorVerifier:indeterminate,resourceVerifier:indeterminate,
@@ -77,7 +79,7 @@ function run(args) {
 
 test('a fully executed scoped run exits 0',()=>{
   const {deps,evidence}=scaffold(PASSING_DEPS);
-  const out=run(['--config',CONFIG,'--deps',deps,'--evidence',evidence,
+  const out=run(['--config',CONFIG,'--deps',deps,
     '--deployment','azure_vm','--limit','3','--gates',GATES,'--json']);
   assert.ok(out.summary,`expected a JSON summary, got:\n${out.stdout}\n${out.stderr}`);
   assert.equal(out.summary.executed,3);
@@ -90,7 +92,7 @@ test('a fully executed scoped run exits 0',()=>{
 
 test('a halted run exits 2, so success and failure stay distinguishable',()=>{
   const {deps,evidence}=scaffold(HALTING_DEPS);
-  const out=run(['--config',CONFIG,'--deps',deps,'--evidence',evidence,
+  const out=run(['--config',CONFIG,'--deps',deps,
     '--deployment','azure_vm','--limit','3','--gates',GATES,'--json']);
   assert.ok(out.summary);
   assert.equal(out.summary.halted,true);
@@ -102,7 +104,7 @@ test('the full revision-2 matrix now executes end to end',()=>{
   const {deps,evidence}=scaffold(PASSING_DEPS);
   // Revision 2 withdrew the 50 session-arm P3 cells, so an unfiltered selection has no
   // unsupported rows left: the whole 400-row matrix runs in one pass.
-  const out=run(['--config',CONFIG,'--deps',deps,'--evidence',evidence,'--gates',GATES,'--json']);
+  const out=run(['--config',CONFIG,'--deps',deps,'--gates',GATES,'--json']);
   assert.ok(out.summary,`expected a JSON summary, got:\n${out.stdout}\n${out.stderr}`);
   assert.equal(out.summary.executed,400);
   assert.equal(out.summary.halted,false);
@@ -118,9 +120,23 @@ test('a selection with an unsupported row is still refused before any claim',()=
   const deps=join(dir,'deps.mjs');
   writeFileSync(deps,PASSING_DEPS.replace('{azure_vm:true,azure_functions_flex:true}','{}'));
   const evidence=join(dir,'evidence');
-  const out=run(['--config',CONFIG,'--deps',deps,'--evidence',evidence,'--gates',GATES]);
+  const out=run(['--config',CONFIG,'--deps',deps,'--gates',GATES]);
   assert.notEqual(out.code,0);
   assert.match(out.stdout+out.stderr,/refusing to run/i);
   const written=existsSync(evidence)?readdirSync(evidence):[];
   assert.deepEqual(written,[],'a refused scope must not leave evidence behind');
+});
+
+test('measured runs fail closed without a locked Azure evidence store',()=>{
+  const {deps}=scaffold(PASSING_DEPS.replace('  evidenceStore:{claim:async()=>{},save:async()=>{}},',''));
+  const out=run(['--config',CONFIG,'--deps',deps,'--deployment','azure_vm','--limit','1','--gates',GATES,'--json']);
+  assert.equal(out.code,3);
+  assert.match(out.stderr,/evidence store error: institution-approved evidence retention is not asserted/);
+  assert.equal(out.summary,null,'no trial summary may be emitted when evidence is unprotected');
+});
+
+test('measured runs reject the local evidence-directory option',()=>{
+  const {code,stderr}=run(['--config',CONFIG,'--evidence','results/test']);
+  assert.equal(code,5);
+  assert.match(stderr,/Measured evidence uses locked Azure Blob storage/);
 });

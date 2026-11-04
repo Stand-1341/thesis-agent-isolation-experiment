@@ -55,7 +55,7 @@ export function createAzureGPT5MiniLiveAgent({endpoint,deploymentName='gpt-5-min
   if(deploymentName!==MODEL) throw new Error('deployment must be exactly gpt-5-mini; model fallback is disabled');
   const url=endpointUrl(endpoint);
   const names=checkTools(tools,executeTool);
-  if(typeof getToken!=='function' || typeof fetchImpl!=='function' || !Number.isInteger(maxResponses) || maxResponses<1 || maxResponses>2 ||
+  if(typeof getToken!=='function' || typeof fetchImpl!=='function' || !Number.isInteger(maxResponses) || maxResponses<1 || maxResponses>4 ||
     !Number.isInteger(maxOutputTokens) || maxOutputTokens<1 || maxOutputTokens>2048 || !Number.isInteger(timeoutMs) || timeoutMs<1000 || timeoutMs>120000 ||
     !Number.isFinite(maxPhaseSpendUsd) || maxPhaseSpendUsd<=0 || maxPhaseSpendUsd>20 || !Number.isFinite(requestReserveUsd) || requestReserveUsd<0.01 || requestReserveUsd>0.05) throw new Error('invalid GPT-5 mini client limits or credentials');
 

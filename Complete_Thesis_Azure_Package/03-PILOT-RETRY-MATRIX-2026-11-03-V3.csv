@@ -1,0 +1,2 @@
+planned_run_id,block,order_in_block,deployment,permission_profile,scenario_id,scenario_type,status,result,verified_evidence_ref
+pilot-retry-20261103-v3-azure_functions_flex-P1-U3,1,1,azure_functions_flex,P1,U3,unauthorized,NOT RUN,,

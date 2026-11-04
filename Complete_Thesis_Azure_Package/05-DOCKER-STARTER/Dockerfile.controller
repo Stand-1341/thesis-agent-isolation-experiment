@@ -11,6 +11,9 @@ COPY --chown=node:node 05-DOCKER-STARTER/config ./config
 COPY --chown=node:node 05-DOCKER-STARTER/dist ./dist
 COPY --chown=node:node 05-DOCKER-STARTER/scripts ./scripts
 COPY --chown=node:node 03-PILOT-TRIAL-MATRIX-80.csv /app/Complete_Thesis_Azure_Package/03-PILOT-TRIAL-MATRIX-80.csv
+COPY --chown=node:node 03-PILOT-RETRY-MATRIX-2026-11-03-V1.csv /app/Complete_Thesis_Azure_Package/03-PILOT-RETRY-MATRIX-2026-11-03-V1.csv
+COPY --chown=node:node 03-PILOT-RETRY-MATRIX-2026-11-03-V2.csv /app/Complete_Thesis_Azure_Package/03-PILOT-RETRY-MATRIX-2026-11-03-V2.csv
+COPY --chown=node:node 03-PILOT-RETRY-MATRIX-2026-11-03-V3.csv /app/Complete_Thesis_Azure_Package/03-PILOT-RETRY-MATRIX-2026-11-03-V3.csv
 RUN mkdir -p results/non-counted-pilot && chown -R node:node /app
 
 USER node

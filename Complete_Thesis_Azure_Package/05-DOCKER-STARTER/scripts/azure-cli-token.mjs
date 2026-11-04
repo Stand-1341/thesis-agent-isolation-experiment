@@ -2,7 +2,7 @@
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const execFileAsync=promisify(execFile);
-const audiences={storage:'https://storage.azure.com/',logs:'https://api.loganalytics.io',sessions:'https://dynamicsessions.io',openai:'https://cognitiveservices.azure.com'};
+const audiences={storage:'https://storage.azure.com/',management:'https://management.azure.com/',logs:'https://api.loganalytics.io',sessions:'https://dynamicsessions.io',openai:'https://cognitiveservices.azure.com'};
 
 function createAzureCliTokenProvider(audience,{azureConfigDirectory,run=execFileAsync,platform=process.platform}={}) {
   const resource=audiences[audience];
@@ -15,6 +15,7 @@ function createAzureCliTokenProvider(audience,{azureConfigDirectory,run=execFile
         // Fixed command text: no credentials, arguments, or user data are interpolated.
         const commands={
           storage:"$ErrorActionPreference = 'Stop'; az account get-access-token --resource https://storage.azure.com/ --query accessToken -o tsv; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+          management:"$ErrorActionPreference = 'Stop'; az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
           logs:"$ErrorActionPreference = 'Stop'; az account get-access-token --resource https://api.loganalytics.io --query accessToken -o tsv; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
           sessions:"$ErrorActionPreference = 'Stop'; az account get-access-token --resource https://dynamicsessions.io --query accessToken -o tsv; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
           openai:"$ErrorActionPreference = 'Stop'; az account get-access-token --resource https://cognitiveservices.azure.com --query accessToken -o tsv; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"
@@ -31,6 +32,7 @@ function createAzureCliTokenProvider(audience,{azureConfigDirectory,run=execFile
   };
 }
 export function createAzureCliStorageTokenProvider(options) { return createAzureCliTokenProvider('storage',options); }
+export function createAzureCliManagementTokenProvider(options) { return createAzureCliTokenProvider('management',options); }
 export function createAzureCliLogsTokenProvider(options) { return createAzureCliTokenProvider('logs',options); }
 export function createAzureCliSessionsTokenProvider(options) { return createAzureCliTokenProvider('sessions',options); }
 export function createAzureCliOpenAITokenProvider(options) { return createAzureCliTokenProvider('openai',options); }

@@ -1,5 +1,5 @@
 {
-  "_comment": "NON-COUNTED PILOT ONLY. Select --deployment azure_functions_flex --profile P1. Other route entries remain example placeholders and are not deployable. No secret values are stored here.",
+  "_comment": "NON-COUNTED PILOT ONLY. Select --deployment azure_functions_flex --profile P1. evidenceDirectory is local and for pilot evidence only. Other route entries remain example placeholders and are not deployable. No secret values are stored here.",
   "evidenceDirectory": "results/evidence",
   "auditWindowSeconds": 3600,
   "deployments": {
@@ -18,10 +18,10 @@
     },
     "azure_custom_sessions_hyperv": {
       "kind": "session",
-      "managementEndpoint": "https://thesis-diag-pool.REPLACE-ENVIRONMENT-ID.eastus.azurecontainerapps.io",
+      "managementEndpoint": "https://replace-session-pool.replace-environment-id.eastus.azurecontainerapps.io",
       "resourceUrl": "https://REPLACE-RESOURCE.REPLACE-REGION.cloudapp.azure.com",
       "collectorUrl": "https://REPLACE-COLLECTOR.REPLACE-REGION.cloudapp.azure.com",
-      "poolName": "thesis-diag-pool",
+      "poolName": "replace-session-pool",
       "region": "eastus",
       "sessionRegistryUrl": "https://REPLACE-REGISTRY.blob.core.windows.net/session-mappings",
       "fixtureBlobEndpoint": "https://REPLACE-FIXTURE.blob.core.windows.net",

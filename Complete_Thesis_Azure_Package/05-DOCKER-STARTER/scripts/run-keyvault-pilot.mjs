@@ -71,8 +71,11 @@ export function buildPilotArgs(extraArgs=[]) {
   const args=[...extraArgs];
   if(args.some(arg=>['--gates','--config','--deployment','--profile','--pilot','--deps'].includes(arg)))
     throw safeError('pilot scope and config are fixed by this launcher');
+  const retry=args.includes('--pilot-retry');
   for(let i=0;i<args.length;i++) {
-    if(args[i]==='--limit') {
+    if(args[i]==='--pilot-retry') {
+      if(i!==0 || !retry) throw safeError('--pilot-retry may appear only once at the start of the options');
+    } else if(args[i]==='--limit') {
       const count=Number(args[i+1]);
       if(!Number.isInteger(count)||count<1||count>10) throw safeError('--limit must be between 1 and 10');
       i++;
@@ -83,8 +86,8 @@ export function buildPilotArgs(extraArgs=[]) {
     } else throw safeError(`unsupported pilot launcher option: ${args[i]}`);
   }
   return ['scripts/run-experiment-cli.mjs','--config','config/experiment.pilot.functions-p1.example.json',
-    '--pilot','--deployment','azure_functions_flex','--profile','P1','--concurrency','1',
-    '--deps','scripts/deps-live.mjs',...args];
+    retry?'--pilot-retry':'--pilot','--deployment','azure_functions_flex','--profile','P1','--concurrency','1',
+    '--deps','scripts/deps-live.mjs',...args.filter(arg=>arg!=='--pilot-retry')];
 }
 
 export async function runPilot({env=process.env,argv=process.argv.slice(2),fetchImpl=globalThis.fetch,spawnImpl=spawn}={}) {

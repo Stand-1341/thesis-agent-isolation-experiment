@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.48.1.52935",
+      "templateHash": "14426105652946487344"
+    }
+  },
+  "parameters": {
+    "registryName": {
+      "type": "string",
+      "defaultValue": "thesisacr74a95224",
+      "metadata": {
+        "description": "Existing registry to which the pull identity needs metadata read access."
+      }
+    },
+    "pullIdentityName": {
+      "type": "string",
+      "defaultValue": "id-thesis-acr-pull",
+      "metadata": {
+        "description": "Existing user-assigned identity already holding AcrPull at the registry scope."
+      }
+    }
+  },
+  "variables": {
+    "readerRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('registryName'))]",
+      "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('registryName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('pullIdentityName')), variables('readerRoleDefinitionId'))]",
+      "properties": {
+        "roleDefinitionId": "[variables('readerRoleDefinitionId')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('pullIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    }
+  ],
+  "outputs": {
+    "assignmentId": {
+      "type": "string",
+      "value": "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', parameters('registryName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('registryName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('pullIdentityName')), variables('readerRoleDefinitionId')))]"
+    }
+  }
+}

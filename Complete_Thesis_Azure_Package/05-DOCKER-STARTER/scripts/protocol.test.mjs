@@ -32,6 +32,21 @@ function loadPilot(){
     'non-counted pilot matrix must match its protocol digest');
   return loadFrozenSchedule(bytes,protocol.pilotPlan.sha256).rows;
 }
+function loadPilotRetry(planName='pilotRetryPlan'){
+  const protocol=loadProtocol();
+  const plan=protocol[planName];
+  const bytes=readFileSync(new URL(`../../${plan.file}`,import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),plan.sha256,
+    'versioned retry matrix must match its protocol digest');
+  return loadFrozenSchedule(bytes,plan.sha256).rows;
+}
+function loadPilotRetryV1(){
+  const protocol=loadProtocol(),plan=protocol.pilotRetryPlanV1;
+  const bytes=readFileSync(new URL(`../../${plan.file}`,import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),plan.sha256,
+    'archived v1 retry matrix must stay byte-for-byte frozen');
+  return loadFrozenSchedule(bytes,plan.sha256).rows;
+}
 
 test('non-counted pilot has a separate frozen 80-row schedule',()=>{
   const protocol=loadProtocol(),rows=loadPilot();
@@ -42,6 +57,40 @@ test('non-counted pilot has a separate frozen 80-row schedule',()=>{
   assert.ok(rows.every(row=>row.planned_run_id.startsWith('pilot-')));
   assert.equal(rows.some(row=>row.deployment==='azure_custom_sessions_hyperv' && row.permission_profile==='P3'),false);
   assert.equal(new Set(rows.map(row=>`${row.deployment}:${row.permission_profile}`)).size,8);
+});
+
+test('v1 retry schedule stays archived after its indeterminate U4 claim',()=>{
+  const protocol=loadProtocol(),plan=protocol.pilotRetryPlanV1,rows=loadPilotRetryV1();
+  assert.equal(plan.countedAsStudyTrials,false);
+  assert.equal(plan.status,'halted_at_U4_indeterminate; all claimed IDs remain preserved');
+  assert.equal(rows.length,plan.trials);
+  assert.ok(rows.every(row=>row.planned_run_id.startsWith('pilot-retry-20261103-v1-')));
+});
+
+test('v2 retry schedule preserves earlier claims as a frozen archive',()=>{
+  const protocol=loadProtocol(),plan=protocol.pilotRetryPlanV2,rows=loadPilotRetry('pilotRetryPlanV2');
+  assert.equal(plan.countedAsStudyTrials,false);
+  assert.equal(plan.preservesPriorClaims,true);
+  assert.equal(plan.derivedFrom,protocol.pilotRetryPlanV1.sha256);
+  assert.equal(plan.supersedes,'pilotRetryPlanV1');
+  assert.equal(rows.length,plan.trials);
+  assert.deepEqual(rows.map(row=>row.scenario_id),['U1','U2','U3','U4','U5','L1']);
+  assert.ok(rows.every(row=>row.deployment==='azure_functions_flex' && row.permission_profile==='P1'));
+  assert.ok(rows.every(row=>row.planned_run_id.startsWith('pilot-retry-20261103-v2-')));
+  assert.equal(rows.some(row=>row.scenario_id==='U7'),false);
+  assert.match(plan.excluded.U7,/pending resolution/);
+});
+
+test('v3 schedule is a fresh single-row Functions P1 U3 non-counted retest',()=>{
+  const protocol=loadProtocol(),plan=protocol.pilotRetryPlan,rows=loadPilotRetry();
+  assert.equal(plan.countedAsStudyTrials,false);
+  assert.equal(plan.trials,1);
+  assert.equal(plan.preservesPriorClaims,true);
+  assert.equal(plan.derivedFrom,protocol.pilotRetryPlanV2.sha256);
+  assert.equal(plan.supersedes,'pilotRetryPlanV2');
+  assert.deepEqual(rows.map(row=>row.scenario_id),['U3']);
+  assert.ok(rows.every(row=>row.deployment==='azure_functions_flex' && row.permission_profile==='P1'));
+  assert.ok(rows.every(row=>row.planned_run_id.startsWith('pilot-retry-20261103-v3-')));
 });
 
 test('protocol.json names match the frozen matrix exactly',()=>{

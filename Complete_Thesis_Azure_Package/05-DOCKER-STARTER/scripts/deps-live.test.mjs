@@ -16,7 +16,8 @@ test('live dependencies do not require an unused subscription ID environment var
 test('unverified live verifiers are constructible only in explicitly non-counted pilot mode',async()=>{
   const shape=await loadExperimentConfigShape(fileURLToPath(new URL('../config/experiment.example.json',import.meta.url)));
   const config=structuredClone(shape);
-  config.deployments.azure_custom_sessions_hyperv.managementEndpoint='https://thesis-diag-pool.fakeenv.eastus.azurecontainerapps.io';
+  config.deployments.azure_custom_sessions_hyperv.poolName='fake-session-pool';
+  config.deployments.azure_custom_sessions_hyperv.managementEndpoint='https://fake-session-pool.fakeenv.eastus.azurecontainerapps.io';
   config.deployments.azure_custom_sessions_hyperv.fixtureBlobEndpoint='https://fixture123.blob.core.windows.net/';
   config.deployments.azure_custom_sessions_hyperv.resourceUrl='https://resource.example.test';
   config.deployments.azure_custom_sessions_hyperv.collectorUrl='https://collector.example.test';

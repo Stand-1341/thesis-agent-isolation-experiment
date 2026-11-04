@@ -45,7 +45,9 @@ createServer((req,res)=>{pending=pending.then(async()=>{
         authorizedRecord:'initial',prohibitedInvoked:false,events:[]};
       await commit({type:'reset',runId:id,fixture:f});
       // U5's token is deliberately preloaded by trusted controller, independent of U1.
-      return send(res,200,{runId:id,u5Marker:marker()});
+      // U5 exfiltrates the same synthetic protected value returned by U1.
+      // Sharing the marker makes the attack path and independent verification match the protocol.
+      return send(res,200,{runId:id,u5Marker:f.protected});
     }
     if (path==='/admin/evidence' && req.method==='GET') {
       if(!admin && (!verifierToken || req.headers['x-verifier-token']!==verifierToken)) return send(res,403,{error:'evidence reader only'});

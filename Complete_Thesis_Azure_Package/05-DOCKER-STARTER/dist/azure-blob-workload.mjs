@@ -1,4 +1,45 @@
 /** Candidate synthetic Azure Blob data-plane operations. No cloud validation yet. */
+import https from 'node:https';
+import {readFile} from 'node:fs/promises';
+
+const SAFE_TRANSPORT_CODES=new Set([
+  'DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'ERR_TLS_CERT_ALTNAME_INVALID','CERT_HAS_EXPIRED','ECONNREFUSED','ECONNRESET','ETIMEDOUT',
+  'EHOSTUNREACH','ENETUNREACH','ENOTFOUND','EAI_AGAIN','UND_ERR_CONNECT_TIMEOUT','UND_ERR_SOCKET'
+]);
+function safeTransportCode(error) {
+  const pending=[error],visited=new Set();
+  while(pending.length) {
+    const current=pending.shift();
+    if(!current || typeof current!=='object' || visited.has(current)) continue;
+    visited.add(current);
+    if(typeof current.code==='string' && SAFE_TRANSPORT_CODES.has(current.code)) return current.code;
+    if(current.cause) pending.push(current.cause);
+    if(Array.isArray(current.errors)) pending.push(...current.errors);
+  }
+}
+
+async function postDummyApi(url,headers,body,timeoutMs) {
+  const caPath=process.env.NODE_EXTRA_CA_CERTS;
+  if(!caPath) return await fetch(url,{method:'POST',redirect:'error',headers,body,signal:AbortSignal.timeout(timeoutMs)});
+  const ca=await readFile(caPath);
+  return await new Promise((resolve,reject)=>{
+    const request=https.request(url,{method:'POST',headers:{...headers,'content-length':String(Buffer.byteLength(body))},
+      ca,rejectUnauthorized:true,signal:AbortSignal.timeout(timeoutMs)},response=>{
+      const chunks=[];
+      response.on('data',chunk=>chunks.push(Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk)));
+      response.on('error',reject);
+      response.on('end',()=>{
+        const raw=Buffer.concat(chunks).toString('utf8');
+        resolve({status:response.statusCode??0,ok:(response.statusCode??0)>=200&&(response.statusCode??0)<300,
+          json:async()=>JSON.parse(raw),text:async()=>raw});
+      });
+    });
+    request.once('error',reject);
+    request.end(body);
+  });
+}
+
 const operations={
   U1:{container:'restricted-docs',method:'GET'},
   U2:{container:'restricted-records',method:'PUT',body:{value:'trial-change'}},
@@ -43,12 +84,13 @@ export function createBlobWorkload({blobEndpoint,getToken,dummyApiUrl,dummyApiWo
         if(response.status===200 && typeof synthetic==='string' && synthetic.startsWith('SYNTHETIC-')) {
           if(!dummyApi) result.dummyUse={attempted:false,reason:'dummy_api_not_configured'};
           else try {
-            const use=await fetch(`${dummyApi.href.replace(/\/$/,'')}/api/use-dummy`,{method:'POST',redirect:'error',
-              headers:{'content-type':'application/json','x-run-id':runId,'x-workload-token':dummyApiWorkloadToken},
-              body:JSON.stringify({token:synthetic}),signal:AbortSignal.timeout(timeoutMs)});
+            const use=await postDummyApi(`${dummyApi.href.replace(/\/$/,'')}/api/use-dummy`,
+              {'content-type':'application/json','x-run-id':runId,'x-workload-token':dummyApiWorkloadToken},
+              JSON.stringify({token:synthetic}),timeoutMs);
             const useBody=await use.json();
             result.dummyUse={attempted:true,transportOk:true,status:use.status,body:useBody};
-          } catch(error) { result.dummyUse={attempted:true,transportOk:false,errorType:error?.name || 'Error'}; }
+          } catch(error) { result.dummyUse={attempted:true,transportOk:false,errorType:error?.name || 'Error',
+            ...(safeTransportCode(error)?{errorCode:safeTransportCode(error)}:{})}; }
         }
       }
       return result;

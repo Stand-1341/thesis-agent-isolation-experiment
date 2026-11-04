@@ -30,6 +30,7 @@ test('--help exits 0 and documents the exit codes',()=>{
   const {code,out}=run(['--help']);
   assert.equal(code,0);
   assert.match(out,/--dry-run/);
+  assert.match(out,/--pilot-retry/);
   assert.match(out,/run-experiment-cli/);
 });
 
@@ -38,6 +39,7 @@ test('usage errors exit 5 without touching configuration',()=>{
   assert.equal(run(['--config']).code,5);
   assert.equal(run(['--config','x','--limit','0']).code,5);
   assert.equal(run(['--config','x','--offset','-1']).code,5);
+  assert.equal(run(['--config','x','--pilot','--pilot-retry']).code,5);
   assert.equal(run(['--config','x','--nope']).code,5);
 });
 
@@ -107,6 +109,28 @@ export default {denialReader:Object.assign(async()=>({verdict:'observed_allow',e
   assert.equal(next.code,0,next.err);
   const nextEnvelope=JSON.parse(readFileSync(join(pilotEvidence,'pilot-azure_vm-P1-U2.json'),'utf8'));
   assert.equal(JSON.parse(nextEnvelope.payload).trial.scenario,'U2');
+});
+
+test('versioned U3 retry plan uses a new ID and writes separate non-counted evidence',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'cli-pilot-retry-'));
+  const deps=join(dir,'deps.mjs');
+  await writeFile(deps,`const classify=async trial=>({classification:trial.scenario.startsWith('L')?'legitimate_completion':'unauthorized_success'});
+const httpFactory=()=>({reset:async()=>({u5Marker:'SYNTHETIC-retry-marker'}),execute:async trial=>({runId:trial.runId,scenario:trial.scenario,status:200,body:{}}),collect:async()=>({resource:{events:[]},collector:{}})});
+export default {denialReader:Object.assign(async()=>({verdict:'observed_allow',evidence:{}}),{capabilities:{azure_vm:true,azure_functions_flex:true}}),blobVerifier:classify,collectorVerifier:classify,resourceVerifier:classify,httpFactory};\n`);
+  const pilotEvidence=join(dir,'pilot-retry-evidence');
+  const out=run(['--config',EXAMPLE,'--deps',deps,'--pilot-retry','--deployment','azure_functions_flex','--profile','P1','--limit','1',
+    '--pilot-evidence',pilotEvidence,'--json'],credentialEnv());
+  const summary=out.out.includes('{')?JSON.parse(out.out.slice(out.out.indexOf('{'))):null;
+  assert.ok(summary,`expected a JSON summary, exit ${out.code}:\n${out.out}\n${out.err}`);
+  assert.equal(out.code,0,out.err);
+  assert.equal(summary.mode,'non_counted_pilot');
+  assert.equal(summary.studyCounted,false);
+  assert.equal(summary.matrixRows,1);
+  assert.equal(summary.executed,1);
+  const path=join(pilotEvidence,'pilot-retry-20261103-v3-azure_functions_flex-P1-U3.json');
+  const evidence=JSON.parse(JSON.parse(readFileSync(path,'utf8')).payload);
+  assert.equal(evidence.mode,'non_counted_pilot');
+  assert.equal(evidence.trial.scenario,'U3');
 });
 
 test('pilot rejects measured gates and custom schedules',()=>{
