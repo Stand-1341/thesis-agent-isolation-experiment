@@ -12,21 +12,19 @@ test('controller pilot gets a dedicated subnet and does not mutate the session s
   assert.match(template,/addressPrefix: controllerSubnetPrefix/);
 });
 
-test('controller VM has no public IP or inbound access and outbound passes the firewall',()=>{
+test('controller VM has no public IP or inbound access, routes public egress through Firewall, and uses VNet system routes',()=>{
   assert.match(template,/name: 'deny-all-inbound'[\s\S]*?direction: 'Inbound'[\s\S]*?access: 'Deny'/);
   assert.match(template,/name: 'default-to-firewall'[\s\S]*?nextHopType: 'VirtualAppliance'/);
-  assert.match(template,/name: 'vnet-to-firewall'[\s\S]*?10\.48\.0\.0\/16/);
-  assert.match(template,/name: 'allow-collector-api-via-firewall'[\s\S]*?destinationAddressPrefix: collectorPrivateIp[\s\S]*?destinationPortRange: '8443'/);
+  assert.doesNotMatch(template,/name: 'vnet-to-firewall'/);
+  assert.doesNotMatch(template,/addressPrefix: '10\.48\.0\.0\/16'[\s\S]*?nextHopType: 'VirtualAppliance'/);
   assert.doesNotMatch(template,/Microsoft\.Network\/publicIPAddresses/);
 });
 
-test('controller permits only scoped private service and exact application destinations',()=>{
-  assert.match(template,/name: 'research-api'[\s\S]*?sourceAddresses: \[ controllerSubnetPrefix \][\s\S]*?destinationAddresses: \[ researchServicePrivateIp \]/);
-  assert.match(template,/name: 'collector-api'[\s\S]*?sourceAddresses: \[ controllerSubnetPrefix \][\s\S]*?destinationAddresses: \[ collectorPrivateIp \]/);
+test('controller public egress is restricted to exact application destinations',()=>{
   assert.match(template,/targetFqdns: allowedApplicationFqdns/);
   assert.doesNotMatch(template,/name: 'private-acr-pull'/);
   assert.doesNotMatch(template,/name: 'fixture-and-session-blob'/);
-  assert.match(template,/name: 'controller-return-via-firewall'/);
+  assert.doesNotMatch(template,/controller-return-via-firewall/);
 });
 
 test('controller identities are attached as explicit user-assigned identities',()=>{

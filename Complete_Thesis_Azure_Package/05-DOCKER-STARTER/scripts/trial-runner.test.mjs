@@ -147,3 +147,36 @@ test('does not clean up an indeterminate session before investigation',async()=>
     assert.equal(cleaned,false);
   } finally {await rm(dir,{recursive:true,force:true});}
 });
+
+test('ACI opt-in cleanup runs after an indeterminate classification and records deletion',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'trial-aci-cleanup-'));
+  try {
+    let cleaned=false;
+    const gates={protocolFrozen:true,deploymentValidated:true,isolationValidated:true,verifierValidated:true};
+    const adapter={cleanupOnFailure:true,reset:async()=>({}),execute:async t=>({runId:t.runId,scenario:t.scenario}),collect:async()=>({}),
+      cleanup:async()=>{cleaned=true;return {groupName:'thesis-aci-p1-deadbeef',deleted:true};}};
+    const record=await runTrial({trial:{runId:'pilot-aci-indeterminate',scenario:'U1'},gates,adapter,
+      verifier:async()=>({classification:'indeterminate',evidence:{reason:'audit_missing'}}),evidenceDirectory:dir,mode:'non_counted_pilot'});
+    assert.equal(record.classification,'indeterminate');
+    assert.equal(cleaned,true);
+    const cleanupId=`cleanup-${createHash('sha256').update('pilot-aci-indeterminate').digest('hex')}`;
+    const cleanup=await readEvidence(join(dir,`${cleanupId}.json`));
+    assert.equal(cleanup.status,'completed');
+    assert.deepEqual(cleanup.outcome,{groupName:'thesis-aci-p1-deadbeef',deleted:true});
+  } finally {await rm(dir,{recursive:true,force:true});}
+});
+
+test('ACI opt-in cleanup runs and is recorded after an execution failure',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'trial-aci-failure-cleanup-'));
+  try {
+    let cleaned=false;
+    const adapter={cleanupOnFailure:true,reset:async()=>({}),execute:async()=>{throw new Error('agent readiness timeout');},collect:async()=>({}),
+      cleanup:async()=>{cleaned=true;return {groupName:'thesis-aci-p1-deadbeef',deleted:true};}};
+    await assert.rejects(runTrial({trial:{runId:'pilot-aci-failed',scenario:'U1'},gates:{},adapter,
+      verifier:async()=> 'indeterminate',evidenceDirectory:dir,mode:'non_counted_pilot'}),/agent readiness timeout/);
+    assert.equal(cleaned,true);
+    assert.equal((await readEvidence(join(dir,'pilot-aci-failed.json'))).classification,'indeterminate');
+    const cleanupId=`cleanup-${createHash('sha256').update('pilot-aci-failed').digest('hex')}`;
+    assert.equal((await readEvidence(join(dir,`${cleanupId}.json`))).status,'completed');
+  } finally {await rm(dir,{recursive:true,force:true});}
+});

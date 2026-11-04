@@ -7,8 +7,6 @@ param vnetName string
 param firewallName string
 param firewallPolicyName string
 param researchNsgName string
-param serviceReturnRouteTableName string
-param privateEndpointReturnRouteTableName string
 @minLength(3)
 @maxLength(50)
 param controllerName string
@@ -39,8 +37,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' existing = { name: 
 resource firewall 'Microsoft.Network/azureFirewalls@2023-09-01' existing = { name: firewallName }
 resource firewallPolicy 'Microsoft.Network/firewallPolicies@2023-09-01' existing = { name: firewallPolicyName }
 resource researchNsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' existing = { name: researchNsgName }
-resource serviceReturnTable 'Microsoft.Network/routeTables@2023-09-01' existing = { name: serviceReturnRouteTableName }
-resource endpointReturnTable 'Microsoft.Network/routeTables@2023-09-01' existing = { name: privateEndpointReturnRouteTableName }
 resource controllerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = { name: controllerIdentityName }
 resource auditIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = { name: auditIdentityName }
 resource sessionIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = { name: sessionIdentityName }
@@ -154,14 +150,6 @@ resource controllerRouteTable 'Microsoft.Network/routeTables@2023-09-01' = {
           nextHopIpAddress: firewall.properties.ipConfigurations[0].properties.privateIPAddress
         }
       }
-      {
-        name: 'vnet-to-firewall'
-        properties: {
-          addressPrefix: '10.48.0.0/16'
-          nextHopType: 'VirtualAppliance'
-          nextHopIpAddress: firewall.properties.ipConfigurations[0].properties.privateIPAddress
-        }
-      }
     ]
   }
 }
@@ -173,27 +161,6 @@ resource controllerSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01'
     addressPrefix: controllerSubnetPrefix
     networkSecurityGroup: { id: controllerNsg.id }
     routeTable: { id: controllerRouteTable.id }
-  }
-}
-
-// Symmetric return routes preserve the Firewall path for private service and
-// Blob endpoints. These are additive child routes on the existing route tables.
-resource serviceReturnRoute 'Microsoft.Network/routeTables/routes@2023-09-01' = {
-  parent: serviceReturnTable
-  name: 'controller-return-via-firewall'
-  properties: {
-    addressPrefix: controllerSubnetPrefix
-    nextHopType: 'VirtualAppliance'
-    nextHopIpAddress: firewall.properties.ipConfigurations[0].properties.privateIPAddress
-  }
-}
-resource endpointReturnRoute 'Microsoft.Network/routeTables/routes@2023-09-01' = {
-  parent: endpointReturnTable
-  name: 'controller-return-via-firewall'
-  properties: {
-    addressPrefix: controllerSubnetPrefix
-    nextHopType: 'VirtualAppliance'
-    nextHopIpAddress: firewall.properties.ipConfigurations[0].properties.privateIPAddress
   }
 }
 
@@ -232,30 +199,6 @@ resource controllerEgressRules 'Microsoft.Network/firewallPolicies/ruleCollectio
   properties: {
     priority: 300
     ruleCollections: [
-      {
-        name: 'controller-private-https'
-        ruleCollectionType: 'FirewallPolicyFilterRuleCollection'
-        priority: 100
-        action: { type: 'Allow' }
-        rules: [
-          {
-            ruleType: 'NetworkRule'
-            name: 'research-api'
-            ipProtocols: [ 'TCP' ]
-            sourceAddresses: [ controllerSubnetPrefix ]
-            destinationAddresses: [ researchServicePrivateIp ]
-            destinationPorts: [ string(researchServicePort) ]
-          }
-          {
-            ruleType: 'NetworkRule'
-            name: 'collector-api'
-            ipProtocols: [ 'TCP' ]
-            sourceAddresses: [ controllerSubnetPrefix ]
-            destinationAddresses: [ collectorPrivateIp ]
-            destinationPorts: [ string(collectorPort) ]
-          }
-        ]
-      }
       {
         name: 'controller-public-https'
         ruleCollectionType: 'FirewallPolicyFilterRuleCollection'
@@ -312,7 +255,7 @@ resource controllerVm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
     }
     networkProfile: { networkInterfaces: [ { id: controllerNic.id } ] }
   }
-  dependsOn: [ controllerEgressRules, serviceReturnRoute, endpointReturnRoute, allowResearchFromController, allowCollectorFromController ]
+  dependsOn: [ controllerEgressRules, allowResearchFromController, allowCollectorFromController ]
 }
 
 resource controllerNic 'Microsoft.Network/networkInterfaces@2023-09-01' = {

@@ -15,7 +15,8 @@
     "plan": "node scripts/plan.mjs",
     "run:experiment": "node scripts/run-experiment-cli.mjs",
     "check:deploy": "node scripts/run-experiment-cli.mjs --config config/experiment.example.json --dry-run",
-    "smoke:live": "node scripts/live-deployment-smoke.mjs"
+    "smoke:live": "node scripts/live-deployment-smoke.mjs",
+    "run:aci-p1-pilot": "node scripts/run-aci-p1-pilot.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

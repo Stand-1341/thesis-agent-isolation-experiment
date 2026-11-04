@@ -43,33 +43,46 @@ limits, so the runner must stay sequential and obey returned throttling.
 
 - ACI VNet deployment requires a dedicated `Microsoft.ContainerInstance/
   containerGroups` delegated subnet. Microsoft recommends at least `/24` for
-  repeated group creation. The candidate free range is `10.48.13.0/24` in the
-  existing East US VNet; recheck for overlap immediately before deployment.
+  repeated group creation. The deployed range is `10.48.13.0/24` in the
+  existing East US VNet.
 - Container groups in a VNet have private IPs. The candidate ACI subnet must
   allow only the controller path to TCP/8080 inbound. DNS must be configured
   explicitly because ACI doesn't inherit VNet DNS settings.
+- Microsoft currently requires a NAT Gateway for outbound connectivity from
+  ACI container groups deployed in a VNet. ACI does not support the subnet's
+  existing 0/0 UDR through Azure Firewall as its outbound route. The pilot
+  subnet now uses NAT Gateway egress with Standard public IP `20.121.216.52`.
+  P1/P2 retain their permissive network baseline.
+- The controller subnet now uses VNet system routes for private VNet targets
+  and retains its 0/0 route through Azure Firewall for public egress. This gives
+  the controller and ACI a symmetric private path to the private agent and
+  research endpoints without forcing ACI through the Firewall.
+- The research-host NSG has two deployed allowances from `10.48.13.0/24` to
+  research `10.48.9.4:443` and collector `10.48.9.5:8443`. Older broad inbound
+  rules also exist, so these allowances do not prove source-only access. Review
+  rule ordering and constrain broad rules before making that claim.
+- The controller-to-ACI TCP/8080 allowance is deployed. A non-counted smoke
+  passed from the controller VM and its ACI group was deleted. Both VMs are now
+  deallocated and no ACI group is running.
 - P1/P2 ACI groups keep their intended permission-profile difference at Azure
   RBAC. The P3 session cells were already withdrawn from revision 2 and remain
   out of scope. Do not treat an ACI P1/P2 firewall route as validated P3
   containment.
 - Azure lists ACI as unsupported for Virtual Network Flow Logs. Network-denial
-  attribution therefore cannot depend on VNet Flow Logs. If a future approved
-  method adds ACI P3, the existing Azure Firewall can be used as the candidate
-  enforcement and log source, but selective rules, return paths, operation
-  correlation, and independent log reads must all pass a pilot first.
-- The current subscription has consumed its Standard public-IP quota (3/3),
-  and no unattached public IP is available for a new NAT Gateway. The candidate
-  pilot uses the existing Azure Firewall and its existing UDR pattern, which
-  Microsoft documents for ACI static egress. However, the current ACI VNet
-  overview now states NAT Gateway is the only supported outbound configuration.
-  These Microsoft pages conflict; deployment preflight and a non-counted smoke
-  group must resolve whether this subscription accepts and supports the existing
-  Firewall path. If Azure requires a NAT Gateway, stop and request one additional
-  Standard public IP or choose another approved method. Do not delete or reassign
-  the Firewall IPs. The subnet template adds symmetric return routes to the
-  already-associated private-endpoint and research-service route tables. The
-  pilot firewall policy permits broad ACI P1/P2 egress, matching their
-  permissive network baseline; it cannot be reused as an ACI P3 treatment.
+  attribution therefore cannot depend on VNet Flow Logs. ACI remains P1/P2
+  only; these profiles do not claim network containment and have no expectation
+  of a network-deny record. Do not add ACI P3 without a supported enforcement
+  path and attributable independent denial evidence.
+- The NAT Gateway and Standard public IP are deployed and `Succeeded`. The
+  ACI subnet has its required delegation and NAT association, with no route
+  table. The earlier ACA diagnostic environment no longer blocks ACI deployment.
+  Preserve the Azure Firewall's public IPs.
+- The ACI subnet template no longer associates the unsupported Firewall UDR.
+  ACI-to-target private traffic will use VNet system routes. The two temporary
+  target-subnet return routes were removed. The controller's VNet override and
+  the corresponding private-endpoint/service return routes were also removed;
+  the controller keeps its Internet default route through Firewall and private
+  VNet destinations use system routes.
 
 ## Gates before deployment and measured runs
 
@@ -89,19 +102,23 @@ limits, so the runner must stay sequential and obey returned throttling.
    Functions route gates. Recompute the new ACI matrix and cost estimate, then
    freeze the protocol only after approval and all pilot checks pass.
 
-**Current state:** no ACI container group is deployed. The ACI usage quota is
-available for a small pilot. A no-change preflight for a new NAT Gateway failed
-because Standard public IP quota is already 3/3. No ACI resource deployment was
-attempted. ACI's VNet overview and its Azure Firewall egress tutorial conflict
-on the required outbound path; a contained no-counted smoke deployment must
-resolve that before proceeding. The local CLI's ACR authorization refresh also
-failed on 2026-11-04, and the research/controller VMs are deallocated. No
-measured trial has run.
+**Current state (verified 2026-11-04):** no ACI container group is deployed.
+The NAT Gateway and Standard public IP `20.121.216.52` are deployed. The ACR
+image was successfully pushed as `thesisacr74a95224.azurecr.io/
+thesis-agent-aci-pilot:20261104` with digest
+`sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b`.
+ACR allows the NAT IP; the temporary workstation allow rule was removed. One
+non-counted private health smoke passed from the controller VM; three earlier
+smokes failed their health probe and were cleaned up. Key Vault contains only
+the six Functions P1 pilot secret names, with no ACI workload/controller
+secrets. Both VMs are deallocated. The 50-row ACI draft remains non-runnable
+pending method approval, U6/U8 analogs, runner integration, and independent
+evidence. No measured trial has run.
 
 ## Microsoft references
 
 - [ACI VNet scenarios and limitations](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-virtual-network-concepts)
-- [ACI static outbound through Azure Firewall](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-egress-ip-address)
+- [ACI NAT Gateway egress for VNet container groups](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-nat-gateway)
 - [ACI managed identities](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-managed-identity)
 - [ACI quotas](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-resource-and-quota-limits)
 - [VNet Flow Log incompatible services](https://learn.microsoft.com/en-us/azure/network-watcher/vnet-flow-logs-overview)

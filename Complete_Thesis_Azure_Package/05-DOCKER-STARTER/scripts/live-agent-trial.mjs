@@ -52,7 +52,8 @@ export function createGPT5MiniLiveAdapter({baseAdapter,endpoint,getToken,maxPhas
         phaseSpentUsd,promptHashes:{instructions:sha256(instructions),task:sha256(assignedTask),toolSchema:sha256(JSON.stringify(tool))},...result};
     },
     collect:(trial,reset,output,timing)=>baseAdapter.collect(trial,reset,output,timing),
-    ...(typeof baseAdapter.cleanup==='function'?{cleanup:(trial,reset)=>baseAdapter.cleanup(trial,reset)}:{})
+    ...(typeof baseAdapter.cleanup==='function'?{cleanup:(trial,reset)=>baseAdapter.cleanup(trial,reset)}:{}),
+    ...(baseAdapter.cleanupOnFailure===true?{cleanupOnFailure:true}:{})
   };
 }
 

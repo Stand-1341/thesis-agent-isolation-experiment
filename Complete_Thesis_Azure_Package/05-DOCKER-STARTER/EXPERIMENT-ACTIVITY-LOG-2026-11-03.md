@@ -120,3 +120,55 @@ Pool deletion completed on 2026-11-04. Azure's session-pool list no longer retur
 - Azure billing-profile API returned $200 current/estimated credit and zero pending eligible charges. Cost Management usage still returned null amounts, so prior charges may lag. Retail-rate estimate for one E16 node: 16 vCPU × $0.057077/hour + 128 GiB × $0.004978/hour + $0.10/hour dedicated management = ~$1.65/hour, ~$39.61/day, ~$1,188 per 30 days. This assumes one continuously allocated node and excludes other services. No E16 compute is running.
 - `npm run verify` passed **222/222** tests. The new session subnet and environment Bicep templates compiled. The `config/experiment.json` live config is still absent; example-config structural preflight reports 20 unsupported P3 rows, 13 missing environment credential references, and all four readiness gates unverified.
 - No measured trial was started. The regional environment quota prevents session-route deployment pending replacement or quota increase; the remaining seven routes and full Azure pilot are also incomplete.
+
+## ACI deployment continuation — 2026-11-04
+
+- Confirmed active Azure account and subscription. The ACI subnet exists, but
+  `az container list` returned no container groups. Both the controller and
+  research-target VMs are deallocated; the resource inventory returned no
+  Function App. No experiment trial was running.
+- The workstation could not push to ACR because its IP (`76.78.187.165`) was
+  absent from the registry allowlist. Added that single IP temporarily, pushed
+  `thesis-agent-aci-pilot:20261104`, and confirmed registry digest
+  `sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b`.
+  Removed the temporary ACR IP rule afterward; the existing `.164` rule remains.
+- Key Vault access from this workstation was also blocked by its IP firewall.
+  A temporary `.165` rule exposed only the names of six Functions P1 pilot
+  secrets. No ACI/session workload or controller credentials exist in that
+  inventory. Removed the temporary Key Vault IP rule afterward; no secret
+  values were read or printed.
+- Live Azure documentation confirms ACI container groups in a VNet require a
+  NAT Gateway for outbound; the previous ACI subnet UDR through Azure Firewall
+  is unsupported. Standard public-IP use is 3/3. The empty Consumption-only ACA
+  environment `cae-thesis-experiment-eus` was confirmed to have no apps, jobs,
+  or session pools, and was selected for replacement under the prior user
+  authorization. Azure reports `ScheduledForDelete`; its managed load-balancer
+  public IP still exists, so quota is not yet freed. The two Firewall IPs were
+  preserved.
+- Replaced the ACI network template's Firewall UDR and temporary return routes
+  with a Standard public IP and NAT Gateway association. Removed the ACI return
+  routes from the private-endpoint and service route tables. A request to delete
+  the now-unused broad ACI Firewall rule group was accepted; Azure reported it
+  is still `Deleting` under operation
+  `783f3704-764e-48ec-b335-e6dc928bfdce` at the last check.
+- Removed the controller subnet's `10.48.0.0/16` Firewall override and its
+  private-endpoint/service return routes. The controller keeps the public
+  `0.0.0.0/0` Firewall route while VNet destinations use system routes. Added
+  two narrow deployed research-host NSG rules allowing only ACI subnet
+  `10.48.13.0/24` to reach research `10.48.9.4:443` and collector
+  `10.48.9.5:8443`; this subnet has no container groups yet.
+- Updated the ACI method and acceptance notes to state the supported NAT design,
+  public-IP quota dependency, current image digest, absent session credentials,
+  and lack of an integrated runner. No ACI group, smoke run, or measured row was
+  deployed or executed. Tests were not run in that continuation.
+
+## ACI continuation — 2026-11-04 (CLI reauthentication verified)
+
+- Azure CLI is authenticated to the enabled subscription `dddc5a29-1701-44ad-b367-50b466089d4b` as `svarnado@gsumail.gram.edu`.
+- Live inventory: no ACI container groups; `thesis-controller-pilot` and `thesis-p3-targets` are deallocated. The ACI NAT Gateway and Standard IP `20.121.216.52` are both `Succeeded`; the subnet is delegated to Container Instances, associated with the NAT Gateway, and has no route table. ACR default action is `Deny` and its allowlist contains the NAT IP plus the existing `.164` workstation entry.
+- The image digest remains `sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b`. Earlier non-counted health smoke evidence includes one pass and three failed probes with cleanup confirmed; no group is currently running.
+- The 50-row ACI draft validator reports `runnable: false` and `countedAsStudyTrials: false`; blockers include method approval, U6/U8 analogs, runner integration, and independent evidence. No measured trial has run.
+- U6/U8 are fail-closed in the ACI runtime until the workload actually tests cross-group access and stale state under a fresh identity. The group lifecycle helper alone did not implement those operations. Focused tests passed after adding this guard.
+- A dedicated sequential runner and dry-run preflight were added. It loads runtime dependencies only after its readiness gates pass, marks execution as non-counted, and halts on indeterminate results. `npm test` passes 263 tests; `npm run run:aci-p1-pilot -- --dry-run` correctly reports `runnable:false` and `executionStarted:false`.
+- No secret values were read or printed. ACI workload/controller credentials and final independent evidence configuration remain incomplete. Existing VM P1 roles span shared session containers, so that identity cannot be reused as an ACI per-group identity without redesigning and validating isolation.
+- The NAT Gateway remains allocated and may incur charges while no groups run. Cost Management returned no current dollar amount in this check.

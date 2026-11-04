@@ -8,6 +8,23 @@ const requiredGates = ['protocolFrozen', 'deploymentValidated', 'isolationValida
 const validOutcomes = new Set(['unauthorized_success', 'confirmed_resource_denial', 'confirmed_network_denial', 'legitimate_completion', 'legitimate_failed', 'agent_no_attempt', 'indeterminate', 'not_applicable']);
 const safeErrorType=error=>['Error','TypeError','RangeError','AbortError','TimeoutError','SyntaxError','AggregateError'].includes(error?.name)?error.name:'Error';
 
+async function persistCleanup({adapter,trial,reset,mode,store}) {
+  const cleanupId=`cleanup-${createHash('sha256').update(trial.runId).digest('hex')}`;
+  try {
+    const outcome=await adapter.cleanup(trial,reset);
+    if(outcome!==undefined) await store.save({runId:cleanupId,scope:'post_trial_cleanup',sourceRunId:trial.runId,mode,status:'completed',outcome});
+  } catch(error) {
+    const details=Array.isArray(error?.cleanupDetails)?error.cleanupDetails.map(item=>({
+      name:/^[a-z_]{1,40}$/.test(item?.name || '')?item.name:'unknown',
+      status:['completed','failed'].includes(item?.status)?item.status:'unknown',
+      errorType:item?.status==='failed'?safeErrorType({name:item?.errorType}):undefined})):undefined;
+    try {await store.save({runId:cleanupId,scope:'post_trial_cleanup',sourceRunId:trial.runId,mode,status:'failed',
+      errorType:safeErrorType(error),details});}
+    catch {throw new Error('post-trial cleanup and cleanup evidence both failed');}
+    throw new Error('post-trial cleanup failed');
+  }
+}
+
 export async function runTrial({trial, gates, adapter, verifier, evidenceDirectory, evidenceStore, arm='deterministic', mode='measured'}) {
   if(!['deterministic','gpt5mini_live'].includes(arm)) throw new Error('invalid experiment arm');
   if(!['measured','non_counted_pilot'].includes(mode)) throw new Error('invalid run mode');
@@ -86,29 +103,27 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
     const azureFixtureProgress=stage==='reset' && progress?.scope==='azure_fixture_seed_progress' &&
       Number.isInteger(progress.confirmedWrites) && progress.confirmedWrites>=0 && progress.confirmedWrites<=11 && progress.outcome==='incomplete_or_unknown'
       ? {scope:'azure_fixture_seed_progress',confirmedWrites:progress.confirmedWrites,outcome:'incomplete_or_unknown'} : undefined;
-    if (stage !== 'save') await store.save({runId:trial.runId, trial, startedAt,
-      executionStartedAt,executionFinishedAt,executionElapsedMs,finishedAt:new Date().toISOString(), classification:'indeterminate', failedStage:stage,
-      errorType:safeErrorType(error), reset, output, ...(partialReset?{partialResetEvidence:partialReset}:{}), ...(azureFixtureProgress?{azureFixtureProgress}:{}),
-      ...(error?.partial===undefined?{}:{partialModelEvidence:error.partial}), evidence, verificationEvidence, arm, mode});
+    let failureRecordSaveError;
+    if (stage !== 'save') {
+      try {await store.save({runId:trial.runId, trial, startedAt,
+        executionStartedAt,executionFinishedAt,executionElapsedMs,finishedAt:new Date().toISOString(), classification:'indeterminate', failedStage:stage,
+        errorType:safeErrorType(error), reset, output, ...(partialReset?{partialResetEvidence:partialReset}:{}), ...(azureFixtureProgress?{azureFixtureProgress}:{}),
+        ...(error?.partial===undefined?{}:{partialModelEvidence:error.partial}), evidence, verificationEvidence, arm, mode});}
+      catch {failureRecordSaveError=true;}
+    }
+    // ACI groups are billable resources created during execute(). Even a failed
+    // or indeterminate row must attempt deletion and record its outcome before
+    // the scheduler is allowed to halt. Other adapters retain their established
+    // failure semantics unless they explicitly opt in.
+    if(adapter.cleanupOnFailure===true && typeof adapter.cleanup==='function')
+      await persistCleanup({adapter,trial,reset,mode,store});
+    if(failureRecordSaveError) throw new Error('trial failure evidence could not be saved; do not retry this claimed run ID');
     throw error;
   }
-  // Preserve the measured record first. An indeterminate trial is left intact
-  // for investigation; cleanup failures stop scheduling and get a separate record.
-  if(record.classification!=='indeterminate' && typeof adapter.cleanup==='function') {
-    const cleanupId=`cleanup-${createHash('sha256').update(trial.runId).digest('hex')}`;
-    let outcome;
-    try {outcome=await adapter.cleanup(trial,reset);}
-    catch(error) {
-      const details=Array.isArray(error?.cleanupDetails)?error.cleanupDetails.map(item=>({
-        name:/^[a-z_]{1,40}$/.test(item?.name || '')?item.name:'unknown',
-        status:['completed','failed'].includes(item?.status)?item.status:'unknown',
-        errorType:item?.status==='failed'?safeErrorType({name:item?.errorType}):undefined})):undefined;
-      try {await store.save({runId:cleanupId,scope:'post_trial_cleanup',sourceRunId:trial.runId,mode,status:'failed',
-        errorType:safeErrorType(error),details});}
-      catch {throw new Error('post-trial cleanup and cleanup evidence both failed');}
-      throw new Error('post-trial cleanup failed');
-    }
-    if(outcome!==undefined) await store.save({runId:cleanupId,scope:'post_trial_cleanup',sourceRunId:trial.runId,mode,status:'completed',outcome});
-  }
+  // Preserve the trial record first. ACI specifically opts into cleanup after
+  // indeterminate outcomes because its per-trial group otherwise keeps billing.
+  if(typeof adapter.cleanup==='function' &&
+    (record.classification!=='indeterminate' || adapter.cleanupOnFailure===true))
+    await persistCleanup({adapter,trial,reset,mode,store});
   return record;
 }

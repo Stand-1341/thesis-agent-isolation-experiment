@@ -376,3 +376,59 @@ but still requires live review and denial-evidence tests. The local verification
 after the route and session-environment changes passed **222/222** tests, and
 both session-environment Bicep templates compiled; neither result is evidence
 that a session pool or Azure enforcement has been deployed.
+
+## ACI overhaul status — 2026-11-04
+
+- Current Azure inventory shows no ACI container groups. The deployed ACI
+  subnet is `10.48.13.0/24` and remains private. East US ACI quota previously
+  read 0/4 Standard cores and 0/100 container groups.
+- The ACI agent image is pushed to ACR as
+  `thesisacr74a95224.azurecr.io/thesis-agent-aci-pilot:20261104`, digest
+  `sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b`.
+  The temporary workstation IP rule was removed after the push.
+- ACI VNet outbound requires NAT Gateway. The existing ACI subnet's UDR through
+  Azure Firewall is not a supported ACI outbound path. The subnet template has
+  been changed to create a Standard public IP and NAT Gateway, but deployment is
+  waiting for public-IP quota. An empty Consumption-only ACA environment was
+  selected for replacement (it had no apps, jobs, or session pools); Azure
+  reports `ScheduledForDelete`, and its managed public IP has not yet been
+  released. The two Firewall public IPs were left intact.
+- Temporary ACI Firewall return routes were removed from the private-endpoint
+  and service route tables. The broad ACI Firewall egress rule group is in
+  Azure's `Deleting` state; confirm its removal before proceeding.
+- The controller's VNet-wide UDR and matching private-endpoint/service return
+  routes were removed. Its default Internet route through Firewall remains, and
+  private VNet destinations use system routing. The research-host NSG now has
+  two narrow rules for ACI P1/P2 source `10.48.13.0/24` to `10.48.9.4:443` and
+  `10.48.9.5:8443`.
+- Key Vault lists six Functions P1 pilot secret names only. No ACI/session
+  workload token or controller key is present. The temporary Key Vault client
+  IP exception was removed after confirming the inventory. Workload and
+  controller VMs remain deallocated. No measured run or ACI smoke run exists.
+- The ACI runtime draft remains local and is not integrated into the existing
+  experiment CLI. It also cannot reuse ACA session lifecycle or U6/U8 evidence;
+  a new ACI schedule and review remain necessary before any measured rows.
+
+This is an implementation status update, not a readiness pass. Do not run the
+400-row revision-2 matrix with ACI substituted for ACA.
+
+## ACI implementation addendum — 2026-11-04
+
+The deployment state has changed since the earlier ACI status above. Azure CLI
+is authenticated to the enabled subscription. The ACI NAT Gateway and Standard
+public IP `20.121.216.52` are deployed; the delegated subnet is attached to NAT
+and has no route table. ACR is default-deny and allows the NAT IP. The image is
+pinned to digest
+`sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b`.
+The current container-group inventory is empty, and both the controller and
+research VMs are deallocated. Earlier health-only smoke attempts include one
+pass and three failures; all groups were cleaned up. These were not trials.
+
+The checked-in 50-row ACI schedule remains explicitly non-runnable and
+non-counted. The dedicated runner's dry run reports `executionStarted:false`;
+all 263 repository tests pass. ACI U6/U8 are fail-closed because the current
+adapter does not yet execute cross-group access or stale-state tests under a
+fresh identity. The live trial dependency module, route-specific credentials,
+independent verifier/evidence validation, and institutional method approval
+remain incomplete. No measured trial has run; no experiment is currently
+running.
