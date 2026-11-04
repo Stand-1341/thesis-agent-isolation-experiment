@@ -421,14 +421,23 @@ and has no route table. ACR is default-deny and allows the NAT IP. The image is
 pinned to digest
 `sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b`.
 The current container-group inventory is empty, and both the controller and
-research VMs are deallocated. Earlier health-only smoke attempts include one
-pass and three failures; all groups were cleaned up. These were not trials.
+research VMs are deallocated. Five health-only smoke attempts produced two
+passes and three failures; all groups were cleaned up. The latest pass used
+private IP `10.48.13.4` and confirmed `trials=0`. These were not trials.
 
 The checked-in 50-row ACI schedule remains explicitly non-runnable and
 non-counted. The dedicated runner's dry run reports `executionStarted:false`;
-all 263 repository tests pass. ACI U6/U8 are fail-closed because the current
+the full suite passes 266 tests after the latest guard and identity-template
+changes. ACI U6/U8 are fail-closed because the current
 adapter does not yet execute cross-group access or stale-state tests under a
-fresh identity. The live trial dependency module, route-specific credentials,
-independent verifier/evidence validation, and institutional method approval
-remain incomplete. No measured trial has run; no experiment is currently
-running.
+fresh identity. The Functions P1 workload token was hash-compared with the
+research host token and matched without revealing either value. Dedicated ACI
+workload and controller secrets are stored in Key Vault; the workstation's
+temporary firewall exception was removed. Separate ACI identities now exist,
+with VM P1's eight Blob role scopes mirrored to the ACI P1 identity and no
+workload roles on P2. Controller lifecycle/subnet/identity-attach roles are
+deployed. The live adapter, independent verifier/evidence validation, U6/U8
+analogs, and institutional method approval remain incomplete. No measured trial
+has run; no experiment is currently running. The ACI runtime now rejects U6/U8
+before fixture reset, preventing those unsupported cases from writing setup
+state.

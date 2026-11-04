@@ -57,10 +57,13 @@ limits, so the runner must stay sequential and obey returned throttling.
   and retains its 0/0 route through Azure Firewall for public egress. This gives
   the controller and ACI a symmetric private path to the private agent and
   research endpoints without forcing ACI through the Firewall.
-- The research-host NSG has two deployed allowances from `10.48.13.0/24` to
-  research `10.48.9.4:443` and collector `10.48.9.5:8443`. Older broad inbound
-  rules also exist, so these allowances do not prove source-only access. Review
-  rule ordering and constrain broad rules before making that claim.
+- The research VM NIC has `thesis-p3-targets-nsg` attached on the two service
+  IPs. It has explicit ACI-source allowances from `10.48.13.0/24` to only
+  research `10.48.9.4:443` and collector `10.48.9.5:8443`, plus a priority-4000
+  deny for other inbound traffic. Separate explicit allows exist for the
+  controller/operator subnets. The NSG rules were inspected, but a health-only
+  smoke does not validate all effective network decisions; probe allowed and
+  denied destinations from ACI before claiming the path is verified.
 - The controller-to-ACI TCP/8080 allowance is deployed. A non-counted smoke
   passed from the controller VM and its ACI group was deleted. Both VMs are now
   deallocated and no ACI group is running.
@@ -92,12 +95,15 @@ limits, so the runner must stay sequential and obey returned throttling.
 2. Confirm the actual image digest, ACR pull identity, distinct P1/P2 workload
    identities, RBAC scopes, controller's narrowly scoped ACI create/delete
    role, private target URLs, and Key Vault-backed settings.
-3. Deploy the dedicated subnet and one bounded non-counted P1 smoke group.
-   Verify image pull, private IP, health, controller-only ingress, fixture
-   access, Blob authorization, independent collector evidence, and cleanup.
-4. Repeat for P2; verify the expected RBAC deny and legitimate operations.
-   Test interruption at each ACI lifecycle step and prove evidence is retained
-   without a duplicate execution.
+3. The ACI subnet and one bounded non-counted P1 health-only smoke are deployed
+   and passed: the pinned image pulled, the private endpoint returned healthy,
+   and the group was deleted. This does not validate controller-only ingress
+   under hostile sources, fixture access, Blob authorization, collector
+   evidence, or trial cleanup.
+4. Still run a non-counted P1 end-to-end technical pilot after approval and
+   wiring real credentials: verify all authorized/prohibited fixture actions,
+   independent collection, and cleanup. Test interruption at each ACI lifecycle
+   step and prove evidence is retained without a duplicate execution.
 5. Validate evidence immutability/independent custody and all existing VM and
    Functions route gates. Recompute the new ACI matrix and cost estimate, then
    freeze the protocol only after approval and all pilot checks pass.
@@ -107,13 +113,22 @@ The NAT Gateway and Standard public IP `20.121.216.52` are deployed. The ACR
 image was successfully pushed as `thesisacr74a95224.azurecr.io/
 thesis-agent-aci-pilot:20261104` with digest
 `sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b`.
-ACR allows the NAT IP; the temporary workstation allow rule was removed. One
-non-counted private health smoke passed from the controller VM; three earlier
-smokes failed their health probe and were cleaned up. Key Vault contains only
-the six Functions P1 pilot secret names, with no ACI workload/controller
-secrets. Both VMs are deallocated. The 50-row ACI draft remains non-runnable
-pending method approval, U6/U8 analogs, runner integration, and independent
-evidence. No measured trial has run.
+ACR allows the NAT IP; the temporary workstation allow rule was removed. Two
+non-counted private health smokes passed from the controller VM; three earlier
+smokes failed their health probe and were cleaned up. The latest group,
+`thesis-aci-health-7b68a5e4f42442aa899768a3`, returned ready on private IP
+`10.48.13.4`, was deleted, and recorded `trials=0`. The Functions P1 token was
+hash-compared with the research host P1 token without displaying either value;
+they match. Dedicated Key Vault secrets `aci-p1-workload-token` and
+`aci-p1-controller-key` were created, and the temporary workstation firewall
+exception was removed. New ACI P1/P2 user-assigned identities exist. P1 has the
+same eight container-scoped Blob role assignments as VM P1; P2 currently has
+none. The controller has narrow group lifecycle, subnet join, and selected
+identity-attach roles. Both VMs are deallocated. The 50-row ACI draft remains
+non-runnable pending method approval, U6/U8 analogs, and a live Azure adapter/
+verifier/protected evidence store. A fail-closed sequential runner and dry-run
+exist, but its cloud dependencies are not wired or validated. No measured trial
+has run.
 
 ## Microsoft references
 

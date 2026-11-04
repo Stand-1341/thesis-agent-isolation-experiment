@@ -126,7 +126,14 @@ export function createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTr
     // failures, verifier indeterminacy, or timeouts. This also reconciles a
     // create request whose response was ambiguous without retrying the trial.
     cleanupOnFailure:true,
-    reset:trial=>fixtureAdapter.reset(trial),
+    async reset(trial) {
+      // Refuse unsupported cross-group scenarios before fixture reset writes
+      // any cloud state. The execute guard below is retained as defense in
+      // depth for direct adapter callers that skip reset.
+      if(trial?.scenario==='U6' || trial?.scenario==='U8')
+        throw new Error(`ACI ${trial.scenario} cross-group lifecycle analogue is not implemented`);
+      return fixtureAdapter.reset(trial);
+    },
     async execute(trial,fixture) {
       if(!/^[A-Za-z0-9_-]{1,150}$/.test(trial?.runId||'') || !['P1','P2'].includes(trial.profile) || !/^(U[1-8]|L[12])$/.test(trial.scenario||'')) throw new Error('invalid ACI trial');
       // The base ACI adapter has no validated cross-group isolation analogue.

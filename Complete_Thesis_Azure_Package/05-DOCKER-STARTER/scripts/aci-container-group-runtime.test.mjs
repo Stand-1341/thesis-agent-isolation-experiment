@@ -106,11 +106,15 @@ test('ACI adapter refuses public addresses and unconfirmed cleanup',async()=>{
 
 test('ACI adapter refuses U6 and U8 before allocating groups until cross-group analogues are validated',async()=>{
   const created=[];
-  const fixtureAdapter={reset:async()=>({}),collect:async()=>({})};
+  const resets=[];
+  const fixtureAdapter={reset:async trial=>{resets.push(trial.runId);return {};},collect:async()=>({})};
   const groupClient={create:async name=>{created.push(name);return {name,privateIp:'10.48.13.9',provisioningState:'Succeeded'};},delete:async()=>({deleted:true})};
   const adapter=createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTrial:async()=>({}),controllerToken:'controller-secret-0123456789',
     fetchImpl:async()=>new Response('{"ready":true}',{status:200})});
   for(const scenario of ['U6','U8'])
+    await assert.rejects(adapter.reset({runId:`pilot-${scenario.toLowerCase()}-reset`,profile:'P1',scenario}),new RegExp(`ACI ${scenario} cross-group lifecycle analogue is not implemented`));
+  for(const scenario of ['U6','U8'])
     await assert.rejects(adapter.execute({runId:`pilot-${scenario.toLowerCase()}-1`,profile:'P1',scenario},{}),new RegExp(`ACI ${scenario} cross-group lifecycle analogue is not implemented`));
   assert.deepEqual(created,[]);
+  assert.deepEqual(resets,[]);
 });

@@ -32,7 +32,7 @@
     "institutional/method approval of the ACI architecture substitution",
     "U6 cross-group analogue is unimplemented and unvalidated",
     "U8 fresh-identity stale-state analogue is unimplemented and unvalidated",
-    "full ACI schedule-to-runner integration and independent evidence path are not established"
+    "live Azure route adapters, independent verifier, and protected evidence store are not wired and validated"
   ],
   "note": "Planning artifact only. This is not an approved protocol, executable pilot schedule, measured plan, or readiness pass. Preserve all existing matrix and protocol files unchanged."
 }
