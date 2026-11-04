@@ -201,11 +201,9 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
   are controller/research-target hosts, not the planned six VM workload routes.
 - No Container Apps session pool or workload app is present. The diagnostic
   pool and its attached diagnostic job were deleted. The remaining
-  `cae-thesis-diagnostic` environment reports `WorkloadProfiles` mode with only
-  the Consumption profile. Azure documents adding Dedicated profiles to an
-  existing workload-profiles environment, but this environment is currently
-  `ScheduledForDelete`; the E16 profile add request was rejected in that state.
-  The experiment template keeps E16 minimum nodes at zero and caps it at one.
+  `cae-thesis-diagnostic` environment reported `WorkloadProfiles` mode with
+  only the Consumption profile before it was deleted. The experiment template
+  keeps E16 minimum nodes at zero and caps it at one.
 - A new delegated `sessions-experiment` subnet (`10.48.12.0/27`) has been
   deployed for that future environment. It is additive network plumbing only:
   it has no route table, NSG, environment, pool, or running compute attached.
@@ -243,35 +241,56 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
 
 ## Environment replacement attempts and present Azure blocker
 
-- Azure accepted deletion of `cae-thesis-diagnostic` at 2026-11-04 04:38 UTC,
-  but the resource remains `ScheduledForDelete`. The attached manual diagnostic
-  job had no running executions and was removed. The dedicated old subnet
-  `sessions-pilot` (`10.48.2.0/23`) had zero NIC/IP-configuration attachments;
-  it was removed and recreated with only the `Microsoft.App/environments`
-  delegation. Its previous P3 candidate NSG and route-table associations are
-  not currently attached. The shared VNet and all unrelated subnets were kept.
+- Azure accepted deletion of `cae-thesis-diagnostic` at 2026-11-04 04:38 UTC;
+  the long-running delete later completed and Azure now lists no Container Apps
+  environments. The attached manual diagnostic job had no running executions
+  and was removed. The dedicated old subnet `sessions-pilot` (`10.48.2.0/23`)
+  had zero NIC/IP-configuration attachments; it was removed and recreated with
+  only the `Microsoft.App/environments` delegation. Its previous P3 candidate
+  NSG and route-table associations are not currently attached. The shared VNet
+  and all unrelated subnets were kept.
 - A replacement deployment in East US failed preflight with
   `MaxNumberOfRegionalEnvironmentsInSubExceeded`. A zero-E16-minimum
   replacement in Central US failed with
   `MaxNumberOfGlobalEnvironmentsInSubExceeded`. Azure therefore reports a
-  subscription-wide one-environment limit. The temporary Central US VNet and
+  subscription-wide one-environment limit. After the old environment finished
+  deleting, both an East US replacement and a Central US replacement failed
+  preflight with `WorkloadProfileMaximumCoresConstraint`: the subscription has
+  zero E16 cores available in each region. The temporary Central US VNet and
   subnet were removed; no Central US environment or compute remains.
 - A fresh ARM token was acquired successfully from Azure CLI. The subscription
-  is Enabled. The environment update to add E16 failed with
-  `ManagedEnvironmentScheduledForDelete`. These are Azure provider state/quota
-  errors, not authentication failures. No E16 node, session pool, replacement
-  environment, or trial was created. The user declined submitting a Microsoft
-  support case; no case was filed.
+  is Enabled. An E16 profile update attempted while the old environment was
+  `ScheduledForDelete` failed with `ManagedEnvironmentScheduledForDelete`.
+  After deletion completed, East US and Central US replacement attempts both
+  failed with `WorkloadProfileMaximumCoresConstraint`: E16 quota is zero in
+  both regions. These are Azure provider state/quota errors, not authentication
+  failures. No E16 node, session pool, replacement environment, or trial was
+  created. The user declined both a Microsoft support case and a 16-core E16
+  quota request; neither was submitted.
 - Microsoft troubleshooting guidance recommends removing the associated VNet
   for a stuck deletion, but this VNet contains the rest of the experiment
   infrastructure and was not deleted. Microsoft Q&A guidance for a
   `ScheduledForDelete` resource that remains stuck says backend cleanup via
-  support is required; a second environment cannot be created under the
-  subscription's current global limit while this resource remains.
+  support is required. The environment eventually deleted, but the zero-E16
+  quota still prevents the replacement. The subscription currently exposes
+  only one Azure subscription to this CLI identity.
 - `sessions-experiment` (`10.48.12.0/27`) remains delegated in the East US VNet
   for a future replacement. It is not attached to any environment. Azure
   Firewall, storage, registry, Functions P1, deallocated VM disks, and logging
   remain in the subscription and may continue to incur charges.
+- A possible quota-free session-arm alternative is Azure Container Instances:
+  the East US usage API currently reports 0/4 standard cores and 0/100 standard
+  container groups. Microsoft documents VNet deployment, user-assigned identity,
+  and per-second billing, but the workload requires a dedicated subnet of at
+  least `/24` and a NAT Gateway for VNet outbound. It does not preserve ACA
+  session-pool allocation, prewarming, or session lifecycle. ACI would require
+  a new adapter, independent create/delete evidence, and a new protocol and
+  matrix; it is a method amendment and cannot substitute silently in the frozen
+  400-row schedule. No ACI resource has been deployed.
+  [ACI VNet constraints](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-virtual-network-concepts),
+  [ACI managed identities](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-managed-identity),
+  [ACI quotas](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-resource-and-quota-limits),
+  [ACI pricing](https://azure.microsoft.com/en-us/pricing/details/container-instances/).
 - A local ARM-parameter validator was added for the evidence-storage template;
   it checks three distinct principal IDs and an explicit retention period but
   does not prove effective Azure permissions. Functions P3 subnet updates now
