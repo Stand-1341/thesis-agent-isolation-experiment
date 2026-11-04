@@ -18,6 +18,9 @@
     "evidenceRetentionApproval": {"passed": false, "evidenceReference": ""},
     "azureGpt5MiniIdentity": {"passed": true, "evidenceReference": "file:docs/ACI-P1-GPT5-MINI-IDENTITY-SMOKE-2026-11-04.md"},
     "credentialsValidated": {"passed": false, "evidenceReference": ""},
-    "costLimitConfigured": {"passed": false, "evidenceReference": ""}
+    "costLimitConfigured": {
+      "passed": true,
+      "evidenceReference": "file:docs/ACI-P1-50-COST-CAP-2026-11-04.md"
+    }
   }
 }

@@ -18,7 +18,7 @@
 - The targeted non-container test suite passed **63/63**. Full project verification passed **363/363**.
 - U5 local assessment now fails closed when operation request IDs are missing; it no longer accepts legacy raw-marker-only evidence. The focused collector assessment/verifier tests passed **3/3**, and the full build/test suite passed **363/363** after this change. This does not prove the live Azure audit correlation path.
 - Controller managed identity successfully read the six required ACI pilot secret names from Key Vault and validated each value's enabled/nonempty shape without displaying or retaining any value. Pinned Node.js `v22.23.4` and npm `10.9.9` are installed on the controller VM. The runner package was transferred with a verified SHA-256 and its lockfile dependencies installed; the remote dry-run remains fail-closed with eight blockers. Details: [controller runner transfer and preflight](ACI-P1-CONTROLLER-RUNNER-TRANSFER-2026-11-04.md).
-- Created `id-thesis-evidence-writer` as a separate managed identity. It has **no storage role assignment** yet. The `trial-evidence` container has no current immutability policy or legal hold, so evidence writes remain blocked until retention is approved and immutability is configured and independently checked.
+- Created `id-thesis-evidence-writer` as a separate managed identity. Current read-only Azure RBAC inventory shows it has `Storage Blob Data Contributor` on `trial-evidence`, and `id-thesis-evidence-reader` has `Storage Blob Data Reader` there. The container still has no immutability policy or legal hold, so writes through the measured evidence store remain blocked until retention is approved and immutability is configured and independently checked.
 
 ## Still blocking the 50-condition run
 
@@ -31,8 +31,16 @@
 
 ## Current cost evidence
 
-The last recorded Cost Management query was **$82.284809 USD month-to-date at 2026-11-04 15:51:42 UTC**; billing can lag. A current dollar total and refreshed credit balance were not obtained in this check. This is not evidence of the remaining credit balance. The VM, NAT Gateway, Firewall, storage, and other provisioned resources remain allocated; no ACI groups are active.
+The last reliable Cost Management snapshot was **$84.8099 USD month-to-date at 2026-11-04 18:57 UTC**; billing can lag. A later usage query returned no usable amounts, so it does not establish a newer total or refreshed credit balance. The VM, NAT Gateway, Firewall, storage, and other provisioned resources remain allocated; no ACI groups are active.
 
 ## Run status
 
 `node scripts/run-aci-live-injection-50.mjs --dry-run` reports `runnable: false` and `executionStarted: false` both locally and from the controller VM. Azure inventory confirms no active ACI groups. No LLM condition, pilot pair, or thesis trial has run. The successful single model tool-call smoke and ACI deployment health smoke are infrastructure evidence, not experiment results.
+
+## 20:18 UTC follow-up
+
+- The model-only spend guard is now recorded as a passed configuration gate, backed by the fixed $0.25/condition and $12.50/phase limits in the protocol and runner. This does not cap infrastructure charges. See [ACI-P1-50-COST-CAP-2026-11-04.md](ACI-P1-50-COST-CAP-2026-11-04.md).
+- The controller bundle was missing the public research-service CA file. I copied `certs/thesis-pilot-ca.pem` to `/opt/thesis-aci-runner-20261104/certs/thesis-pilot-ca.pem` through Azure VM Run Command and verified its SHA-256 matches the local certificate. With `NODE_EXTRA_CA_CERTS` set, the controller's read-only credential smoke returned **accepted** for research admin, collector admin, and both independent service-verifier credentials. No secret values were displayed.
+- Via the controller's managed identity, the six required Key Vault names were confirmed enabled; each value was fetched only in memory and passed the configured length/character-shape check. The ACI controller key and workload token have not yet been exercised in a newly created ACI group, so the complete credential gate remains false.
+- The evidence writer and reader currently have container-scoped Blob Contributor/Reader assignments. The container itself still has no immutability policy or legal hold.
+- The current local dry run reports seven remaining blockers: U1 verification, U5 verification, operation-correlation proof, independent evidence protection, department-approved retention, full ACI credential validation, and matching the requested retention to a locked 146,000-day policy. It still reports `executionStarted: false`; no model condition or ACI group was started.
