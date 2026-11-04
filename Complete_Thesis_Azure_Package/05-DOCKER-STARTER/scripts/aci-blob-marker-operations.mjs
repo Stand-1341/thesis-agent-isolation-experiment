@@ -136,17 +136,20 @@ export function createAciBlobMarkerOperations({blobServiceResourceId,blobEndpoin
       await response.body?.cancel();
       markers.set(trial.runId,{marker,fingerprint,etag,target:{...target,runId:trial.runId,scenario:trial.scenario},container});
       return {runId:trial.runId,container,statusCode:201,principalId:result.principalId,resourceId:target.resourceId,
-        objectUri:target.objectUri,requestId,startedAt:result.startedAt,markerFingerprint:fingerprint};
+        objectUri:target.objectUri,requestId,startedAt:result.startedAt,markerFingerprint:fingerprint,
+        contentCapture:{bodyBytes:Buffer.from(body,'utf8'),statusCode:201,requestId,principalId:result.principalId,
+          capturedAt:result.startedAt,captureBoundary:'blob_request_body'}};
     },
     async readMarker({trial,container,resourceId,markerFingerprint}) {
-      const target=targetForMarker({trial,container}),expected=markers.get(trial.runId);
-      if(target.resourceId!==resourceId||!expected||expected.fingerprint!==markerFingerprint)
+      const target=targetForMarker({trial,container});
+      if(target.resourceId!==resourceId||!/^sha256:[a-f0-9]{64}$/i.test(markerFingerprint||''))
         throw new Error('ACI independent marker read target or fingerprint mismatch');
       const requestId=uniqueRequestId(trial.runId,'verifier-get');
       const result=await blobRequest({identity:verifierIdentity,target,operation:'verifier read',method:'GET',requestId});
       const raw=await readBody(result.response);
       const marker=parseMarkerBody(raw);
       const actualFingerprint=marker?jsonFingerprint(marker).fingerprint:undefined;
+      const capturedAt=safeNow(now);
       let accessEvidence;
       try {accessEvidence=await readVerifierAccessEvidence({identity:verifierIdentity,trial,container,target,observedAt:result.startedAt});}
       catch {throw new Error('independent verifier effective-access evidence unavailable');}
@@ -154,7 +157,10 @@ export function createAciBlobMarkerOperations({blobServiceResourceId,blobEndpoin
         throw new Error('independent verifier effective-access evidence is incomplete');
       return {matched:result.response.status===200&&actualFingerprint===markerFingerprint,
         markerFingerprint:actualFingerprint,verifierPrincipalId:result.principalId,resourceId:target.resourceId,objectUri:target.objectUri,
-        requestId,startedAt:result.startedAt,verifierAccessReview:accessEvidence.verifierAccessReview,
+        requestId,startedAt:result.startedAt,
+        ...(result.response.status===200&&actualFingerprint?{contentCapture:{bodyBytes:Buffer.from(raw,'utf8'),statusCode:200,
+          requestId,principalId:result.principalId,capturedAt,captureBoundary:'blob_response_body'}}:{}),
+        verifierAccessReview:accessEvidence.verifierAccessReview,
         verifierEffectiveAccess:accessEvidence.verifierEffectiveAccess};
     },
     async attemptRead({trial,group,identity,container,resourceId,sourceGroup,sourceGroupMustRemainActive}) {
@@ -167,8 +173,12 @@ export function createAciBlobMarkerOperations({blobServiceResourceId,blobEndpoin
       const result=await blobRequest({identity,target,operation:'probe read',method:'GET',requestId});
       const raw=await readBody(result.response),statusCode=result.response.status;
       const marker=statusCode===200?parseMarkerBody(raw):undefined;
+      const capturedAt=safeNow(now);
       return {runId:trial.runId,container,statusCode,principalId:result.principalId,resourceId:target.resourceId,
         objectUri:target.objectUri,requestId,startedAt:result.startedAt,groupName:group.name,
+        ...(statusCode===200&&marker?{contentCapture:{bodyBytes:Buffer.from(raw,'utf8'),statusCode:200,requestId,
+          principalId:result.principalId,capturedAt,captureBoundary:'blob_response_body'}}:{}),
+        ...(statusCode===403?{observedAt:capturedAt}:{}),
         ...(trial.scenario==='U6'?{sourceGroupActiveAtProbe:sourceGroupMustRemainActive===true}:{}),
         ...(statusCode===200?{...(marker?{markerFingerprint:jsonFingerprint(marker).fingerprint}:{})}:
           {errorCode:statusCode===403?safeErrorCode(result.response,raw):undefined})};

@@ -19,7 +19,7 @@ test('fixture session seeds only controlled state and does not return credential
   } finally {globalThis.fetch=original;}
 });
 
-test('managed ACI seed is identity-bound, request-correlated, and returns fingerprint plus exact ETag only',async()=>{
+test('managed ACI seed is identity-bound and retains a transient exact request-body capture for proof persistence',async()=>{
   const principal='00000000-0000-4000-8000-000000000001',requestId=`aci-seed-${'a'.repeat(64)}`;
   const serviceId='/subscriptions/11111111-1111-4111-8111-111111111111/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture123/blobServices/default';
   const encode=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -37,7 +37,9 @@ test('managed ACI seed is identity-bound, request-correlated, and returns finger
   assert.equal(result.resourceId,`${serviceId}/containers/session-b`);
   assert.equal(result.objectUri,captured.url);assert.equal(result.etag,'"seed-etag"');
   assert.match(result.markerFingerprint,/^sha256:[a-f0-9]{64}$/);
-  assert.ok(!JSON.stringify(result).includes(token)&&!JSON.stringify(result).includes('SYNTHETIC-'));
+  assert.equal(Buffer.from(result.contentCapture.bodyBase64,'base64').toString(),captured.options.body);
+  assert.equal(result.contentCapture.captureBoundary,'blob_request_body');
+  assert.ok(!JSON.stringify(result).includes(token));
 });
 
 test('managed ACI seed rejects identity/resource mismatches before storage writes',async()=>{

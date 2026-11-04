@@ -43,7 +43,7 @@ function mapAuditRow(row,runId) {
 export function createAciBlobSessionAzureCallbacks({
   subscriptionId,resourceGroup,workspaceId,managementIdentityClientId,storageIdentityClientId,auditIdentityClientId,
   getManagementToken,createCredential,groupBodyForIdentity,profileForRun,identityProvider,effectiveAccessEvaluator,blobOperations,
-  agentSessionCallbacks,independentMarkerReader,
+  agentSessionCallbacks,independentMarkerReader,persistMarkerContentProof,
   observeGroup,fetchImpl=fetch,groupClientFactory=createAciContainerGroupClient,
   storageTokenProvider=createManagedStorageTokenProvider,logsTokenProvider=createManagedLogsTokenProvider,
   auditReaderFactory=createStorageAuditReader,groupBodyBuilder=buildAciContainerGroupBody,now=()=>Date.now()
@@ -64,6 +64,7 @@ export function createAciBlobSessionAzureCallbacks({
   for(const name of requiredBlobOps) requireFn(blobOperations?.[name],`blobOperations.${name}`);
   for(const name of ['seedMarker','attemptRead','deleteMarker']) requireFn(agentSessionCallbacks?.[name],`agentSessionCallbacks.${name}`);
   requireFn(independentMarkerReader,'a separately credentialed positive-control marker reader');
+  requireFn(persistMarkerContentProof,'a locked-retention marker-content proof persister');
   requireFn(fetchImpl,'fetch implementation');
   requireFn(now,'clock');
 
@@ -84,6 +85,7 @@ export function createAciBlobSessionAzureCallbacks({
     deleteMarker:args=>agentSessionCallbacks.deleteMarker(args),
     attemptRead:args=>agentSessionCallbacks.attemptRead(args),
     readMarker:args=>independentMarkerReader({...args,getToken:getVerifierBlobToken}),
+    persistMarkerContentProof:args=>persistMarkerContentProof(args),
     observeGroup:args=>observeGroup({...args,getManagementToken:managementToken,fetchImpl}),
     async createGroup({runId,scenario,phase,container,identity}) {
       if(!/^[A-Za-z0-9_-]{1,130}$/.test(runId||'')||!['U6','U8'].includes(scenario)||

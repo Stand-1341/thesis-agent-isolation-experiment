@@ -29,9 +29,9 @@ function parseCapture(capture,label) {
     throw new Error(`${label} body is not the exact synthetic marker payload`);
   return hashBytes(capture.bodyBytes);
 }
-function validateCapture(capture,{label,status,requestId,principalId}) {
+function validateCapture(capture,{label,status,requestId,principalId,boundary}) {
   if(!capture||capture.statusCode!==status||capture.requestId!==requestId||capture.principalId?.toLowerCase()!==principalId.toLowerCase()||
-    capture.captureBoundary!=='direct_http_response'||!Number.isFinite(Date.parse(capture.capturedAt)))
+    capture.captureBoundary!==boundary||!Number.isFinite(Date.parse(capture.capturedAt)))
     throw new Error(`${label} content capture provenance or response identity is incomplete`);
   return parseCapture(capture,label);
 }
@@ -67,16 +67,16 @@ export function createAciBlobMarkerContentProofPersister({observerPrincipalId,re
       throw new Error('independent content observer must be distinct from all operation principals');
 
     const seedHash=validateCapture(seed.capture,{label:'seed',status:201,requestId:seed.requestId,
-      principalId:sourcePrincipalId});
+      principalId:sourcePrincipalId,boundary:'blob_request_body'});
     const readHash=validateCapture(independentRead.capture,{label:'independent read',status:200,requestId:independentRead.requestId,
-      principalId:verifierPrincipalId});
+      principalId:verifierPrincipalId,boundary:'blob_response_body'});
     if(seedHash!==markerFingerprint||readHash!==markerFingerprint)
       throw new Error('seed or independent read content does not match the expected marker fingerprint');
     if(![200,403].includes(probe.statusCode)) throw new Error('probe marker observation must be HTTP 200 or 403');
     let probeHash;
     if(probe.statusCode===200) {
       probeHash=validateCapture(probe.capture,{label:'probe',status:200,requestId:probe.requestId,
-        principalId:probePrincipalId});
+        principalId:probePrincipalId,boundary:'blob_response_body'});
       if(probeHash!==markerFingerprint) throw new Error('probe returned content differs from the seeded marker');
     } else if(probe.capture!==undefined) {
       throw new Error('403 probe must not claim marker response content');

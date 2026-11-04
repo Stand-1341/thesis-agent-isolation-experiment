@@ -121,7 +121,7 @@ function validMarkerTarget(target,container,runId) {
 
 export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
   createIdentity,deleteIdentity,evaluateEffectiveAccess,createGroup,deleteGroup,observeGroup,targetForMarker,seedMarker,deleteMarker,
-  readMarker,attemptRead,readAudit,now=Date.now}) {
+  readMarker,attemptRead,readAudit,persistMarkerContentProof,now=Date.now}) {
   if(methodDecision?.status!=='approved'||!REF.test(methodDecision?.reference||''))
     throw new Error('ACI U6/U8 analogue requires an approved method decision reference');
   if(methodDecision.unauthorizedOperations?.U6!=='read_other_active_group_blob_marker'||
@@ -132,6 +132,7 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
     [evaluateEffectiveAccess,'live Azure effective-access evaluator'],
     [createGroup,'group creator'],[deleteGroup,'group cleanup'],[observeGroup,'independent group observer'],[seedMarker,'marker seeder'],
     [targetForMarker,'deterministic marker target resolver'],[deleteMarker,'marker deletion'],
+    [persistMarkerContentProof,'locked independent marker-content proof persistence callback'],
     [readMarker,'independent marker reader'],[attemptRead,'workload read operation'],[readAudit,'independent audit reader']]) assertFn(fn,name);
   if(typeof now!=='function') throw new Error('invalid ACI session analogue clock');
   const claimed=new Set();
@@ -298,6 +299,21 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
       observations.verifierIdentityAccessReview=seedRead.verifierAccessReview;
       observations.verifierEffectiveAccess=verifierAccess;
       observations.probeAudit=probeAudit;
+      const probeObservedAt=probe.statusCode===403?probe.observedAt:probe.contentCapture?.capturedAt;
+      let markerContentProof;
+      try {
+        markerContentProof=await persistMarkerContentProof({runId:trial.runId,scenario:trial.scenario,
+          resourceId:markerTarget.resourceId,objectUri:markerTarget.objectUri,markerFingerprint:markerResult.markerFingerprint,
+          sourcePrincipalId:sourceIdentity.objectId,verifierPrincipalId:seedReadRequest.principalId,
+          probePrincipalId:probeIdentity.objectId,
+          seed:{requestId:markerResult.requestId,principalId:sourceIdentity.objectId,capture:markerResult.contentCapture},
+          independentRead:{requestId:seedReadRequest.requestId,principalId:seedReadRequest.principalId,capture:seedRead.contentCapture},
+          probe:{requestId:probeRequest.requestId,principalId:probeIdentity.objectId,statusCode:probe.statusCode,
+            ...(probe.statusCode===200?{capture:probe.contentCapture}:{observedAt:probeObservedAt})}});
+      } catch {throw new Error('ACI marker-content proof could not be independently persisted and reloaded');}
+      if(!markerContentProof||!REF.test(markerContentProof.evidenceReference||'')||
+        !/^sha256:[a-f0-9]{64}$/i.test(markerContentProof.snapshotFingerprint||''))
+        throw new Error('ACI marker-content proof persistence returned no valid protected evidence reference');
       const retrieved=probe.statusCode===200&&probe.markerFingerprint===markerResult.markerFingerprint;
       // A positive cross-group read is an unauthorized success only when the
       // independent access review proves that the probe identity had no
@@ -312,7 +328,7 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
         sourceIdentityObjectId:sourceIdentity.objectId,probeIdentityObjectId:probeIdentity.objectId,
         sourceGroupName:source.name,probeGroupName:probe.groupName??null,
         sourceRetiredAt:trial.scenario==='U8'?events.find(item=>item.stage==='source_group_absent')?.at:null,
-        verifierPrincipalId:seedReadRequest.principalId,markerFingerprint:markerResult.markerFingerprint,
+        verifierPrincipalId:seedReadRequest.principalId,markerFingerprint:markerResult.markerFingerprint,markerContentProof,
         permissionBaseline:{source:observations.sourceIdentityAccessReview,probe:observations.probeIdentityAccessReview,
           probeHadEffectiveBlobReadRole:probeHasBlobReadRole,unauthorizedOperation:methodDecision.unauthorizedOperations[trial.scenario]},
         seedAudit,seedReadAudit,probeAudit,probeStatusCode:probe.statusCode,observations,

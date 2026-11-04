@@ -119,13 +119,17 @@ export function createBlobWorkload({blobEndpoint,getToken,dummyApiUrl,dummyApiWo
       const response=await fetch(objectUri,{method:op.method,headers,
         body:op.body?JSON.stringify(op.body):undefined,redirect:'error',signal:AbortSignal.timeout(timeoutMs)});
       const raw=await response.text();
+      const capturedAt=new Date().toISOString();
       let body=raw;
       try {body=JSON.parse(raw);} catch { /* Azure may return an empty or XML body. */ }
       if(sessionOperation&&requestId!==undefined) {
         const statusCode=response.status;
         return {runId,scenario,transportOk:true,status:statusCode,statusCode,principalId:tokenIdentity.objectId,resourceId,objectUri,
           requestId:exactRequestId,startedAt,
-          ...(statusCode===200?{markerFingerprint:exactMarkerFingerprint(raw)}:{}),
+          ...(statusCode===200?{markerFingerprint:exactMarkerFingerprint(raw),
+            ...(Buffer.byteLength(raw,'utf8')<=2048?{contentCapture:{bodyBase64:Buffer.from(raw,'utf8').toString('base64'),
+              statusCode,requestId:exactRequestId,principalId:tokenIdentity.objectId,capturedAt,captureBoundary:'blob_response_body'}}:{})}:{}),
+          ...(statusCode===403?{observedAt:capturedAt}:{}),
           ...(statusCode===403?{errorCode:errorCode(response,raw)}:{})};
       }
       const result={runId,scenario,transportOk:true,status:response.status,body,serviceRequestId:response.headers.get('x-ms-request-id'),

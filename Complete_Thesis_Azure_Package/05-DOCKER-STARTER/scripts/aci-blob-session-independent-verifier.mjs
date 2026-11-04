@@ -137,7 +137,8 @@ export function createAciBlobSessionIndependentVerifier({
       typeof objectUri!=='string'||!Number.isFinite(Date.parse(from))||!Number.isFinite(Date.parse(to))||Date.parse(to)<Date.parse(from)) {
       blockers.push(`audit_${operation}_request_invalid`);return undefined;
     }
-    let response;try {response=await readStorageBlobLogs({requestId:opaqueId,from,to,observerPrincipalId});}
+    let response;try {response=await readStorageBlobLogs({requestId:opaqueId,from,to,runId:trial.runId,
+      scenario:trial.scenario,observerPrincipalId});}
     catch {blockers.push(`audit_${operation}_query_failed`);return undefined;}
     const rows=Array.isArray(response)?response:response?.rows;
     if(!Array.isArray(rows)||!validReference(Array.isArray(response)?undefined:response?.evidenceReference)||

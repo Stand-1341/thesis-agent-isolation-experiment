@@ -17,6 +17,7 @@ function dependencies(events=[]) {
     agentSessionCallbacks:Object.fromEntries(['seedMarker','attemptRead','deleteMarker'].map(name=>[
       name,async()=>{events.push(`agent:${name}`);return {agentOperation:true};}])),
     independentMarkerReader:async args=>{events.push(`independent-marker:${typeof args.getToken}`);return {independentlyRead:true};},
+    persistMarkerContentProof:async args=>{events.push('marker-proof-persist');return {evidenceReference:'urn:proof',snapshotFingerprint:`sha256:${'a'.repeat(64)}`};},
     observeGroup:async ({group})=>({state:'Running',name:group.name,identityObjectId:id(9),createdAt:'2026-11-04T12:00:00Z'}),
     fetchImpl:async()=>{throw new Error('network must not be used by injected local test');},
     groupClientFactory:()=>({
@@ -64,6 +65,8 @@ test('wires phase-specific ARM group lifecycle, scoped tokens, and request-id au
   assert.ok(events.includes('agent:seedMarker'));
   assert.deepEqual(await callbacks.readMarker({}),{independentlyRead:true});
   assert.ok(events.includes('independent-marker:function'));
+  assert.deepEqual(await callbacks.persistMarkerContentProof({}),{evidenceReference:'urn:proof',snapshotFingerprint:`sha256:${'a'.repeat(64)}`});
+  assert.ok(events.includes('marker-proof-persist'));
   const rows=await callbacks.readAudit({runId:'pilot-1',requestId:'operation-request-123',
     from:'2026-11-04T12:00:00Z',to:'2026-11-04T12:01:00Z'});
   assert.equal(rows[0].runId,'pilot-1');
@@ -79,4 +82,7 @@ test('refuses incomplete independent-access or evidence-related adapter wiring',
   const missingObserver=dependencies();
   delete missingObserver.observeGroup;
   assert.throws(()=>createAciBlobSessionAzureCallbacks(missingObserver),/independent ACI group observer/);
+  const missingProofStore=dependencies();
+  delete missingProofStore.persistMarkerContentProof;
+  assert.throws(()=>createAciBlobSessionAzureCallbacks(missingProofStore),/marker-content proof persister/);
 });

@@ -41,6 +41,16 @@ function validRequestId(value) {return typeof value==='string'&&REQUEST_ID.test(
 function validFingerprint(value) {return typeof value==='string'&&/^sha256:[a-f0-9]{64}$/i.test(value);}
 function validEtag(value) {return typeof value==='string'&&/^"[^"\r\n]{1,196}"$/.test(value);}
 function validTime(value) {return typeof value==='string'&&Number.isFinite(Date.parse(value));}
+function decodeCapture(value,{statusCode,requestId,principalId,boundary}) {
+  if(!value||typeof value.bodyBase64!=='string'||value.bodyBase64.length>4096||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value.bodyBase64)||
+    value.statusCode!==statusCode||value.requestId!==requestId||value.principalId?.toLowerCase()!==principalId.toLowerCase()||
+    !validTime(value.capturedAt)||value.captureBoundary!==boundary)
+    throw new Error('ACI marker response-byte capture is missing or mismatched');
+  const bodyBytes=Buffer.from(value.bodyBase64,'base64');
+  if(bodyBytes.toString('base64')!==value.bodyBase64) throw new Error('ACI marker response-byte capture encoding is invalid');
+  return {bodyBytes,statusCode,requestId,principalId:principalId.toLowerCase(),capturedAt:value.capturedAt,captureBoundary:boundary};
+}
 
 export function createAciAgentSessionHttpCallbacks({controllerToken,blobEndpoint,fetchImpl=fetch,timeoutMs=20000,
   blobServiceResourceId,runCleanupWithIdentity}={}) {
@@ -78,9 +88,12 @@ export function createAciAgentSessionHttpCallbacks({controllerToken,blobEndpoint
         data?.principalId?.toLowerCase()!==principalId||data?.resourceId!==target.resourceId||data?.objectUri!==target.objectUri||
         !Number.isInteger(data?.statusCode)||!validTime(data?.startedAt)||!validFingerprint(data?.markerFingerprint)||
         (data.statusCode===201&&!validEtag(data.etag))) throw new Error('ACI session seed observation did not match the request');
+      const contentCapture=data.statusCode===201?decodeCapture(data.contentCapture,{statusCode:201,requestId,principalId,
+        boundary:'blob_request_body'}):undefined;
       return {runId:data.runId,container:data.container,statusCode:data.statusCode,principalId:data.principalId,
         resourceId:data.resourceId,objectUri:data.objectUri,requestId:data.requestId,startedAt:data.startedAt,
         markerFingerprint:data.markerFingerprint,...(validEtag(data.etag)?{etag:data.etag}:{}),
+        ...(contentCapture?{contentCapture}:{}),
         ...(typeof data.errorCode==='string'&&/^[A-Za-z][A-Za-z0-9]{0,79}$/.test(data.errorCode)?{errorCode:data.errorCode}:{})};
     },
     async attemptRead({trial,group,identity:probeIdentity,container,resourceId,sourceGroup,sourceGroupMustRemainActive}) {
@@ -101,9 +114,14 @@ export function createAciAgentSessionHttpCallbacks({controllerToken,blobEndpoint
         !Number.isInteger(data?.statusCode)||!validTime(data?.startedAt)||
         (data.statusCode===200&&data.markerFingerprint!==undefined&&!validFingerprint(data.markerFingerprint)))
         throw new Error('ACI session probe observation did not match the request');
-      // Whitelist only non-secret evidence. Never propagate agent body/marker.
+      const contentCapture=data.statusCode===200?decodeCapture(data.contentCapture,{statusCode:200,requestId,principalId:identity(probeIdentity),
+        boundary:'blob_response_body'}):undefined;
+      // Retain response bytes only in this in-process transient capture for the
+      // protected marker-proof writer. The session analogue strips this value
+      // and trial evidence stores only the protected reference/hash.
       return {runId:data.runId,container,statusCode:data.statusCode,principalId:data.principalId,resourceId:data.resourceId,
         objectUri:data.objectUri,requestId:data.requestId,startedAt:data.startedAt,groupName:group.name,
+        ...(contentCapture?{contentCapture}:{}),...(data.statusCode===403&&validTime(data.observedAt)?{observedAt:data.observedAt}:{}),
         ...(trial.scenario==='U6'?{sourceGroupActiveAtProbe:true}:{}),
         ...(data.statusCode===200?(validFingerprint(data.markerFingerprint)?{markerFingerprint:data.markerFingerprint}:{}) :
           (typeof data.errorCode==='string'&&/^[A-Za-z][A-Za-z0-9]{0,79}$/.test(data.errorCode)?{errorCode:data.errorCode}:{}))};

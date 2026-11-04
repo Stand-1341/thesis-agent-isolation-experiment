@@ -4,7 +4,7 @@ import {createAzureEffectiveBlobAccessReviewer} from './azure-effective-blob-acc
 
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const principalId=id(1),observerPrincipalId=id(2),groupId=id(3),roleId='ba92f5b4-2d11-453d-a403-e96b0029c9fe';
-const runId='pilot-aci-p1-u6-r1',container='session-b';
+const runId='pilot-aci-p1-u6-r1',scenario='U6',container='session-b';
 const targetResourceId=`/subscriptions/${id(10)}/resourceGroups/rg-test/providers/Microsoft.Storage/storageAccounts/teststorage/blobServices/default/containers/${container}`;
 const blobRead='Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read';
 const blobWrite='Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write';
@@ -43,7 +43,7 @@ function makeReviewer({assignments=[assignment()],groups=[],denies=[],definition
 
 test('returns complete, independently evidenced direct Blob access and strict source role review',async()=>{
   const {reviewer,saved,requests}=makeReviewer();
-  const effective=await reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,container,targetResourceId});
+  const effective=await reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,scenario,container,targetResourceId});
   assert.equal(effective.status,'complete');
   assert.equal(effective.hasBlobRead,true);assert.equal(effective.hasBlobWrite,true);
   assert.equal(effective.inheritanceResolved,true);assert.equal(effective.groupMembershipsResolved,true);
@@ -55,7 +55,7 @@ test('returns complete, independently evidenced direct Blob access and strict so
   assert.ok(requests.some(item=>item.url.includes('transitiveMemberOf')));
   assert.ok(requests.some(item=>item.url.includes('roleAssignments')));
   assert.ok(requests.some(item=>item.url.includes('denyAssignments')));
-  const accessReview=await reviewer.reviewIdentityAccess({identity:{objectId:principalId},runId,container,targetResourceId});
+  const accessReview=await reviewer.reviewIdentityAccess({identity:{objectId:principalId},runId,scenario,container,targetResourceId});
   assert.equal(accessReview.status,'complete');assert.equal(accessReview.complete,true);assert.equal(accessReview.includesInherited,true);
   assert.equal(accessReview.groupMembershipsResolved,true);assert.deepEqual(accessReview.groupPrincipalIds,[]);
   assert.deepEqual(accessReview.unknownRoleDefinitions,[]);
@@ -64,7 +64,7 @@ test('returns complete, independently evidenced direct Blob access and strict so
 
 test('fails closed if transitive group assignment would be required to explain access',async()=>{
   const {reviewer,saved}=makeReviewer({groups:[{'@odata.type':'#microsoft.graph.group',id:groupId}],assignments:[assignment(groupId)]});
-  await assert.rejects(reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,container,targetResourceId}),error=>{
+  await assert.rejects(reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,scenario,container,targetResourceId}),error=>{
     assert.equal(error.partialEvidence.status,'incomplete');
     assert.match(error.partialEvidence.unresolved.join(' '),/group-based role access/);
     return true;
@@ -75,7 +75,7 @@ test('fails closed if transitive group assignment would be required to explain a
 test('fails closed when Graph membership, role definition, or protected evidence is unavailable',async()=>{
   for(const options of [{failGraph:true},{failDefinition:true},{persist:async()=>({})},{failCredentialReview:true}]) {
     const {reviewer}=makeReviewer(options);
-    await assert.rejects(reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,container,targetResourceId}),error=>{
+    await assert.rejects(reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,scenario,container,targetResourceId}),error=>{
       assert.equal(error.partialEvidence.status,'incomplete');return true;
     });
   }
@@ -89,7 +89,7 @@ test('fails closed on conditional assignments, indirect credential permissions, 
   ];
   for(const options of cases) {
     const {reviewer}=makeReviewer(options);
-    await assert.rejects(reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,container,targetResourceId}),error=>{
+    await assert.rejects(reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,scenario,container,targetResourceId}),error=>{
       assert.equal(error.partialEvidence.status,'incomplete');return true;
     });
   }
@@ -97,7 +97,7 @@ test('fails closed on conditional assignments, indirect credential permissions, 
 
 test('applies an effective deny assignment instead of reporting Blob read access',async()=>{
   const {reviewer}=makeReviewer({denies:[deny()]});
-  const effective=await reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,container,targetResourceId});
+  const effective=await reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,scenario,container,targetResourceId});
   assert.equal(effective.status,'complete');
   assert.equal(effective.hasBlobRead,false);
   assert.equal(effective.hasBlobWrite,true);
@@ -107,8 +107,9 @@ test('refuses untrusted pagination and malformed principal/target input',async()
   const {reviewer}=makeReviewer({extraFetch:async()=>new Response('{}',{status:404})});
   await assert.rejects(reviewer.evaluateEffectiveAccess({identity:{objectId:'not-guid'},runId,container,targetResourceId}),/invalid Azure Blob/);
   const malicious=makeReviewer({graphNextLink:'https://evil.example/steal'});
-  await assert.rejects(malicious.reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,container,targetResourceId}),error=>{
+  await assert.rejects(malicious.reviewer.evaluateEffectiveAccess({identity:{objectId:principalId},runId,scenario,container,targetResourceId}),error=>{
     assert.equal(error.partialEvidence.status,'incomplete');return true;
   });
 });
+
 

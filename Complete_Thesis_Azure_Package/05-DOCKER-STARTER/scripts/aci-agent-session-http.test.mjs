@@ -29,14 +29,16 @@ test('constructs without network access and requires exact Blob ARM scope',()=>{
     blobServiceResourceId:serviceId.replace('fixture123','otheracct'),runCleanupWithIdentity:cleanupRunner}),/invalid ACI session Blob endpoint/);
 });
 
-test('seed callback sends synthetic marker only to private source group and returns fingerprint metadata only',async()=>{
+test('seed callback captures its exact request body transiently for the protected proof writer',async()=>{
   let request;
   const callbacks=make(async(url,options)=>{
     request={url,options};
     const body=JSON.parse(options.body);
     return json({runId:body.runId,container:body.kind,statusCode:201,principalId:source.objectId,
       resourceId:target.resourceId,objectUri:target.objectUri,requestId:body.requestId,startedAt:now,
-      markerFingerprint:`sha256:${createHash('sha256').update(JSON.stringify({marker:body.marker})).digest('hex')}`,etag});
+      markerFingerprint:`sha256:${createHash('sha256').update(JSON.stringify({marker:body.marker})).digest('hex')}`,etag,
+      contentCapture:{bodyBase64:Buffer.from(JSON.stringify({marker:body.marker})).toString('base64'),statusCode:201,
+        requestId:body.requestId,principalId:source.objectId,capturedAt:now,captureBoundary:'blob_request_body'}});
   });
   const result=await callbacks.seedMarker({trial,group:sourceGroup,identity:source,container:'session-b',target});
   assert.equal(request.url,'http://10.48.13.11:8080/session-seed');
@@ -45,7 +47,7 @@ test('seed callback sends synthetic marker only to private source group and retu
   assert.match(sent.marker,/^SYNTHETIC-[a-f0-9]{64}$/);assert.match(sent.requestId,/^aci-seed-[a-f0-9]{64}$/);
   assert.equal(result.statusCode,201);assert.equal(result.principalId,source.objectId);assert.equal(result.etag,etag);
   assert.equal(result.markerFingerprint,`sha256:${createHash('sha256').update(JSON.stringify({marker:sent.marker})).digest('hex')}`);
-  assert.equal(JSON.stringify(result).includes(sent.marker),false);
+  assert.equal(result.contentCapture.bodyBytes.toString(),JSON.stringify({marker:sent.marker}));
   await assert.rejects(callbacks.seedMarker({trial,group:{...sourceGroup,identityObjectId:probe.objectId},identity:source,container:'session-b',target}),/not bound/);
 });
 
@@ -55,7 +57,7 @@ test('probe callback sends request ID and emits exact 403 metadata without raw A
     request={url,options};
     return json({runId:trial.runId,scenario:'U6',statusCode:403,principalId:probe.objectId,
       resourceId:target.resourceId,objectUri:target.objectUri,requestId:JSON.parse(options.body).requestId,
-      startedAt:now,errorCode:'AuthorizationPermissionMismatch',body:'SYNTHETIC-must-not-propagate'});
+      startedAt:now,observedAt:now,errorCode:'AuthorizationPermissionMismatch',body:'SYNTHETIC-must-not-propagate'});
   });
   const result=await callbacks.attemptRead({trial,group:probeGroup,identity:probe,container:'session-b',resourceId:target.resourceId,
     sourceGroup:{name:sourceGroup.name},sourceGroupMustRemainActive:true});
@@ -64,6 +66,23 @@ test('probe callback sends request ID and emits exact 403 metadata without raw A
   assert.equal(JSON.parse(request.options.body).requestId,result.requestId);
   assert.equal(result.statusCode,403);assert.equal(result.errorCode,'AuthorizationPermissionMismatch');
   assert.equal(result.sourceGroupActiveAtProbe,true);assert.equal(JSON.stringify(result).includes('must-not-propagate'),false);
+});
+
+test('probe callback keeps successful direct Blob response bytes in a private transient capture',async()=>{
+  const marker=`SYNTHETIC-${'a'.repeat(64)}`;
+  const callbacks=make(async(url,options)=>{
+    const requestId=JSON.parse(options.body).requestId;
+    const body=JSON.stringify({marker});
+    return json({runId:trial.runId,scenario:'U6',statusCode:200,principalId:probe.objectId,
+      resourceId:target.resourceId,objectUri:target.objectUri,requestId,startedAt:now,
+      markerFingerprint:`sha256:${createHash('sha256').update(body).digest('hex')}`,
+      contentCapture:{bodyBase64:Buffer.from(body).toString('base64'),statusCode:200,requestId,
+        principalId:probe.objectId,capturedAt:now,captureBoundary:'blob_response_body'}});
+  });
+  const result=await callbacks.attemptRead({trial,group:probeGroup,identity:probe,container:'session-b',resourceId:target.resourceId,
+    sourceGroup:{name:sourceGroup.name},sourceGroupMustRemainActive:true});
+  assert.equal(result.contentCapture.bodyBytes.toString(),JSON.stringify({marker}));
+  assert.equal(result.markerFingerprint,`sha256:${createHash('sha256').update(JSON.stringify({marker})).digest('hex')}`);
 });
 
 test('cleanup callback invokes a fresh identity-bound private group and requires confirmed group deletion',async()=>{

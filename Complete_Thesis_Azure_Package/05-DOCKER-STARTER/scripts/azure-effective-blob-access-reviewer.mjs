@@ -163,14 +163,14 @@ export function createAzureEffectiveBlobAccessReviewer({getManagementToken,getGr
     typeof reviewCredentialPaths!=='function'||typeof fetchImpl!=='function'||typeof now!=='function'||!GUID.test(observerPrincipalId||''))
     throw new Error('Azure Blob access reviewer requires separate ARM/Graph tokens, an observer, an independent credential-path reviewer, and protected snapshot storage');
 
-  async function runReview({principalId,runId,container,targetResourceId}) {
-    if(!GUID.test(principalId||'')||!RUN.test(runId||'')||!['session-b','prior-session'].includes(container)||
+  async function runReview({principalId,runId,scenario,container,targetResourceId}) {
+    if(!GUID.test(principalId||'')||!RUN.test(runId||'')||!['U6','U8'].includes(scenario)||!['session-b','prior-session'].includes(container)||
       !CONTAINER_ARM.test(targetResourceId||'')) throw new Error('invalid Azure Blob access review target');
     const armToken=await getManagementToken(),graphToken=await getGraphToken();
     if(typeof armToken!=='string'||armToken.length<20||/\s/.test(armToken)||typeof graphToken!=='string'||graphToken.length<20||/\s/.test(graphToken))
       throw new Error('Azure Blob access review token unavailable');
     const observedAt=new Date(now()).toISOString();
-    const snapshot={schema:'azure-effective-blob-access-review-v1',runId,principalId:principalId.toLowerCase(),container,
+    const snapshot={schema:'azure-effective-blob-access-review-v1',runId,scenario,principalId:principalId.toLowerCase(),container,
       resourceId:targetResourceId,observerPrincipalId:observerPrincipalId.toLowerCase(),observedAt,
       roleAssignments:[],roleDefinitions:[],transitiveGroups:[],denyAssignments:[],unresolved:[]};
     let groups=[],hasBlobRead=false,hasBlobWrite=false,assignments=[];
@@ -301,16 +301,16 @@ export function createAzureEffectiveBlobAccessReviewer({getManagementToken,getGr
   }
 
   return Object.freeze({
-    async reviewIdentityAccess({identity,runId,container,targetResourceId}) {
-      const result=await runReview({principalId:identity?.objectId,runId,container,targetResourceId});
+    async reviewIdentityAccess({identity,runId,scenario,container,targetResourceId}) {
+      const result=await runReview({principalId:identity?.objectId,runId,scenario,container,targetResourceId});
       return {status:'complete',runId:result.runId,principalId:result.principalId,container,observerPrincipalId:result.observerPrincipalId,
         readMethod:'azure_role_assignments_effective_snapshot',httpStatus:200,observedAt:result.observedAt,
         snapshotFingerprint:result.snapshotFingerprint,evidenceReference:result.evidenceReference,
         complete:true,includesInherited:true,groupMembershipsResolved:true,groupPrincipalIds:result.groupPrincipalIds,
         unknownRoleDefinitions:result.unknownRoleDefinitions,effectiveRoleAssignments:result.effectiveRoleAssignments};
     },
-    evaluateEffectiveAccess:({identity,runId,container,targetResourceId})=>
-      runReview({principalId:identity?.objectId,runId,container,targetResourceId})
+    evaluateEffectiveAccess:({identity,runId,scenario,container,targetResourceId})=>
+      runReview({principalId:identity?.objectId,runId,scenario,container,targetResourceId})
   });
 }
 

@@ -52,13 +52,13 @@ test('dummy-token exposure and use are distinct observations',async()=>{
   } finally {globalThis.fetch=original;}
 });
 
-test('request-ID-aware U6/U8 reads return run-bound metadata and never expose marker contents',async()=>{
+test('request-ID-aware U6/U8 reads return a transient direct-response capture for proof persistence',async()=>{
   const original=globalThis.fetch,principal='10000000-0000-4000-8000-000000000001';
   const serviceId='/subscriptions/11111111-1111-4111-8111-111111111111/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture123/blobServices/default';
   const encode=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
   const token=`${encode({alg:'RS256'})}.${encode({aud:'https://storage.azure.com/',oid:principal,appid:'20000000-0000-4000-8000-000000000001'})}.signature`;
-  const requestId=`aci-probe-${'a'.repeat(64)}`;let captured;
-  globalThis.fetch=async(url,options)=>{captured={url,options};return new Response(JSON.stringify({marker:'SYNTHETIC-example'}),{status:200});};
+  const requestId=`aci-probe-${'a'.repeat(64)}`,marker=`SYNTHETIC-${'b'.repeat(64)}`;let captured;
+  globalThis.fetch=async(url,options)=>{captured={url,options};return new Response(JSON.stringify({marker}),{status:200});};
   try {
     const workload=createBlobWorkload({blobEndpoint:'https://fixture123.blob.core.windows.net/',getToken:async()=>token,
       blobResourceId:serviceId,expectedPrincipalId:principal,expectedClientId:'20000000-0000-4000-8000-000000000001'});
@@ -68,7 +68,9 @@ test('request-ID-aware U6/U8 reads return run-bound metadata and never expose ma
     assert.equal(result.statusCode,200);assert.equal(result.principalId,principal);
     assert.equal(result.resourceId,`${serviceId}/containers/session-b`);assert.equal(result.requestId,requestId);
     assert.equal(result.objectUri,captured.url);assert.match(result.markerFingerprint,/^sha256:[a-f0-9]{64}$/);
-    assert.equal(Object.hasOwn(result,'body'),false);assert.equal(JSON.stringify(result).includes('SYNTHETIC-'),false);
+    assert.equal(Object.hasOwn(result,'body'),false);
+    assert.equal(Buffer.from(result.contentCapture.bodyBase64,'base64').toString(),JSON.stringify({marker}));
+    assert.equal(result.contentCapture.captureBoundary,'blob_response_body');
     await assert.rejects(workload({runId:'pilot-u6-1',scenario:'U6',requestId:'bad'}),/invalid Blob request ID/);
   } finally {globalThis.fetch=original;}
 });

@@ -1,15 +1,17 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {createAciBlobSessionAnalog} from './aci-blob-session-analog.mjs';
 
 const runId='aci-analog-run-1';
 const reference='https://advisor.example.test/approval/aci-method-1';
-const markerFingerprint=`sha256:${'a'.repeat(64)}`;
+const markerPayload=JSON.stringify({marker:`SYNTHETIC-${'a'.repeat(64)}`});
+const markerFingerprint=`sha256:${createHash('sha256').update(markerPayload).digest('hex')}`;
 const containerId=container=>`/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/store/blobServices/default/containers/${container}`;
 const objectUri=container=>`https://store.blob.core.windows.net/${container}/${runId}.json`;
 
 function harness({scenario='U6',probeStatus=403,approve=true,failCleanup=false,failMarkerCleanup=false,duplicateGroups=false,oldAudit=false,
-  probeHasReadRole=false,unknownRole=false,overbroadSource=false}={}) {
+  probeHasReadRole=false,unknownRole=false,overbroadSource=false,failProof=false}={}) {
   const events=[];let identityNumber=0,groupNumber=0,requestNumber=0;
   const identities=new Map(),groups=new Map();
   const nextTime=()=>`2026-11-04T12:00:${String(events.length%60).padStart(2,'0')}.000Z`;
@@ -63,8 +65,10 @@ function harness({scenario='U6',probeStatus=403,approve=true,failCleanup=false,f
     targetForMarker:async ({container})=>({resourceId:containerId(container),objectUri:objectUri(container)}),
     seedMarker:async ({trial,group,identity,container,target})=>{
       events.push('seed');
+      const requestId=`seed-request-${++requestNumber}-long`,startedAt=nextTime();
       return {runId:trial.runId,container,statusCode:201,principalId:identity.objectId,resourceId:target.resourceId,objectUri:target.objectUri,
-        requestId:`seed-request-${++requestNumber}-long`,startedAt:nextTime(),markerFingerprint,etag:'"etag-one"'};
+        requestId,startedAt,markerFingerprint,etag:'"etag-one"',contentCapture:{bodyBytes:Buffer.from(markerPayload),statusCode:201,
+          requestId,principalId:identity.objectId,capturedAt:startedAt,captureBoundary:'blob_request_body'}};
     },
     readMarker:async ({container})=>({matched:true,markerFingerprint,verifierPrincipalId:'30000000-0000-4000-8000-000000000001',
       verifierAccessReview:{runId,principalId:'30000000-0000-4000-8000-000000000001',container,complete:true,includesInherited:true,
@@ -78,14 +82,25 @@ function harness({scenario='U6',probeStatus=403,approve=true,failCleanup=false,f
         snapshotFingerprint:`sha256:${'e'.repeat(64)}`,observedAt:nextTime(),inheritanceResolved:true,
         groupMembershipsResolved:true,customRolesResolved:true,dataActionsResolved:true,indirectCredentialPathsResolved:true,
         unknownRoleDefinitions:[],hasBlobRead:true,hasBlobWrite:false,effectiveAssignments:[]},
-      resourceId:containerId(container),objectUri:objectUri(container),requestId:`readback-request-${++requestNumber}-long`,startedAt:nextTime()}),
+      resourceId:containerId(container),objectUri:objectUri(container),requestId:`readback-request-${++requestNumber}-long`,startedAt:nextTime(),
+      contentCapture:{bodyBytes:Buffer.from(markerPayload),statusCode:200,requestId:`readback-request-${requestNumber}-long`,
+        principalId:'30000000-0000-4000-8000-000000000001',capturedAt:nextTime(),captureBoundary:'blob_response_body'}}),
     attemptRead:async ({trial,group,identity})=>{
       events.push(`probe:${trial.scenario}`);
       return {runId:trial.runId,container:trial.scenario==='U6'?'session-b':'prior-session',
         statusCode:probeStatus,principalId:identity.objectId,resourceId:containerId(trial.scenario==='U6'?'session-b':'prior-session'),
         objectUri:objectUri(trial.scenario==='U6'?'session-b':'prior-session'),requestId:`probe-request-${++requestNumber}-long`,
-        startedAt:nextTime(),groupName:group.name,sourceGroupActiveAtProbe:scenario==='U6',
+        startedAt:nextTime(),observedAt:nextTime(),groupName:group.name,sourceGroupActiveAtProbe:scenario==='U6',
+        ...(probeStatus===200?{contentCapture:{bodyBytes:Buffer.from(markerPayload),statusCode:200,
+          requestId:`probe-request-${requestNumber}-long`,principalId:identity.objectId,capturedAt:nextTime(),captureBoundary:'blob_response_body'}}:{}),
         ...(probeStatus===200?{markerFingerprint}:{errorCode:'AuthorizationPermissionMismatch'})};
+    },
+    persistMarkerContentProof:async value=>{
+      if(failProof) throw new Error('mock protected evidence unavailable');
+      assert.equal(value.seed.capture.bodyBytes.toString(),markerPayload);
+      assert.equal(value.independentRead.capture.bodyBytes.toString(),markerPayload);
+      return {evidenceReference:`https://evidence.example.test/marker-proof/${value.runId}`,
+        snapshotFingerprint:`sha256:${'f'.repeat(64)}`};
     },
     deleteMarker:async ({trial,container,target,identity,etag})=>{
       events.push('marker-delete');

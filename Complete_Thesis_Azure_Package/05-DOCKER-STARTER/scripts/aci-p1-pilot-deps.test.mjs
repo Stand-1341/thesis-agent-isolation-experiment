@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import createDeps,{validateAciP1DependencyConfig,validateAciP1DependencyRows} from './aci-p1-pilot-deps.mjs';
 import {validateAciP1DraftSchedule} from './aci-p1-pilot-draft-validator.mjs';
+import {buildAciRunIdentitySpecs} from './aci-preprovisioned-identity-provider.mjs';
 
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const env={
-  THESIS_ACI_SUBSCRIPTION_ID:id(1),THESIS_ACI_RESOURCE_GROUP:'rg-pilot',THESIS_ACI_LOCATION:'eastus',
+  THESIS_ACI_SUBSCRIPTION_ID:id(1),THESIS_ACI_TENANT_ID:id(13),THESIS_ACI_RESOURCE_GROUP:'rg-pilot',THESIS_ACI_LOCATION:'eastus',
   THESIS_ACI_IMAGE_DIGEST_REFERENCE:`example.azurecr.io/agent@sha256:${'a'.repeat(64)}`,
   THESIS_ACI_REGISTRY_SERVER:'example.azurecr.io',
   THESIS_ACI_PULL_IDENTITY_RESOURCE_ID:`/subscriptions/${id(1)}/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/pull`,
@@ -31,14 +32,20 @@ const env={
 const row=scenario=>({deployment:'azure_container_instances',permission_profile:'P1',scenario_id:scenario});
 
 const methodDecision={status:'approved',reference:'https://institution.example.test/method/aci-amendment',
+  approvalEvidenceReference:'https://institution.example.test/approvals/aci-amendment',reviewerPrincipalId:id(14),
   unauthorizedOperations:{U6:'read_other_active_group_blob_marker',U8:'read_retired_group_blob_marker'}};
 const sessionAnalog=async()=>({classification:'indeterminate',evidence:{}});
 const sessionAnalogVerifier=async()=>({classification:'indeterminate',evidence:{}});
 let verifiedDecision;
 const approval=async decision=>{verifiedDecision=decision;return true;};
+const lifecycleRows=Array.from({length:10},(_,i)=>({deployment:'azure_container_instances',permission_profile:'P1',
+  scenario_id:i%2?'U8':'U6',planned_run_id:`pilot-aci-fixture-${i+1}`}));
+const inventorySpecs=buildAciRunIdentitySpecs(lifecycleRows.map(r=>({runId:r.planned_run_id,scenario:r.scenario_id})))
+  .map((spec,i)=>({...spec,principalId:`70000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`}));
+const preprovisionedIdentityManifest={scheduleSha256:'a'.repeat(64),identitySpecs:inventorySpecs};
 
 test('dependency schedule validation rejects ACI U6 and U8 without separately injected callbacks',async()=>{
-  for(const scenario of ['U6','U8']) await assert.rejects(createDeps({rows:[row(scenario)],env:{}}),/separate sessionAnalog and independent sessionAnalogVerifier callbacks/);
+  for(const scenario of ['U6','U8']) await assert.rejects(createDeps({rows:[row(scenario)],env:{}}),/method-decision/);
   assert.throws(()=>validateAciP1DependencyRows([row('U6')]),/separate sessionAnalog/);
   assert.throws(()=>validateAciP1DependencyRows([row('U8')]),/separate sessionAnalog/);
   assert.throws(()=>validateAciP1DependencyRows([row('U6')],{sessionAnalog,sessionAnalogVerifier}),/method-decision/);
@@ -54,7 +61,7 @@ test('checked-in 50-row draft still blocks dependency creation because U6 and U8
   assert.equal(schedule.rows,50);
   const text=bytes.toString('utf8');
   assert.match(text,/U6/);assert.match(text,/U8/);
-  await assert.rejects(createDeps({rows:[row('U1'),row('U6'),row('U8')],env:{}}),/separate sessionAnalog and independent sessionAnalogVerifier callbacks/);
+  await assert.rejects(createDeps({rows:[row('U1'),row('U6'),row('U8')],env:{}}),/method-decision/);
 });
 
 test('dependency schedule validation is limited to ACI P1 and known scenario adapters',()=>{
@@ -85,6 +92,8 @@ test('wires separated identity providers, Key Vault secrets, adapter, independen
   const identityIds=[],secretReads=[],storageIds=[],logIds=[]; let captured;
   const mockCredential=clientId=>{identityIds.push(clientId);return {getToken:async()=>({token:'mock-token'})};};
   const components={
+    identityLifecycleRoleDefinitionId:`/subscriptions/${id(1)}/providers/Microsoft.Authorization/roleDefinitions/${id(15)}`,
+    preprovisionedIdentityManifest,
     identity:mockCredential,
     storageProvider:({clientId})=>{storageIds.push(clientId);return async()=>'mock-storage-token';},
     logsProvider:({clientId})=>{logIds.push(clientId);return async()=>'mock-logs-token';},
@@ -101,23 +110,32 @@ test('wires separated identity providers, Key Vault secrets, adapter, independen
     collectorReader:args=>Object.assign(async()=>({}),{config:args}),
     resourceReader:args=>Object.assign(async()=>({}),{config:args}),
     verifierRouter:args=>Object.assign(async()=>({classification:'indeterminate'}),{config:args}),
-    sessionAnalog,sessionAnalogVerifier,methodDecision,verifyMethodApproval:approval,
+    methodDecision,verifyMethodApproval:approval,
+    reviewCredentialPaths:async({principalId,runId,container,targetResourceId,observerPrincipalId})=>({
+      status:'complete',source:'azure_live_identity_credential_path_review_v1',principalId,runId,container,
+      resourceId:targetResourceId,observerPrincipalId,readOnly:true,allPathsResolved:true,unresolvedPaths:[],
+      evidenceReference:'urn:credential-review:test',snapshotFingerprint:`sha256:${'c'.repeat(64)}`,observedAt:'2026-11-04T12:00:00Z'}),
+    observeGroup:async({group})=>({state:'Running',name:group.name,identityObjectId:group.identityObjectId,
+      createdAt:'2026-11-04T12:00:00Z'}),
+    readAciLifecycleEvidence:async()=>({source:'azure_aci_arm_activity_snapshot_v1',readOnly:true,
+      observerPrincipalId:env.THESIS_ACI_AUDIT_PRINCIPAL_OBJECT_ID,snapshot:{}}),
     evidenceStore:async args=>{captured={...(captured??{}),evidenceArgs:args};return {claim:async()=>{},save:async()=>{}};}
   };
-  const deps=await createDeps({rows:[row('U1'),row('U4'),row('U5'),row('U6'),row('U7'),row('L1')],env,components});
+  const deps=await createDeps({rows:[row('U1'),row('U4'),row('U5'),row('U7'),row('L1'),...lifecycleRows],env,components});
   assert.equal(typeof deps.adapter,'object');assert.equal(typeof deps.verifier,'function');
   assert.equal(typeof deps.evidenceStore.claim,'function');assert.equal(typeof deps.evidenceStore.save,'function');
   assert.deepEqual(identityIds,[env.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID,
     env.THESIS_ACI_FIXTURE_VERIFIER_IDENTITY_CLIENT_ID,env.THESIS_ACI_AUDIT_IDENTITY_CLIENT_ID]);
-  assert.deepEqual(storageIds,[env.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID,env.THESIS_ACI_FIXTURE_VERIFIER_IDENTITY_CLIENT_ID]);
-  assert.deepEqual(logIds,[env.THESIS_ACI_AUDIT_IDENTITY_CLIENT_ID]);
+  assert.deepEqual(storageIds,[env.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID,env.THESIS_ACI_FIXTURE_VERIFIER_IDENTITY_CLIENT_ID,
+    env.THESIS_ACI_FIXTURE_VERIFIER_IDENTITY_CLIENT_ID]);
+  assert.deepEqual(logIds,[env.THESIS_ACI_AUDIT_IDENTITY_CLIENT_ID,env.THESIS_ACI_AUDIT_IDENTITY_CLIENT_ID]);
   assert.deepEqual(secretReads,['resource-admin','collector-admin','controller-key','workload-token','collector-verifier','resource-verifier']);
   assert.equal(deps.adapter.config.controllerToken,'secret-value-controller-key');
   assert.equal(deps.adapter.config.groupBodyForTrial instanceof Function,true);
-  assert.equal(deps.adapter.config.sessionAnalog,sessionAnalog);
+  assert.equal(typeof deps.adapter.config.sessionAnalog,'function');
   assert.equal(deps.adapter.config.groupClient.config.resourceGroup,'rg-pilot');
   assert.equal(deps.verifier.config.blobVerifier.config.pilotMode,true);
-  assert.equal(deps.verifier.config.sessionAnalogVerifier,sessionAnalogVerifier);
+  assert.equal(typeof deps.verifier.config.sessionAnalogVerifier,'function');
   assert.notEqual(deps.verifier.config.sessionAnalogVerifier,deps.adapter.config.sessionAnalog);
   assert.equal(verifiedDecision,methodDecision);
   assert.equal(Object.hasOwn(deps,'readiness'),false);

@@ -83,6 +83,9 @@ export async function seedSessionBlob({blobEndpoint,runId,kind,marker,azureAcces
   return {scope:'fixture_session_seed_observation',runId,kind,requestId,status:response.status,
     statusCode:response.status,container:kind,principalId:expectedPrincipalId.toLowerCase(),resourceId:scope.resourceId,
     objectUri:scope.objectUri,startedAt,markerFingerprint,...(safeEtag(etag)?{etag}:{}),
+    ...(managed&&requestedRequestId!==undefined&&response.status===201?{contentCapture:{
+      bodyBase64:Buffer.from(body,'utf8').toString('base64'),statusCode:response.status,requestId,
+      principalId:expectedPrincipalId.toLowerCase(),capturedAt:startedAt,captureBoundary:'blob_request_body'}}:{}),
     ...(response.status===403?{errorCode:response.headers.get('x-ms-error-code')||undefined}:{}),
     serviceRequestId:typeof serviceRequestId==='string' && /^[A-Za-z0-9-]{1,100}$/.test(serviceRequestId)?serviceRequestId:null};
 }

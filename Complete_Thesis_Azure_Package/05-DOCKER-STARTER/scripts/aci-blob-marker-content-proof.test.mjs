@@ -10,16 +10,16 @@ const probeId='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const body=Buffer.from(JSON.stringify({marker:`SYNTHETIC-${'a'.repeat(64)}`}));
 const contentFingerprint=`sha256:${createHash('sha256').update(body).digest('hex')}`;
 const ts='2026-11-04T12:00:00.000Z';
-const capture=(requestId,principalId,statusCode)=>({bodyBytes:body,statusCode,requestId,principalId,
-  capturedAt:ts,captureBoundary:'direct_http_response'});
+const capture=(requestId,principalId,statusCode,captureBoundary)=>({bodyBytes:body,statusCode,requestId,principalId,
+  capturedAt:ts,captureBoundary});
 function fixture({probeStatusCode=403,probeBody=false}={}) {
   const input={runId:'u6-proof-run',scenario:'U6',resourceId:'/subscriptions/11111111-1111-4111-8111-111111111111/resourceGroups/r/providers/Microsoft.Storage/storageAccounts/store/blobServices/default/containers/session-b',
     objectUri:'https://store.blob.core.windows.net/session-b/u6-proof-run.json',markerFingerprint:contentFingerprint,
     sourcePrincipalId:source,verifierPrincipalId:verifier,probePrincipalId:probeId,
-    seed:{requestId:'aci-put-1234567890',principalId:source,capture:capture('aci-put-1234567890',source,201)},
-    independentRead:{requestId:'aci-verifier-get-1234567890',principalId:verifier,capture:capture('aci-verifier-get-1234567890',verifier,200)},
+    seed:{requestId:'aci-put-1234567890',principalId:source,capture:capture('aci-put-1234567890',source,201,'blob_request_body')},
+    independentRead:{requestId:'aci-verifier-get-1234567890',principalId:verifier,capture:capture('aci-verifier-get-1234567890',verifier,200,'blob_response_body')},
     probe:{requestId:'aci-probe-get-1234567890',principalId:probeId,statusCode:probeStatusCode,
-      ...(probeBody?{capture:capture('aci-probe-get-1234567890',probeId,200)}:{observedAt:ts})}};
+      ...(probeBody?{capture:capture('aci-probe-get-1234567890',probeId,200,'blob_response_body')}:{observedAt:ts})}};
   let persisted;
   const persist=createAciBlobMarkerContentProofPersister({observerPrincipalId:observer,requiredRetentionDays:180,
     writeProtectedEvidence:async({snapshot})=>{persisted=snapshot;return {reference:'https://evidence.example.test/marker/u6-proof-run'};},
