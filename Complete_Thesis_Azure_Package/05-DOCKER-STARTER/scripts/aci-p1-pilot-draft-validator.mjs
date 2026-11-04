@@ -64,7 +64,7 @@ function parseDraftCsv(bytes) {
 
 /**
  * Validate integrity and full one-cell shape. This draft is deliberately never
- * runnable: pending U6/U8 analogs and method approval are hard blockers.
+ * runnable: U6/U8 integration/validation and method approval are hard blockers.
  */
 export function validateAciP1DraftSchedule({bytes, protocol}) {
   const draft=protocol?.status==='draft_not_approved' && protocol?.runPermitted===false;
@@ -112,7 +112,7 @@ export function validateAciP1DraftSchedule({bytes, protocol}) {
     if (cells.some((cell,index)=>cell.order!==index+1)) throw new Error(`ACI draft block ${block} order must be contiguous`);
   }
   return {
-    status: approved ? 'approved_non_counted_pilot' : 'draft_blocked_pending_method_approval_and_u6_u8_analogs',
+    status: approved ? 'approved_non_counted_pilot' : 'draft_blocked_pending_method_approval_u6_u8_integration_and_validation',
     runnable: approved,
     countedAsStudyTrials: false,
     rows: 50,

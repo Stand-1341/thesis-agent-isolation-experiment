@@ -61,6 +61,15 @@ technical pilot, not proof that the candidate is equivalent to the thesis
 scenario. The advisor's written method decision must state whether the external
 Blob authorization boundary is an acceptable substitute for session isolation.
 
+A local candidate orchestrator now exists in
+`05-DOCKER-STARTER/scripts/aci-blob-session-analog.mjs`, with eight mock-based
+tests. It requires an approved method decision and injected identity, RBAC,
+group, Blob, and independent audit interfaces. It fails closed on incomplete
+effective-access reviews, unknown access paths, mismatched audit rows, duplicate
+groups, or uncertain cleanup. It is not connected to the ACI trial adapter, and
+none of its Azure callbacks have been implemented or validated. Its passing
+tests are local code checks, not evidence that either scenario passed in Azure.
+
 Until that decision exists, the ACI runner must keep U6/U8 blocked and the
 existing 50-row draft non-runnable.
 

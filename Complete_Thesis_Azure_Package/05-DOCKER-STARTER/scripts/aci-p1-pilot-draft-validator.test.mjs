@@ -34,7 +34,7 @@ test('validates the first-50 structure and remains explicitly blocked from runni
   const result=validateAciP1DraftSchedule({bytes,protocol:protocolFor(bytes)});
   assert.deepEqual({status:result.status,runnable:result.runnable,counted:result.countedAsStudyTrials,
     rows:result.rows,blocks:result.blocks,unauthorized:result.unauthorized,legitimate:result.legitimate},
-    {status:'draft_blocked_pending_method_approval_and_u6_u8_analogs',runnable:false,counted:false,
+    {status:'draft_blocked_pending_method_approval_u6_u8_integration_and_validation',runnable:false,counted:false,
       rows:50,blocks:5,unauthorized:40,legitimate:10});
 });
 
@@ -54,5 +54,9 @@ test('checked-in draft metadata and schedule agree and preserve U6/U8 as unimple
   assert.equal(result.runnable,false);
   assert.equal(protocol.pendingScenarioAnalogs.U6.status,'unimplemented');
   assert.equal(protocol.pendingScenarioAnalogs.U8.status,'unimplemented');
+  for(const scenario of ['U6','U8']) {
+    assert.equal(protocol.pendingScenarioAnalogs[scenario].candidateImplementation.status,'local_prototype_not_integrated_or_azure_validated');
+    assert.equal(protocol.pendingScenarioAnalogs[scenario].candidateImplementation.azureValidated,false);
+  }
   assert.equal(protocol.sourceMethod.methodAmendmentRequired,true);
 });

@@ -18,8 +18,10 @@ const env={
   THESIS_BLOB_RESOURCE_ID:`/subscriptions/${id(1)}/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/storageacct/blobServices/default`,
   THESIS_LOG_ANALYTICS_WORKSPACE_ID:id(3),THESIS_ACI_P1_PRINCIPAL_OBJECT_ID:id(4),
   THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID:id(5),THESIS_ACI_FIXTURE_VERIFIER_IDENTITY_CLIENT_ID:id(6),
-  THESIS_ACI_AUDIT_IDENTITY_CLIENT_ID:id(7),THESIS_KEY_VAULT_URI:'https://vault-name.vault.azure.net',
-  THESIS_EVIDENCE_IDENTITY_CLIENT_ID:id(8),THESIS_EVIDENCE_RETENTION_APPROVED:'true',
+  THESIS_ACI_AUDIT_IDENTITY_CLIENT_ID:id(7),THESIS_ACI_CONTROLLER_PRINCIPAL_OBJECT_ID:id(9),
+  THESIS_ACI_FIXTURE_VERIFIER_PRINCIPAL_OBJECT_ID:id(10),THESIS_ACI_AUDIT_PRINCIPAL_OBJECT_ID:id(11),
+  THESIS_KEY_VAULT_URI:'https://vault-name.vault.azure.net',THESIS_EVIDENCE_IDENTITY_CLIENT_ID:id(8),
+  THESIS_EVIDENCE_PRINCIPAL_OBJECT_ID:id(12),THESIS_EVIDENCE_RETENTION_APPROVED:'true',
   THESIS_EVIDENCE_RETENTION_DAYS:'180',THESIS_EVIDENCE_BLOB_CONTAINER_URL:'https://evidenceacct.blob.core.windows.net/evidence',
   THESIS_EVIDENCE_CONTAINER_RESOURCE_ID:`/subscriptions/${id(1)}/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/evidenceacct/blobServices/default/containers/evidence`,
   THESIS_ACI_RESOURCE_ADMIN_SECRET_NAME:'resource-admin',THESIS_ACI_COLLECTOR_ADMIN_SECRET_NAME:'collector-admin',
@@ -55,6 +57,8 @@ test('dependency schedule validation is limited to ACI P1 and known scenario ada
 test('configuration validation identifies required inputs and rejects shared privileged identities',()=>{
   assert.throws(()=>validateAciP1DependencyConfig({}),/missing ACI pilot dependency configuration: .*THESIS_KEY_VAULT_URI/);
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_ACI_AUDIT_IDENTITY_CLIENT_ID:env.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID}),/must be distinct/);
+  assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_PRINCIPAL_OBJECT_ID:env.THESIS_ACI_P1_PRINCIPAL_OBJECT_ID}),/principals must be distinct/);
+  assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_IDENTITY_CLIENT_ID:env.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID}),/managed identities must be distinct/);
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_ACI_IMAGE_DIGEST_REFERENCE:'example.azurecr.io/agent:latest'}),/pinned by digest/);
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_RETENTION_APPROVED:'false'}),/retention is not asserted/);
 });
