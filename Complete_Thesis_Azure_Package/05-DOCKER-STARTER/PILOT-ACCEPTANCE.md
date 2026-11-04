@@ -200,12 +200,12 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
 - `thesis-controller-pilot` and `thesis-p3-targets` are both deallocated. They
   are controller/research-target hosts, not the planned six VM workload routes.
 - No Container Apps session pool or workload app is present. The diagnostic
-  pool was deleted. The remaining `cae-thesis-diagnostic` environment is
-  confirmed Consumption-only; custom-container session pools need a new
-  workload-profiles environment with dedicated E16 capacity, which can be
-  billable while a ready session exists. The environment template now includes
-  an E16 profile capped at one instance. The old environment cannot be converted
-  in place.
+  pool and its attached diagnostic job were deleted. The remaining
+  `cae-thesis-diagnostic` environment reports `WorkloadProfiles` mode with only
+  the Consumption profile. Azure documents adding Dedicated profiles to an
+  existing workload-profiles environment, but this environment is currently
+  `ScheduledForDelete`; the E16 profile add request was rejected in that state.
+  The experiment template keeps E16 minimum nodes at zero and caps it at one.
 - A new delegated `sessions-experiment` subnet (`10.48.12.0/27`) has been
   deployed for that future environment. It is additive network plumbing only:
   it has no route table, NSG, environment, pool, or running compute attached.
@@ -240,6 +240,50 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
   returned null quantities/costs, so charges may lag. The user reported about
   $50 of compute used.
 - The measured runner was not started. No measured rows are complete.
+
+## Environment replacement attempts and present Azure blocker
+
+- Azure accepted deletion of `cae-thesis-diagnostic` at 2026-11-04 04:38 UTC,
+  but the resource remains `ScheduledForDelete`. The attached manual diagnostic
+  job had no running executions and was removed. The dedicated old subnet
+  `sessions-pilot` (`10.48.2.0/23`) had zero NIC/IP-configuration attachments;
+  it was removed and recreated with only the `Microsoft.App/environments`
+  delegation. Its previous P3 candidate NSG and route-table associations are
+  not currently attached. The shared VNet and all unrelated subnets were kept.
+- A replacement deployment in East US failed preflight with
+  `MaxNumberOfRegionalEnvironmentsInSubExceeded`. A zero-E16-minimum
+  replacement in Central US failed with
+  `MaxNumberOfGlobalEnvironmentsInSubExceeded`. Azure therefore reports a
+  subscription-wide one-environment limit. The temporary Central US VNet and
+  subnet were removed; no Central US environment or compute remains.
+- A fresh ARM token was acquired successfully from Azure CLI. The subscription
+  is Enabled. The environment update to add E16 failed with
+  `ManagedEnvironmentScheduledForDelete`. These are Azure provider state/quota
+  errors, not authentication failures. No E16 node, session pool, replacement
+  environment, or trial was created. The user declined submitting a Microsoft
+  support case; no case was filed.
+- Microsoft troubleshooting guidance recommends removing the associated VNet
+  for a stuck deletion, but this VNet contains the rest of the experiment
+  infrastructure and was not deleted. Microsoft Q&A guidance for a
+  `ScheduledForDelete` resource that remains stuck says backend cleanup via
+  support is required; a second environment cannot be created under the
+  subscription's current global limit while this resource remains.
+- `sessions-experiment` (`10.48.12.0/27`) remains delegated in the East US VNet
+  for a future replacement. It is not attached to any environment. Azure
+  Firewall, storage, registry, Functions P1, deallocated VM disks, and logging
+  remain in the subscription and may continue to incur charges.
+- A local ARM-parameter validator was added for the evidence-storage template;
+  it checks three distinct principal IDs and an explicit retention period but
+  does not prove effective Azure permissions. Functions P3 subnet updates now
+  preserve existing NSG, service endpoint, policy, and delegation fields. The
+  VM package builder prints its manifest digest. `npm run verify` passed
+  **227/227** tests, Functions P3 Bicep compiled, and a VM workload package was
+  prepared locally. Its manifest SHA-256 is
+  `1ceff4e46e3e2305f301d50d68c66034bda800c7ea79b224a5da27472d7ec4f4`; the
+  separate Node 22.23.4 Linux runtime matches the installer-pinned binary hash.
+  Neither local artifact has been deployed.
+- Commit `4739dab` was pushed to the private GitHub repository. No measured
+  trial was started.
 
 ## How the open gates will be validated
 
