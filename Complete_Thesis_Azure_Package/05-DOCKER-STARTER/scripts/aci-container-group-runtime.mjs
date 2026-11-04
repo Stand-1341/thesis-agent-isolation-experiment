@@ -15,11 +15,15 @@ export function aciGroupName(runId,profile) {
 }
 
 export function buildAciContainerGroupBody({location,imageDigestReference,registryServer,pullIdentityId,workloadIdentityId,
-  workloadIdentityClientId,subnetId,researchUrl,collectorUrl,blobEndpoint,workloadToken,trialRequestKey,cpu=1,memoryInGiB=1.5,dnsServer='168.63.129.16'}) {
+  workloadIdentityClientId,workloadPrincipalObjectId,blobResourceId,subnetId,researchUrl,collectorUrl,blobEndpoint,workloadToken,trialRequestKey,cpu=1,memoryInGiB=1.5,dnsServer='168.63.129.16'}) {
   if(typeof location!=='string' || !location || typeof imageDigestReference!=='string' || !/@sha256:[a-f0-9]{64}$/.test(imageDigestReference)) throw new Error('ACI image must be pinned by digest');
   if(typeof registryServer!=='string' || !/^[a-z0-9-]+\.azurecr\.io$/i.test(registryServer)) throw new Error('invalid ACR server');
   if(!ARM_ID.test(pullIdentityId||'') || !ARM_ID.test(workloadIdentityId||'') || pullIdentityId.toLowerCase()===workloadIdentityId.toLowerCase()) throw new Error('ACR pull and workload identities must be distinct user-assigned identities');
   if(!GUID.test(workloadIdentityClientId||'')) throw new Error('invalid workload identity client ID');
+  if(!GUID.test(workloadPrincipalObjectId||'')) throw new Error('invalid workload identity principal object ID');
+  const blobMatch=/^\/subscriptions\/[0-9a-f-]{36}\/resourceGroups\/[A-Za-z0-9._()-]+\/providers\/Microsoft\.Storage\/storageAccounts\/([a-z0-9]{3,24})\/blobServices\/default$/i.exec(blobResourceId||'');
+  if(!blobMatch||`${blobMatch[1]}.blob.core.windows.net`.toLowerCase()!==new URL(blobEndpoint).hostname.toLowerCase())
+    throw new Error('ACI Blob service resource ID must match the configured endpoint');
   if(typeof subnetId!=='string' || !/^\/subscriptions\/[^/]+\/resourceGroups\/[^/]+\/providers\/Microsoft\.Network\/virtualNetworks\/[^/]+\/subnets\/[^/]+$/i.test(subnetId)) throw new Error('invalid ACI subnet resource ID');
   for(const [value,name] of [[researchUrl,'researchUrl'],[collectorUrl,'collectorUrl'],[blobEndpoint,'blobEndpoint']]) {
     let url; try {url=new URL(value);} catch {throw new Error(`invalid ${name}`);}
@@ -41,6 +45,8 @@ export function buildAciContainerGroupBody({location,imageDigestReference,regist
           {name:'PORT',value:'8080'},
           {name:'AZURE_TOKEN_MODE',value:'managed'},
           {name:'AZURE_CLIENT_ID',value:workloadIdentityClientId},
+          {name:'AZURE_PRINCIPAL_OBJECT_ID',value:workloadPrincipalObjectId},
+          {name:'THESIS_BLOB_RESOURCE_ID',value:blobResourceId},
           {name:'AZURE_BLOB_ENDPOINT',value:blobEndpoint},
           {name:'RESEARCH_URL',value:researchUrl},
           {name:'COLLECTOR_URL',value:collectorUrl},

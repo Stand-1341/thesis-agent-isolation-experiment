@@ -10,9 +10,11 @@ test('separate fixture service accepts only its key and obtains its own scoped t
   const token=`${encode({alg:'RS256',padding:'x'.repeat(50)})}.${encode({aud:'https://storage.azure.com/',oid:principal,exp:Math.floor(Date.now()/1000)+3600})}.synthetic-signature`;
   let calls=0,usedToken;
   const original=globalThis.fetch;
-  globalThis.fetch=async(url,options)=>{calls++;usedToken=options.headers.authorization;return new Response(null,{status:201,headers:{'x-ms-request-id':'req-1'}});};
+  globalThis.fetch=async(url,options)=>{calls++;usedToken=options.headers.authorization;return new Response(null,{status:201,headers:{etag:'"seed-etag"','x-ms-request-id':'req-1'}});};
   const sessionId='a'.repeat(48);
-  const server=createFixtureSeedServer({requestKey:key,blobEndpoint:'https://fixture123.blob.core.windows.net/',ownerPrincipalId:principal,sessionId,getManagedToken:async()=>token}).listen(0,'127.0.0.1');
+  const server=createFixtureSeedServer({requestKey:key,blobEndpoint:'https://fixture123.blob.core.windows.net/',
+    blobResourceId:'/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture123/blobServices/default',
+    ownerPrincipalId:principal,sessionId,getManagedToken:async()=>token}).listen(0,'127.0.0.1');
   await once(server,'listening');
   const send=(requestKey,body)=>new Promise((resolve,reject)=>{
     const req=request({hostname:'127.0.0.1',port:server.address().port,path:'/session-seed',method:'POST',headers:{'x-fixture-key':requestKey,'content-type':'application/json'}},res=>{

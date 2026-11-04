@@ -64,7 +64,7 @@ function harness({scenario='U6',probeStatus=403,approve=true,failCleanup=false,f
     seedMarker:async ({trial,group,identity,container,target})=>{
       events.push('seed');
       return {runId:trial.runId,container,statusCode:201,principalId:identity.objectId,resourceId:target.resourceId,objectUri:target.objectUri,
-        requestId:`seed-request-${++requestNumber}-long`,startedAt:nextTime(),markerFingerprint};
+        requestId:`seed-request-${++requestNumber}-long`,startedAt:nextTime(),markerFingerprint,etag:'"etag-one"'};
     },
     readMarker:async ({container})=>({matched:true,markerFingerprint,verifierPrincipalId:'30000000-0000-4000-8000-000000000001',
       verifierAccessReview:{runId,principalId:'30000000-0000-4000-8000-000000000001',container,complete:true,includesInherited:true,
@@ -87,14 +87,15 @@ function harness({scenario='U6',probeStatus=403,approve=true,failCleanup=false,f
         startedAt:nextTime(),groupName:group.name,sourceGroupActiveAtProbe:scenario==='U6',
         ...(probeStatus===200?{markerFingerprint}:{errorCode:'AuthorizationPermissionMismatch'})};
     },
-    deleteMarker:async ({trial,container,target,identity})=>{
+    deleteMarker:async ({trial,container,target,identity,etag})=>{
       events.push('marker-delete');
+      assert.equal(etag,'"etag-one"');
       return {runId:trial.runId,container,resourceId:target.resourceId,objectUri:target.objectUri,
         removed:!failMarkerCleanup,statusCode:202,principalId:identity.objectId,
         requestId:`delete-marker-${++requestNumber}-long`,startedAt:nextTime()};
     },
     readAudit:async ({requestId,principalId,resourceId,objectUri})=>[{
-      clientRequestId:requestId,principalId,resourceId,
+      clientRequestId:requestId,principalId,resourceId:resourceId.split('/blobServices/')[0],
       objectUri,operation:requestId.startsWith('seed-request-')?'PutBlob':requestId.startsWith('delete-marker-')?'DeleteBlob':'GetBlob',
       statusCode:requestId.startsWith('seed-request-')?201:requestId.startsWith('readback-request-')?200:
         requestId.startsWith('delete-marker-')?202:probeStatus,
@@ -169,6 +170,11 @@ test('overbroad source roles and unresolved custom roles fail closed; a probe gr
   const result=await probeGranted.runner({runId,scenario:'U6',deployment:'azure_container_instances',profile:'P1'});
   assert.equal(result.classification,'indeterminate');
   assert.equal(result.evidence.permissionBaseline.probeHadEffectiveBlobReadRole,true);
+  const permittedRead=harness({probeHasReadRole:true,probeStatus:200});
+  const permittedResult=await permittedRead.runner({runId,scenario:'U6',deployment:'azure_container_instances',profile:'P1'});
+  assert.equal(permittedResult.classification,'indeterminate');
+  assert.equal(permittedResult.evidence.probeStatusCode,200);
+  assert.equal(permittedResult.evidence.probeHadEffectiveBlobReadRole,true);
 });
 
 test('a run ID cannot be replayed and identity separation is mandatory',async()=>{

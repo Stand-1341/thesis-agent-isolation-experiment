@@ -7,6 +7,7 @@ const workloadId='/subscriptions/11111111-1111-1111-1111-111111111111/resourceGr
 const subnetId='/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets/aci-experiment';
 const config={location:'eastus',imageDigestReference:`thesisacr.azurecr.io/thesis-agent@sha256:${'a'.repeat(64)}`,registryServer:'thesisacr.azurecr.io',
   pullIdentityId:pullId,workloadIdentityId:workloadId,workloadIdentityClientId:'11111111-1111-4111-8111-111111111111',subnetId,
+  workloadPrincipalObjectId:'22222222-2222-4222-8222-222222222222',blobResourceId:'/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture/blobServices/default',
   researchUrl:'https://10.48.9.4',collectorUrl:'https://10.48.9.5:8443',blobEndpoint:'https://fixture.blob.core.windows.net',
   workloadToken:'workload-secret-0123456789',trialRequestKey:'controller-secret-0123456789'};
 
@@ -29,6 +30,8 @@ test('ACI spec pins image, keeps pull/workload identities separate, and marks cr
   const env=body.properties.containers[0].properties.environmentVariables;
   assert.equal(env.find(item=>item.name==='WORKLOAD_TOKEN').secureValue,config.workloadToken);
   assert.equal(env.find(item=>item.name==='TRIAL_REQUEST_KEY').secureValue,config.trialRequestKey);
+  assert.equal(env.find(item=>item.name==='AZURE_PRINCIPAL_OBJECT_ID').value,config.workloadPrincipalObjectId);
+  assert.equal(env.find(item=>item.name==='THESIS_BLOB_RESOURCE_ID').value,config.blobResourceId);
   assert.equal(env.find(item=>item.name==='WORKLOAD_TOKEN').value,undefined);
   assert.equal(body.properties.ipAddress.type,'Private');
   assert.equal(body.properties.subnetIds[0].id,subnetId);

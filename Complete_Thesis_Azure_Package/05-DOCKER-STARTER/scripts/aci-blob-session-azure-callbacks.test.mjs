@@ -13,8 +13,10 @@ function dependencies(events=[]) {
     profileForRun:()=> 'P2',
     identityProvider:{createIdentity:async()=>{},deleteIdentity:async()=>{},evaluateEffectiveAccess:async()=>{}},
     effectiveAccessEvaluator:async()=>{},
-    blobOperations:Object.fromEntries(['targetForMarker','seedMarker','deleteMarker','readMarker','attemptRead'].map(name=>[
-      name,async args=>{events.push(`blob:${name}:${typeof args.getToken}`);return {localOnly:true};} ])),
+    blobOperations:{targetForMarker:async args=>{events.push('blob:targetForMarker');return {localOnly:true};}},
+    agentSessionCallbacks:Object.fromEntries(['seedMarker','attemptRead','deleteMarker'].map(name=>[
+      name,async()=>{events.push(`agent:${name}`);return {agentOperation:true};}])),
+    independentMarkerReader:async args=>{events.push(`independent-marker:${typeof args.getToken}`);return {independentlyRead:true};},
     observeGroup:async ({group})=>({state:'Running',name:group.name,identityObjectId:id(9),createdAt:'2026-11-04T12:00:00Z'}),
     fetchImpl:async()=>{throw new Error('network must not be used by injected local test');},
     groupClientFactory:()=>({
@@ -58,8 +60,10 @@ test('wires phase-specific ARM group lifecycle, scoped tokens, and request-id au
   assert.equal(group.identityObjectId,id(9));
   assert.match(group.name,/^thesis-aci-p2-[a-f0-9]{24}$/);
   assert.ok(events.indexOf('body:probe')<events.findIndex(x=>x.startsWith('group-create:')));
-  assert.deepEqual(await callbacks.seedMarker({}),{localOnly:true});
-  assert.ok(events.includes('blob:seedMarker:function'));
+  assert.deepEqual(await callbacks.seedMarker({}),{agentOperation:true});
+  assert.ok(events.includes('agent:seedMarker'));
+  assert.deepEqual(await callbacks.readMarker({}),{independentlyRead:true});
+  assert.ok(events.includes('independent-marker:function'));
   const rows=await callbacks.readAudit({runId:'pilot-1',requestId:'operation-request-123',
     from:'2026-11-04T12:00:00Z',to:'2026-11-04T12:01:00Z'});
   assert.equal(rows[0].runId,'pilot-1');

@@ -92,9 +92,12 @@ function auditRow(rows,request,{operation,statusCode}) {
   if(!Number.isFinite(windowStart)||!Number.isFinite(windowEnd)||windowEnd<windowStart) return undefined;
   const allowedStart=windowStart-30000,allowedEnd=windowEnd+30000;
   if(!Array.isArray(rows)) return undefined;
+  // StorageBlobLogs._ResourceId is the storage-account ARM ID. The exact
+  // container and blob are established independently by Uri/objectUri.
+  const accountResourceId=request.resourceId.split('/blobServices/')[0];
   const matches=rows.filter(row=>row?.clientRequestId===request.requestId&&
     row?.principalId?.toLowerCase()===request.principalId.toLowerCase()&&
-    row?.resourceId===request.resourceId&&row?.objectUri===request.objectUri&&row?.operation===operation&&row?.statusCode===statusCode&&
+    row?.resourceId?.toLowerCase()===accountResourceId.toLowerCase()&&row?.objectUri===request.objectUri&&row?.operation===operation&&row?.statusCode===statusCode&&
     row?.runId===request.runId&&Number.isFinite(Date.parse(row?.time))&&Date.parse(row.time)>=allowedStart&&Date.parse(row.time)<=allowedEnd);
   return matches.length===1?matches[0]:undefined;
 }
@@ -146,7 +149,7 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
     const events=[];
     const observations={};
     const accessEvaluations=new Map();
-    let sourceIdentity,probeIdentity,verifierPrincipalId,markerTarget,probeHasBlobReadRole=false,markerMayExist=false;
+    let sourceIdentity,probeIdentity,verifierPrincipalId,markerTarget,markerEtag,probeHasBlobReadRole=false,markerMayExist=false;
     const stamp=()=>new Date(now()).toISOString();
     const identityFor=async role=>{
       const value=identity(await createIdentity({runId:trial.runId,scenario:trial.scenario,role,container,target:markerTarget}),
@@ -191,6 +194,7 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
       const source=await groupFor(sourceIdentity,'source');
       markerMayExist=true;
       const markerResult=await seedMarker({trial,group:source,identity:sourceIdentity,container,target:markerTarget});
+      markerEtag=markerResult?.etag;
       observations.markerSeed=markerResult&&{runId:markerResult.runId,container:markerResult.container,
         statusCode:markerResult.statusCode,principalId:markerResult.principalId,resourceId:markerResult.resourceId,
         objectUri:markerResult.objectUri,requestId:markerResult.requestId,startedAt:markerResult.startedAt,markerFingerprint:markerResult.markerFingerprint};
@@ -198,7 +202,8 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
         resourceId:markerResult?.resourceId,objectUri:markerResult?.objectUri,requestId:markerResult?.requestId});
       if(markerResult?.statusCode!==201||markerResult.runId!==trial.runId||markerResult.container!==container||
         markerResult.principalId?.toLowerCase()!==sourceIdentity.objectId||markerResult.resourceId!==markerTarget.resourceId||
-        markerResult.objectUri!==markerTarget.objectUri||!/^sha256:[a-f0-9]{64}$/i.test(markerResult.markerFingerprint||''))
+        markerResult.objectUri!==markerTarget.objectUri||!/^sha256:[a-f0-9]{64}$/i.test(markerResult.markerFingerprint||'')||
+        typeof markerEtag!=='string'||!/^"[^"\r\n]{1,196}"$/.test(markerEtag))
         throw new Error('ACI synthetic marker seed was not confirmed');
       const seedAudit=await observeRequest({...seedRequest,startedAt:markerResult.startedAt},
         {operation:'PutBlob',statusCode:201});
@@ -294,9 +299,14 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
       observations.verifierEffectiveAccess=verifierAccess;
       observations.probeAudit=probeAudit;
       const retrieved=probe.statusCode===200&&probe.markerFingerprint===markerResult.markerFingerprint;
+      // A positive cross-group read is an unauthorized success only when the
+      // independent access review proves that the probe identity had no
+      // effective Blob read permission. Otherwise the setup violated the
+      // intended authorization profile and cannot measure isolation.
+      const unauthorizedSuccess=retrieved&&!probeHasBlobReadRole;
       const denied=probe.statusCode===403&&!probeHasBlobReadRole&&typeof probe.errorCode==='string'&&
         probe.errorCode==='AuthorizationPermissionMismatch';
-      const classification=retrieved?'unauthorized_success':denied?'confirmed_resource_denial':'indeterminate';
+      const classification=unauthorizedSuccess?'unauthorized_success':denied?'confirmed_resource_denial':'indeterminate';
       result={classification,evidence:{scope:'candidate_aci_cross_group_blob_analogue',methodReference:methodDecision.reference,
         equivalence:'not_claimed',scenario:trial.scenario,runId:trial.runId,container,
         sourceIdentityObjectId:sourceIdentity.objectId,probeIdentityObjectId:probeIdentity.objectId,
@@ -322,7 +332,7 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
           if(accessEvaluations.get(cleanupIdentity.objectId)?.hasBlobWrite!==true)
             throw new Error('ACI cleanup identity lacks independently resolved scoped Blob write access');
           const removal=await deleteMarker({trial,container,target:markerTarget,identity:cleanupIdentity,
-            markerFingerprint:observations.markerSeed?.markerFingerprint??null});
+            markerFingerprint:observations.markerSeed?.markerFingerprint??null,etag:markerEtag});
           if(removal?.runId!==trial.runId||removal.container!==container||removal.resourceId!==markerTarget.resourceId||
             removal.objectUri!==markerTarget.objectUri||removal.removed!==true||![202,404].includes(removal.statusCode)||
             !GUID.test(removal.principalId||'')||removal.principalId.toLowerCase()!==cleanupIdentity.objectId||

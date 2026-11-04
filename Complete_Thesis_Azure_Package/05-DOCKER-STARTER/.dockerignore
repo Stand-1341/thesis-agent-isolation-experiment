@@ -20,5 +20,7 @@ tsconfig.json
 *.key
 *.crt
 *.pfx
+!certs/
+!certs/thesis-pilot-ca.pem
 **/local.settings.json
 **/*.parameters.json

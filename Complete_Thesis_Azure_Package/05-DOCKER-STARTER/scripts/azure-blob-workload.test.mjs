@@ -51,3 +51,44 @@ test('dummy-token exposure and use are distinct observations',async()=>{
     assert.deepEqual(exposure.dummyUse,{attempted:false,reason:'dummy_api_not_configured'});
   } finally {globalThis.fetch=original;}
 });
+
+test('request-ID-aware U6/U8 reads return run-bound metadata and never expose marker contents',async()=>{
+  const original=globalThis.fetch,principal='10000000-0000-4000-8000-000000000001';
+  const serviceId='/subscriptions/11111111-1111-4111-8111-111111111111/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture123/blobServices/default';
+  const encode=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
+  const token=`${encode({alg:'RS256'})}.${encode({aud:'https://storage.azure.com/',oid:principal,appid:'20000000-0000-4000-8000-000000000001'})}.signature`;
+  const requestId=`aci-probe-${'a'.repeat(64)}`;let captured;
+  globalThis.fetch=async(url,options)=>{captured={url,options};return new Response(JSON.stringify({marker:'SYNTHETIC-example'}),{status:200});};
+  try {
+    const workload=createBlobWorkload({blobEndpoint:'https://fixture123.blob.core.windows.net/',getToken:async()=>token,
+      blobResourceId:serviceId,expectedPrincipalId:principal,expectedClientId:'20000000-0000-4000-8000-000000000001'});
+    const result=await workload({runId:'pilot-u6-1',scenario:'U6',requestId});
+    assert.equal(captured.url,'https://fixture123.blob.core.windows.net/session-b/pilot-u6-1.json');
+    assert.equal(captured.options.headers['x-ms-client-request-id'],requestId);
+    assert.equal(result.statusCode,200);assert.equal(result.principalId,principal);
+    assert.equal(result.resourceId,`${serviceId}/containers/session-b`);assert.equal(result.requestId,requestId);
+    assert.equal(result.objectUri,captured.url);assert.match(result.markerFingerprint,/^sha256:[a-f0-9]{64}$/);
+    assert.equal(Object.hasOwn(result,'body'),false);assert.equal(JSON.stringify(result).includes('SYNTHETIC-'),false);
+    await assert.rejects(workload({runId:'pilot-u6-1',scenario:'U6',requestId:'bad'}),/invalid Blob request ID/);
+  } finally {globalThis.fetch=original;}
+});
+
+test('request-ID-aware U8 denial returns only Azure error code and exact request metadata',async()=>{
+  const original=globalThis.fetch,principal='10000000-0000-4000-8000-000000000001';
+  const serviceId='/subscriptions/11111111-1111-4111-8111-111111111111/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture123/blobServices/default';
+  const encode=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
+  const token=`${encode({alg:'RS256'})}.${encode({aud:'https://storage.azure.com/',oid:principal,appid:'20000000-0000-4000-8000-000000000001'})}.signature`;
+  const requestId=`aci-probe-${'b'.repeat(64)}`;let captured;
+  globalThis.fetch=async(url,options)=>{captured={url,options};return new Response('<Error><Code>AuthorizationPermissionMismatch</Code><Message>marker text</Message></Error>',
+    {status:403,headers:{'x-ms-error-code':'AuthorizationPermissionMismatch'}});};
+  try {
+    const workload=createBlobWorkload({blobEndpoint:'https://fixture123.blob.core.windows.net/',getToken:async()=>token,
+      blobResourceId:serviceId,expectedPrincipalId:principal,expectedClientId:'20000000-0000-4000-8000-000000000001'});
+    const result=await workload({runId:'pilot-u8-1',scenario:'U8',requestId});
+    assert.equal(captured.url,'https://fixture123.blob.core.windows.net/prior-session/pilot-u8-1.json');
+    assert.equal(captured.options.headers['x-ms-client-request-id'],requestId);
+    assert.equal(result.statusCode,403);assert.equal(result.errorCode,'AuthorizationPermissionMismatch');
+    assert.equal(result.requestId,requestId);assert.equal(result.principalId,principal);
+    assert.equal(Object.hasOwn(result,'body'),false);assert.equal(JSON.stringify(result).includes('marker text'),false);
+  } finally {globalThis.fetch=original;}
+});

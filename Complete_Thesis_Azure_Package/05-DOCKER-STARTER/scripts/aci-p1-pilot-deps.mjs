@@ -218,7 +218,8 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
     groupBodyForTrial:async()=>c.groupBody({location:cfg.THESIS_ACI_LOCATION,
       imageDigestReference:cfg.THESIS_ACI_IMAGE_DIGEST_REFERENCE,registryServer:cfg.THESIS_ACI_REGISTRY_SERVER,
       pullIdentityId:cfg.THESIS_ACI_PULL_IDENTITY_RESOURCE_ID,workloadIdentityId:cfg.THESIS_ACI_P1_IDENTITY_RESOURCE_ID,
-      workloadIdentityClientId:cfg.THESIS_ACI_P1_IDENTITY_CLIENT_ID,subnetId:cfg.THESIS_ACI_SUBNET_ID,
+      workloadIdentityClientId:cfg.THESIS_ACI_P1_IDENTITY_CLIENT_ID,workloadPrincipalObjectId:cfg.THESIS_ACI_P1_PRINCIPAL_OBJECT_ID,
+      blobResourceId:cfg.THESIS_BLOB_RESOURCE_ID,subnetId:cfg.THESIS_ACI_SUBNET_ID,
       researchUrl:cfg.THESIS_ACI_RESEARCH_URL,collectorUrl:cfg.THESIS_ACI_COLLECTOR_URL,
       blobEndpoint:cfg.THESIS_FIXTURE_BLOB_ENDPOINT,workloadToken,trialRequestKey:controllerKey})});
   const adapter=aciAdapter;

@@ -14,7 +14,7 @@ import {createManagedLogsTokenProvider} from './azure-managed-logs-token.mjs';
 import {createStorageAuditReader} from './azure-storage-audit-reader.mjs';
 
 const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const requiredBlobOps=['targetForMarker','seedMarker','deleteMarker','readMarker','attemptRead'];
+const requiredBlobOps=['targetForMarker'];
 const requiredIdentityOps=['createIdentity','deleteIdentity','evaluateEffectiveAccess'];
 
 function requireFn(value,name) {
@@ -43,6 +43,7 @@ function mapAuditRow(row,runId) {
 export function createAciBlobSessionAzureCallbacks({
   subscriptionId,resourceGroup,workspaceId,managementIdentityClientId,storageIdentityClientId,auditIdentityClientId,
   getManagementToken,createCredential,groupBodyForIdentity,profileForRun,identityProvider,effectiveAccessEvaluator,blobOperations,
+  agentSessionCallbacks,independentMarkerReader,
   observeGroup,fetchImpl=fetch,groupClientFactory=createAciContainerGroupClient,
   storageTokenProvider=createManagedStorageTokenProvider,logsTokenProvider=createManagedLogsTokenProvider,
   auditReaderFactory=createStorageAuditReader,groupBodyBuilder=buildAciContainerGroupBody,now=()=>Date.now()
@@ -61,11 +62,13 @@ export function createAciBlobSessionAzureCallbacks({
   for(const name of requiredIdentityOps) requireFn(identityProvider?.[name],`identityProvider.${name}`);
   requireFn(effectiveAccessEvaluator,'an independent effective-access evaluator');
   for(const name of requiredBlobOps) requireFn(blobOperations?.[name],`blobOperations.${name}`);
+  for(const name of ['seedMarker','attemptRead','deleteMarker']) requireFn(agentSessionCallbacks?.[name],`agentSessionCallbacks.${name}`);
+  requireFn(independentMarkerReader,'a separately credentialed positive-control marker reader');
   requireFn(fetchImpl,'fetch implementation');
   requireFn(now,'clock');
 
   const managementToken=getManagementToken;
-  const getBlobToken=storageTokenProvider({clientId:storageIdentityClientId,createCredential});
+  const getVerifierBlobToken=storageTokenProvider({clientId:storageIdentityClientId,createCredential});
   const getAuditToken=logsTokenProvider({clientId:auditIdentityClientId,createCredential});
   const groupClient=groupClientFactory({subscriptionId,resourceGroup,getManagementToken:managementToken,fetchImpl});
   const readStorageAudit=auditReaderFactory({workspaceId,getToken:getAuditToken});
@@ -75,10 +78,12 @@ export function createAciBlobSessionAzureCallbacks({
     deleteIdentity:args=>identityProvider.deleteIdentity(args),
     evaluateEffectiveAccess:args=>effectiveAccessEvaluator(args),
     targetForMarker:args=>blobOperations.targetForMarker(args),
-    seedMarker:args=>blobOperations.seedMarker({...args,getToken:getBlobToken}),
-    deleteMarker:args=>blobOperations.deleteMarker({...args,getToken:getBlobToken}),
-    readMarker:args=>blobOperations.readMarker({...args,getToken:getBlobToken}),
-    attemptRead:args=>blobOperations.attemptRead({...args,getToken:getBlobToken}),
+    // The source, probe, and cleanup operations happen inside identity-bound
+    // ACI groups. Controller credentials are never substituted for them.
+    seedMarker:args=>agentSessionCallbacks.seedMarker(args),
+    deleteMarker:args=>agentSessionCallbacks.deleteMarker(args),
+    attemptRead:args=>agentSessionCallbacks.attemptRead(args),
+    readMarker:args=>independentMarkerReader({...args,getToken:getVerifierBlobToken}),
     observeGroup:args=>observeGroup({...args,getManagementToken:managementToken,fetchImpl}),
     async createGroup({runId,scenario,phase,container,identity}) {
       if(!/^[A-Za-z0-9_-]{1,130}$/.test(runId||'')||!['U6','U8'].includes(scenario)||
@@ -117,7 +122,6 @@ export function createAciBlobSessionAzureCallbacks({
 
   return Object.freeze({
     callbacks:Object.freeze(callbacks),
-    getBlobToken,
     methodApprovalRequired:true,
     evidenceRetentionApprovalRequired:true,
     liveValidationRequired:true,
