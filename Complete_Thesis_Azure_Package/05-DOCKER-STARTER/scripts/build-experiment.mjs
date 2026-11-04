@@ -1,5 +1,5 @@
 /**
- * Compose the active revision-2 deployment/profile routes the runner requires.
+ * Compose the active revision-3 deployment/profile routes the runner requires.
  *
  * `createTrialAdapterRouter` demands exactly the active revision-2 routes, each with its own
  * workload principal and a reset/execute/collect adapter, and nothing in the
@@ -27,7 +27,7 @@ const required=(names,where)=>{
  */
 export function buildRoutes(config, deps={}, {routeKeys}={}) {
   if(!config || !Array.isArray(config.routes) || config.routes.length!==EXPERIMENT_ROUTES.length)
-    throw new Error(`config must contain all ${EXPERIMENT_ROUTES.length} revision-2 routes; run validateExperimentConfig first`);
+    throw new Error(`config must contain all ${EXPERIMENT_ROUTES.length} revision-3 routes; run validateExperimentConfig first`);
   const routes={};
   for(const route of config.routes) {
     const key=`${route.deployment}:${route.profile}`;

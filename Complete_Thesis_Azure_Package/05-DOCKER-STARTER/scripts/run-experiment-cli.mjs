@@ -31,7 +31,7 @@ const EXIT={complete:0,partial:2,gates:3,config:4,usage:5};
 const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
 
   --config <file>        deployment configuration (no secrets; see experiment-config.mjs)
-  --pilot                run the separate frozen 80-row non-counted pilot schedule
+  --pilot                run the separate frozen 60-row non-counted pilot schedule
   --pilot-retry          run the versioned non-counted Functions P1 retry schedule
   --pilot-evidence <dir> isolated evidence directory for --pilot (default: results/non-counted-pilot)
   --limit <n>            limit a run to an initial subset (with --pilot this is non-counted)
@@ -360,13 +360,12 @@ async function main(argv) {
     if(summary.halted) say(`HALTED at ${summary.haltedAt} — investigate before resuming`);
     if(options.pilot) say('Pilot records are isolated, labeled non-counted, and do not clear study readiness gates.');
     if(!options.pilot && !summary.matrixComplete && summary.scopeComplete && !summary.halted)
-      say('Scope note: the selected rows all completed, but this is not the full 400-row matrix.');
+      say('Scope note: the selected rows all completed, but this is not the full 300-row matrix.');
     say('Note: the four readiness gates are operator assertions; this tool does not verify them.');
   }
   // The exit code describes the run that was asked for, not the matrix that was not.
-  // Requiring matrixComplete made success unreachable: a complete full-matrix selection
-  // is refused because the session P3 cells have no selective-egress design, so every
-  // executable run — always a scoped subset — would report the same code as a halt.
+  // Requiring matrixComplete would make a completed scoped execution report the same
+  // code as a halt; matrixComplete remains in the summary as scope information.
   // matrixComplete stays in the summary as information; it must not gate the result.
   return summary.halted || !summary.scopeComplete || summary.executed!==summary.planned ? EXIT.partial : EXIT.complete;
 }

@@ -1,4 +1,6 @@
-# 400-trial Azure experiment status
+# Historical: 400-trial Azure status (revision 2)
+
+> Superseded on 2026-11-04 by `300-TRIAL-AZURE-STATUS-2026-11-04.md` and `azure-proposed-v1-rev3`. Do not use this file as current deployment or trial instructions.
 
 **Checked:** 2026-11-04 19:00 UTC
 **Scope:** deterministic Azure study plan, revision 2. This is separate from the 50-condition GPT-5 mini ACI pilot.

@@ -18,7 +18,7 @@ from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parents[2]
 # PLAN is the schedule the runner executes; callers and tests import it.
-PLAN = PACKAGE / '03-PLANNED-TRIAL-MATRIX-400-REV2.csv'
+PLAN = PACKAGE / '03-PLANNED-TRIAL-MATRIX-300-REV3.csv'
 SUPERSEDED = PACKAGE / '03-PLANNED-TRIAL-MATRIX-450.csv'   # historical, never edited
 DEFAULT_PLANS = [PLAN, SUPERSEDED]
 HEADER = ['planned_run_id', 'block', 'order_in_block', 'deployment', 'permission_profile',

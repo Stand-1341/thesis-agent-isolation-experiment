@@ -9,10 +9,8 @@ import {fileURLToPath} from 'node:url';
 /**
  * The exit code has to have a success path.
  *
- * `complete` required matrixComplete, matrixComplete required a full 400-row
- * selection, and a full selection is refused because the session P3 cells have no
- * selective-egress design. Every executable run is therefore a scoped subset that
- * could never exit 0, so a flawless run reported the same code as a halt.
+ * A complete scoped execution must exit 0; indeterminate or incomplete execution
+ * must remain distinguishable from success.
  *
  * This drives the real CLI as a child process against a fake dependency module and
  * asserts the success path, the halt path, and that the refused path writes nothing.
@@ -106,7 +104,7 @@ test('the full revision-2 matrix now executes end to end',()=>{
   // unsupported rows left: the whole 400-row matrix runs in one pass.
   const out=run(['--config',CONFIG,'--deps',deps,'--gates',GATES,'--json']);
   assert.ok(out.summary,`expected a JSON summary, got:\n${out.stdout}\n${out.stderr}`);
-  assert.equal(out.summary.executed,400);
+  assert.equal(out.summary.executed,300);
   assert.equal(out.summary.halted,false);
   assert.equal(out.summary.matrixComplete,true);
   assert.equal(out.summary.scope.unsupportedRows,0);

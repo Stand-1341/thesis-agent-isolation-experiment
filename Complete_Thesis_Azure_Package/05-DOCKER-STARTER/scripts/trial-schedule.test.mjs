@@ -31,7 +31,7 @@ test('validates all cells before execution and stops after an indeterminate resu
 });
 
 test('loads the supplied matrix only when its complete byte digest matches',async()=>{
-  const path=fileURLToPath(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
+  const path=fileURLToPath(new URL('../../03-PLANNED-TRIAL-MATRIX-300-REV3.csv',import.meta.url));
   const python='import csv,json,sys; f=open(sys.argv[1],encoding="utf-8-sig",newline=""); print(json.dumps(list(csv.DictReader(f))))';
   // Stock Debian/Ubuntu ships python3 only; a hardcoded 'python' made this structural
   // check fail before it ever reached the digest assertion. Probe for an interpreter.
@@ -41,12 +41,12 @@ test('loads the supplied matrix only when its complete byte digest matches',asyn
   assert.ok(interpreter,'python3 is required to cross-check the matrix structure');
   const result=spawnSync(interpreter,['-c',python,path],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
-  assert.equal(validateSchedule(JSON.parse(result.stdout)).rows,400);
+  assert.equal(validateSchedule(JSON.parse(result.stdout)).rows,300);
   const bytes=readFileSync(path);
-  const hash='d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863';
+  const hash='a6bc3ffe78d677d25e07452e06cfc437062fdd9e8322b4c834d31118337ccc7e';
   assert.equal(verifyPlanDigest(bytes,hash),hash);
   assert.throws(()=>verifyPlanDigest(Buffer.concat([bytes,Buffer.from('x')]),hash),/differs/);
-  assert.equal(loadFrozenSchedule(bytes,hash).rows.length,400);
+  assert.equal(loadFrozenSchedule(bytes,hash).rows.length,300);
   let calls=0;
   await assert.rejects(runFrozenSchedule(Buffer.concat([bytes,Buffer.from('x')]),hash,async()=>{calls++;}),/differs/);
   assert.equal(calls,0);

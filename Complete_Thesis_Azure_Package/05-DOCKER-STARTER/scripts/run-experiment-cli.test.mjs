@@ -58,8 +58,8 @@ test('missing credential variables are named, never printed as values',()=>{
 test('a dry run over the frozen matrix reports the real digest and its blockers',()=>{
   const {code,out}=run(['--config',EXAMPLE,'--dry-run'],credentialEnv());
   assert.equal(code,4);
-  assert.match(out,/matrix hash d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863/);
-  assert.match(out,/400 planned trials, 400 selected/);
+  assert.match(out,/matrix hash a6bc3ffe78d677d25e07452e06cfc437062fdd9e8322b4c834d31118337ccc7e/);
+  assert.match(out,/300 planned trials, 300 selected/);
   assert.match(out,/20 unsupported/);
   assert.match(out,/Readiness gates remain unverified/);
 });
@@ -67,8 +67,8 @@ test('a dry run over the frozen matrix reports the real digest and its blockers'
 test('filters reduce the selected rows without changing the matrix digest',()=>{
   const {code,out}=run(['--config',EXAMPLE,'--dry-run','--deployment','azure_vm','--profile','P1','--limit','5'],credentialEnv());
   assert.equal(code,4);
-  assert.match(out,/400 planned trials, 5 selected/);
-  assert.match(out,/matrix hash d904392e/);
+  assert.match(out,/300 planned trials, 5 selected/);
+  assert.match(out,/matrix hash a6bc3ffe/);
 });
 
 test('a measured run without all four gates exits 3 and executes nothing',async()=>{

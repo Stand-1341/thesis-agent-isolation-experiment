@@ -8,12 +8,11 @@ import {liveAgentPromptManifest} from './live-agent-trial.mjs';
 import {implementationManifest} from './implementation-manifest.mjs';
 
 const packageRoot=resolve(fileURLToPath(new URL('../..',import.meta.url)));
-// Follows the current plan. Revision 2 withdrew the session-arm P3 cells, so the
-// live arm must mirror 400 rows, not the superseded 450.
-const inputPath=resolve(packageRoot,'03-PLANNED-TRIAL-MATRIX-400-REV2.csv');
+// Follows the active 300-row revision 3 plan; superseded schedules remain historical.
+const inputPath=resolve(packageRoot,'03-PLANNED-TRIAL-MATRIX-300-REV3.csv');
 const outputPath=resolve(packageRoot,'05-DOCKER-STARTER','results','gpt5mini-live-agent-plan.draft-v24.csv');
 const metadataPath=resolve(packageRoot,'05-DOCKER-STARTER','results','gpt5mini-live-agent-plan.draft-v24.json');
-const expectedInputSha256='d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863';
+const expectedInputSha256='a6bc3ffe78d677d25e07452e06cfc437062fdd9e8322b4c834d31118337ccc7e';
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const inputBytes=await readFile(inputPath);
 const source=loadFrozenSchedule(inputBytes,expectedInputSha256);

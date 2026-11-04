@@ -7,9 +7,8 @@ import {runExperiment} from './experiment-runner.mjs';
 import {implementationManifest} from './implementation-manifest.mjs';
 import {loadFrozenSchedule} from './trial-schedule.mjs';
 
-// Frozen digest of the supplied revision-2 matrix, as recorded in trial-schedule.test.mjs,
-// generate-gpt5mini-live-plan.mjs and EXPERIMENT-STATUS.md.
-const frozenPlanSha256='d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863';
+// Frozen digest of the active revision-3 300-row matrix.
+const frozenPlanSha256='a6bc3ffe78d677d25e07452e06cfc437062fdd9e8322b4c834d31118337ccc7e';
 const matrixHeader=['planned_run_id','block','order_in_block','deployment','permission_profile','scenario_id','scenario_type','status','result','verified_evidence_ref'];
 
 /**
@@ -20,7 +19,7 @@ const matrixHeader=['planned_run_id','block','order_in_block','deployment','perm
  * byte-identical to the generator's output (same header, same order, "live-" prefix).
  */
 function liveDraftPlanBytes(){
-  const sourceBytes=readFileSync(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
+  const sourceBytes=readFileSync(new URL('../../03-PLANNED-TRIAL-MATRIX-300-REV3.csv',import.meta.url));
   const {rows}=loadFrozenSchedule(sourceBytes,frozenPlanSha256);
   const csv=[matrixHeader.join(','),
     ...rows.map(row=>matrixHeader.map(key=>(key==='planned_run_id'?`live-${row[key]}`:row[key])).join(',')),
@@ -29,10 +28,10 @@ function liveDraftPlanBytes(){
 }
 
 test('composes the frozen schedule, matching route, principal and evidence; stops on indeterminate',async()=>{
-  const planBytes=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
+  const planBytes=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-300-REV3.csv',import.meta.url));
   const planSha256=createHash('sha256').update(planBytes).digest('hex');
   const {rows:scheduledRows}=loadFrozenSchedule(planBytes,planSha256);
-  const deployments=['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv'],profiles=['P1','P2','P3'];
+  const deployments=['azure_vm','azure_functions_flex'],profiles=['P1','P2','P3'];
   const seen=[],routes={};let n=0;
   for(const deployment of deployments) for(const profile of profiles) {
     const principalObjectId=`00000000-0000-0000-0000-${String(++n).padStart(12,'0')}`;
@@ -62,7 +61,7 @@ test('live phase claim prevents a fresh budget counter after a prior launch',asy
   const {rows:scheduledRows}=loadFrozenSchedule(planBytes,planSha256);
   const {sha256:implementationSha256}=await implementationManifest();
   const routes={};let n=0,resets=0;
-  for(const deployment of ['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv']) for(const profile of ['P1','P2','P3']) {
+  for(const deployment of ['azure_vm','azure_functions_flex']) for(const profile of ['P1','P2','P3']) {
     routes[`${deployment}:${profile}`]={principalObjectId:`00000000-0000-0000-0000-${String(++n).padStart(12,'0')}`,
       adapter:{reset:async()=>{resets++;return {};},execute:async()=>({}),collect:async()=>({})}};
   }
@@ -79,7 +78,7 @@ test('live phase claim prevents a fresh budget counter after a prior launch',asy
 });
 
 test('preflight N/A rows are evidenced without invoking a workload adapter',async()=>{
-  const planBytes=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
+  const planBytes=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-300-REV3.csv',import.meta.url));
   const planSha256=createHash('sha256').update(planBytes).digest('hex');
   const {rows}=loadFrozenSchedule(planBytes,planSha256);
   const row=rows.find(item=>item.deployment==='azure_vm' && item.scenario_id==='U6');

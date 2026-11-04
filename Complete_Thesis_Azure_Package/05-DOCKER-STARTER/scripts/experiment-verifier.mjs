@@ -136,7 +136,7 @@ export function denialWindow({start,end}, auditWindowSeconds=3600, skewMs=0) {
  */
 export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifier,denialReader,networkCapabilities={},rows}={}) {
   const missing={};
-  const selected=rows ?? ['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv'].flatMap(deployment=>
+  const selected=rows ?? ['azure_vm','azure_functions_flex'].flatMap(deployment=>
     ['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2'].flatMap(scenario=>
       ['P1','P2','P3'].map(permission_profile=>({scenario_id:scenario,permission_profile,deployment}))));
   const networkGaps=[];
@@ -153,11 +153,8 @@ export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifie
     if(reason) missing[scenario]=reason;
     if(profile==='P3' && (scenario==='U5'||scenario==='U7')) {
       if(typeof denialReader!=='function') networkGaps.push(`${deployment}:network_denial_reader_not_configured`);
-      else if(deployment==='azure_custom_sessions_hyperv') networkGaps.push(`${deployment}:custom_session_p3_selective_egress_unverifiable`);
       else if(networkCapabilities[deployment]!==true) networkGaps.push(`${deployment}:independent_network_denial_evidence_unavailable`);
     }
-    if(profile==='P3' && deployment==='azure_custom_sessions_hyperv')
-      networkGaps.push(`${deployment}:custom_session_p3_selective_egress_unverifiable`);
   }
   const uniqueNetworkGaps=[...new Set(networkGaps)];
   return {resourceProfiles:{supported:Object.keys(missing).length===0?['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2']:[],missing},

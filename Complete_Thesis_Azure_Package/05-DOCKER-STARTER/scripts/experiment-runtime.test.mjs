@@ -20,18 +20,14 @@ function config(){
   return validateExperimentConfig({evidenceDirectory:'ev',auditWindowSeconds:300,
     deployments:{
       azure_vm:{kind:'http',agentUrl:'https://vm.example',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
-      azure_functions_flex:{kind:'http',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
-      azure_custom_sessions_hyperv:{kind:'session',managementEndpoint:'https://thesissessionpool.envabc123.eastus.azurecontainerapps.io',
-        resourceUrl:'https://res.example',collectorUrl:'https://col.example',
-        poolName:'thesissessionpool',region:'eastus',sessionRegistryUrl:'https://reg.blob.core.windows.net/session-mappings',
-        fixtureBlobEndpoint:'https://fx.blob.core.windows.net'}},
+      azure_functions_flex:{kind:'http',resourceUrl:'https://res.example',collectorUrl:'https://col.example'}},
     routes});
 }
 
-test('all eight revision-2 routes are built and accepted by the router',()=>{
+test('all six revision-3 routes are built and accepted by the router',()=>{
   const cfg=config();
-  const routes=buildRoutes(cfg,{sessionFactory:()=>({reset:async()=>{},execute:async()=>({}),collect:async()=>({})})});
-  assert.equal(Object.keys(routes).length,8);
+  const routes=buildRoutes(cfg,{});
+  assert.equal(Object.keys(routes).length,6);
   const router=createTrialAdapterRouter(routes);
   assert.match(router.principalObjectId({deployment:'azure_vm',profile:'P2'}),/^00000000-/);
   assert.equal(typeof router.execute, 'function');
@@ -51,19 +47,19 @@ test('route descriptions show per-profile Functions targets',()=>{
   assert.deepEqual(targets,['https://p1.fn.example/api','https://p2.fn.example/api','https://p3.fn.example/api']);
 });
 
-test('a session route without a factory fails instead of silently degrading',()=>{
-  assert.throws(()=>buildRoutes(config(),{}),/no sessionFactory was supplied/);
+test('the current config contains no ACA session route',()=>{
+  assert.equal(config().routes.some(route=>route.deployment==='azure_custom_sessions_hyperv'),false);
 });
 
 test('a route whose adapter is missing a member is rejected by the router',()=>{
   const cfg=config();
-  const routes=buildRoutes(cfg,{sessionFactory:()=>({reset:async()=>{},execute:async()=>({})})});
+  const routes=buildRoutes(cfg,{httpFactory:()=>({reset:async()=>{},execute:async()=>({})})});
   assert.throws(()=>createTrialAdapterRouter(routes),/invalid deployment route/);
 });
 
 test('describeRoutes never exposes a credential value',()=>{
   const described=describeRoutes(config());
-  assert.equal(described.length,8);
+  assert.equal(described.length,6);
   for(const entry of described) for(const variable of entry.credentialVariables) assert.match(variable,/^[A-Z]/);
 });
 
@@ -106,10 +102,9 @@ test('a missing execution window cannot be classified',async()=>{
 test('coverage names exactly what is missing',()=>{
   const empty=verifierCoverage({});
   assert.equal(empty.networkProfile.supported,false);
-  assert.equal(Object.keys(empty.resourceProfiles.missing).length,10);
+  assert.equal(Object.keys(empty.resourceProfiles.missing).length,8);
   const full=verifierCoverage({denialReader:()=>{},networkCapabilities:{azure_vm:true,azure_functions_flex:true},blobVerifier:()=>{},collectorVerifier:()=>{},resourceVerifier:()=>{}});
-  assert.equal(full.networkProfile.supported,false);
-  assert.match(full.networkProfile.reason,/azure_custom_sessions_hyperv/);
+  assert.equal(full.networkProfile.supported,true);
   assert.equal(full.resourceProfiles.supported.length,10);
 });
 
@@ -117,7 +112,7 @@ test('runExperiment runs two rows from the frozen matrix in parallel lanes',asyn
   const {readFile}=await import('node:fs/promises');
   const {createHash}=await import('node:crypto');
   const {runExperiment}=await import('./experiment-runner.mjs');
-  const matrix=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
+  const matrix=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-300-REV3.csv',import.meta.url));
   const sha=createHash('sha256').update(matrix).digest('hex');
   const {loadFrozenSchedule}=await import('./trial-schedule.mjs');
   const rows=loadFrozenSchedule(matrix,sha).rows;
@@ -135,7 +130,7 @@ test('runExperiment runs two rows from the frozen matrix in parallel lanes',asyn
     verifier:()=>({classification:'unauthorized_success'}),
     evidenceStore:{claim:async()=>{},save:async entry=>{saved.push(entry);}},
     rowFilter:new Set([first.planned_run_id,second.planned_run_id]),concurrency:2,
-    networkCapabilities:{azure_vm:true,azure_functions_flex:true,azure_custom_sessions_hyperv:true}});
+    networkCapabilities:{azure_vm:true,azure_functions_flex:true}});
   assert.equal(record.length,2);
   assert.equal(record.complete,true);
   assert.equal(record.matrixComplete,false);
@@ -152,7 +147,7 @@ test('a lane selector keeps the profiles of one deployment in a single lane',()=
   assert.equal(select({deployment:'azure_vm',permission_profile:'P1'}),'azure_vm');
   assert.equal(select({deployment:'azure_vm',permission_profile:'P3'}),'azure_vm');
   assert.notEqual(select({deployment:'azure_vm',permission_profile:'P1'}),
-                  select({deployment:'azure_custom_sessions_hyperv',permission_profile:'P1'}));
+                  select({deployment:'azure_functions_flex',permission_profile:'P1'}));
 });
 
 test('the denial query window extends past the trial by the audit window',()=>{

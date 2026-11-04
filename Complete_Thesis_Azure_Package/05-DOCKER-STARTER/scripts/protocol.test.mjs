@@ -16,13 +16,13 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {loadFrozenSchedule} from './trial-schedule.mjs';
 
-const frozenPlanSha256='d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863';
+const frozenPlanSha256='a6bc3ffe78d677d25e07452e06cfc437062fdd9e8322b4c834d31118337ccc7e';
 
 function loadProtocol(){
   return JSON.parse(readFileSync(new URL('../config/protocol.json',import.meta.url),'utf8'));
 }
 function loadMatrix(){
-  const bytes=readFileSync(new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url));
+  const bytes=readFileSync(new URL('../../03-PLANNED-TRIAL-MATRIX-300-REV3.csv',import.meta.url));
   return loadFrozenSchedule(bytes,frozenPlanSha256).rows;
 }
 function loadPilot(){
@@ -48,15 +48,15 @@ function loadPilotRetryV1(){
   return loadFrozenSchedule(bytes,plan.sha256).rows;
 }
 
-test('non-counted pilot has a separate frozen 80-row schedule',()=>{
+test('non-counted pilot has a separate frozen 60-row schedule',()=>{
   const protocol=loadProtocol(),rows=loadPilot();
   assert.equal(protocol.pilotPlan.countedAsStudyTrials,false);
-  assert.equal(protocol.pilotPlan.trials,80);
+  assert.equal(protocol.pilotPlan.trials,60);
   assert.equal(protocol.pilotPlan.derivedFrom,protocol.matrix.sha256);
-  assert.equal(rows.length,80);
+  assert.equal(rows.length,60);
   assert.ok(rows.every(row=>row.planned_run_id.startsWith('pilot-')));
-  assert.equal(rows.some(row=>row.deployment==='azure_custom_sessions_hyperv' && row.permission_profile==='P3'),false);
-  assert.equal(new Set(rows.map(row=>`${row.deployment}:${row.permission_profile}`)).size,8);
+  assert.equal(rows.some(row=>row.deployment==='azure_custom_sessions_hyperv'),false);
+  assert.equal(new Set(rows.map(row=>`${row.deployment}:${row.permission_profile}`)).size,6);
 });
 
 test('v1 retry schedule stays archived after its indeterminate U4 claim',()=>{
@@ -129,9 +129,7 @@ test('protocol.json trial counts match the frozen matrix',()=>{
   assert.equal(rows.length,protocol.expectedDeterministicTrials);
   assert.equal(protocol.repetitions,5);
   assert.equal(protocol.plannedLiveAgent.expectedTrials,rows.length);
-  // Revision 2 withdrew the 50 session-arm P3 cells, so the matrix is no longer the
-  // clean product of repetitions x deployments x profiles x scenarios. It is checked
-  // against the declared shape instead of being re-derived from the protocol lists.
+  // Revision 3 contains six VM/Functions profile cells with five repetitions each.
   const declared=protocol.matrix;
   assert.ok(declared, 'protocol.json must declare the matrix it describes');
   assert.equal(declared.trials,rows.length);
@@ -154,22 +152,21 @@ test('the declared digest is the digest of the matrix actually in the repository
     'the superseded matrix must not be edited; it is the record of what was planned');
 });
 
-test('revision 2 withdraws exactly the session-arm P3 cells and nothing else',()=>{
+test('revision 3 withdraws both ACA session cells from the 400-row revision 2 plan',()=>{
   const protocol=loadProtocol();
   const current=loadMatrix();
   const prior=loadFrozenSchedule(
     readFileSync(new URL(`../../${protocol.matrix.supersedes.file}`,import.meta.url)),
     protocol.matrix.supersedes.sha256).rows;
-  const kept=new Set(current.map(row=>row.planned_run_id));
-  const dropped=prior.filter(row=>!kept.has(row.planned_run_id));
-  assert.equal(dropped.length,50);
+  const dropped=prior.filter(row=>row.deployment==='azure_custom_sessions_hyperv');
+  assert.equal(dropped.length,100);
   for(const row of dropped) {
     assert.equal(row.deployment,'azure_custom_sessions_hyperv');
-    assert.equal(row.permission_profile,'P3');
+    assert.ok(['P1','P2'].includes(row.permission_profile));
   }
-  // Every surviving row keeps its original run ID, so evidence stays traceable.
-  const priorIds=new Set(prior.map(row=>row.planned_run_id));
-  for(const row of current) assert.ok(priorIds.has(row.planned_run_id));
+  assert.equal(current.length,300);
+  assert.ok(current.every(row=>row.deployment==='azure_vm'||row.deployment==='azure_functions_flex'));
+  assert.ok(current.every(row=>row.planned_run_id.startsWith('r3-')));
 });
 
 test('protocol.json audit window cannot be shorter than the documented log latency',()=>{

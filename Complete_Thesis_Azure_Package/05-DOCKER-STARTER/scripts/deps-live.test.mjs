@@ -16,12 +16,6 @@ test('live dependencies do not require an unused subscription ID environment var
 test('unverified live verifiers are constructible only in explicitly non-counted pilot mode',async()=>{
   const shape=await loadExperimentConfigShape(fileURLToPath(new URL('../config/experiment.example.json',import.meta.url)));
   const config=structuredClone(shape);
-  config.deployments.azure_custom_sessions_hyperv.poolName='fake-session-pool';
-  config.deployments.azure_custom_sessions_hyperv.managementEndpoint='https://fake-session-pool.fakeenv.eastus.azurecontainerapps.io';
-  config.deployments.azure_custom_sessions_hyperv.fixtureBlobEndpoint='https://fixture123.blob.core.windows.net/';
-  config.deployments.azure_custom_sessions_hyperv.resourceUrl='https://resource.example.test';
-  config.deployments.azure_custom_sessions_hyperv.collectorUrl='https://collector.example.test';
-  config.deployments.azure_custom_sessions_hyperv.sessionRegistryUrl='https://fixture123.blob.core.windows.net/session-mappings';
   const env={THESIS_LOG_ANALYTICS_WORKSPACE_ID:'00000000-0000-0000-0000-000000000001',
     THESIS_FIXTURE_BLOB_ENDPOINT:'https://fixture.blob.core.windows.net',
     THESIS_BLOB_RESOURCE_ID:'/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture/blobServices/default',
@@ -43,10 +37,7 @@ test('unverified live verifiers are constructible only in explicitly non-counted
   assert.equal(typeof functionsAdapter.reset,'function');
   assert.equal(typeof functionsAdapter.execute,'function');
   assert.equal(typeof functionsAdapter.collect,'function');
-  const session=pilot.sessionFactory(resolved.routes.find(route=>route.deployment==='azure_custom_sessions_hyperv'&&route.profile==='P1'));
-  assert.equal(typeof session.reset,'function');
-  assert.equal(typeof session.execute,'function');
-  assert.equal(typeof session.collect,'function');
+  assert.equal(pilot.sessionFactory,undefined);
   assert.match(pilot.notes.join('\n'),/NON-COUNTED PILOT/);
   const scopedEnv={...env};
   for(const name of ['THESIS_DENIAL_DESTINATION_IP','THESIS_VM_TARGET_RESOURCE_ID','THESIS_SESSION_CONTROL_PRINCIPAL_ID',

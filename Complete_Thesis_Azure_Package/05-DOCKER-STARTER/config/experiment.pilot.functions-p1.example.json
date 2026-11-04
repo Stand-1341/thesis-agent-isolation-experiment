@@ -1,5 +1,5 @@
 {
-  "_comment": "NON-COUNTED PILOT ONLY. Select --deployment azure_functions_flex --profile P1. evidenceDirectory is local and for pilot evidence only. Other route entries remain example placeholders and are not deployable. No secret values are stored here.",
+  "_comment": "Revision 3 measured-run template: six VM/Functions P1-P3 routes; ACA session arms removed. Replace placeholders before deployment. No secrets are stored here.",
   "evidenceDirectory": "results/evidence",
   "auditWindowSeconds": 3600,
   "deployments": {
@@ -14,18 +14,6 @@
       "kind": "http",
       "resourceUrl": "https://10.48.9.4",
       "collectorUrl": "https://10.48.9.5:8443",
-      "timeoutMs": 30000
-    },
-    "azure_custom_sessions_hyperv": {
-      "kind": "session",
-      "managementEndpoint": "https://replace-session-pool.replace-environment-id.eastus.azurecontainerapps.io",
-      "resourceUrl": "https://REPLACE-RESOURCE.REPLACE-REGION.cloudapp.azure.com",
-      "collectorUrl": "https://REPLACE-COLLECTOR.REPLACE-REGION.cloudapp.azure.com",
-      "poolName": "replace-session-pool",
-      "region": "eastus",
-      "sessionRegistryUrl": "https://REPLACE-REGISTRY.blob.core.windows.net/session-mappings",
-      "fixtureBlobEndpoint": "https://REPLACE-FIXTURE.blob.core.windows.net",
-      "headerIsolationVerified": false,
       "timeoutMs": 30000
     }
   },
@@ -94,26 +82,6 @@
         "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
         "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY",
         "functionKey": "THESIS_FN_P3_FUNCTION_KEY"
-      }
-    },
-    {
-      "deployment": "azure_custom_sessions_hyperv",
-      "profile": "P1",
-      "principalObjectId": "00000000-0000-4000-8000-000000000007",
-      "credentials": {
-        "controller": "THESIS_SESSION_P1_CONTROLLER_KEY",
-        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
-        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY"
-      }
-    },
-    {
-      "deployment": "azure_custom_sessions_hyperv",
-      "profile": "P2",
-      "principalObjectId": "00000000-0000-4000-8000-000000000008",
-      "credentials": {
-        "controller": "THESIS_SESSION_P2_CONTROLLER_KEY",
-        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
-        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY"
       }
     }
   ]

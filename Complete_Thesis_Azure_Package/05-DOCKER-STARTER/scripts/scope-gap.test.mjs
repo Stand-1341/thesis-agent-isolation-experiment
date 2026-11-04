@@ -6,7 +6,7 @@ import {loadFrozenSchedule,runSchedule} from './trial-schedule.mjs';
 import {runScheduleParallel} from './parallel-schedule.mjs';
 import {createAzureBlobVerifier} from './azure-blob-verifier.mjs';
 
-const MATRIX_URL=new URL('../../03-PLANNED-TRIAL-MATRIX-400-REV2.csv',import.meta.url);
+const MATRIX_URL=new URL('../../03-PLANNED-TRIAL-MATRIX-300-REV3.csv',import.meta.url);
 const bytes=readFileSync(MATRIX_URL);
 const sha=createHash('sha256').update(bytes).digest('hex');
 const protocol=JSON.parse(readFileSync(new URL('../config/protocol.json',import.meta.url),'utf8'));
@@ -52,12 +52,12 @@ test('every one of those 60 is declared out of scope, not indeterminate',async()
 
 const isScopeGap=trial=>['U6','U8'].includes(trial.scenario) && trial.deployment!=='azure_custom_sessions_hyperv';
 
-test('the full 400-trial matrix now runs to completion with 60 declared out of scope',async()=>{
+test('the full 300-trial matrix has 60 declared out-of-scope U6/U8 rows',async()=>{
   // This is the run that used to halt around trial 21. Every row executes; the 60
   // cross-session cells on sessionless deployments are recorded as scope gaps.
   const results=await runSchedule(plan.rows,async trial=>({runId:trial.runId,
     classification:isScopeGap(trial)?'not_applicable':'unauthorized_success'}));
-  assert.equal(results.length,400);
+  assert.equal(results.length,300);
   assert.equal(results.halted,false);
   assert.equal(results.complete,true);
   assert.equal(results.notApplicable,60);
@@ -83,12 +83,6 @@ test('a scope gap does not halt the parallel schedule either',async()=>{
   assert.equal(results.notApplicable,60);
 });
 
-test('cross-session scenarios remain verifiable on the sessions arm',async()=>{
-  const row=plan.rows.find(entry=>entry.scenario_id==='U6' && entry.deployment==='azure_custom_sessions_hyperv');
-  // No session preparation in the evidence, so this must be a configuration complaint
-  // rather than the out-of-scope shortcut.
-  const verdict=await verifier({scenario:row.scenario_id,deployment:row.deployment,
-    permission_profile:row.permission_profile},{timing:{}});
-  assert.equal(verdict.classification,'indeterminate');
-  assert.equal(verdict.evidence.reason,'session_fixture_audit_configuration_missing');
+test('the revision-3 matrix has no ACA session arm',()=>{
+  assert.equal(plan.rows.some(row=>row.deployment==='azure_custom_sessions_hyperv'),false);
 });

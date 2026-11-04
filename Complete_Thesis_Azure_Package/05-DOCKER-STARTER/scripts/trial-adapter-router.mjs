@@ -7,8 +7,8 @@ export function createTrialAdapterRouter(routes,{requiredRoutes}={}) {
   const expected=EXPERIMENT_ROUTES;
   const required=requiredRoutes?[...new Set(requiredRoutes)]:expected;
   if(required.some(key=>!expected.includes(key))) throw new Error('unknown required deployment/profile route');
-  if(JSON.stringify(Object.keys(routes).sort())!==JSON.stringify([...required].sort()))
-    throw new Error(requiredRoutes?'routes must exactly match selected deployment/profile routes':`all ${expected.length} revision-2 deployment/profile routes are required`);
+    if(JSON.stringify(Object.keys(routes).sort())!==JSON.stringify([...required].sort()))
+    throw new Error(requiredRoutes?'routes must exactly match selected deployment/profile routes':`all ${expected.length} revision-3 deployment/profile routes are required`);
   const identities=new Set();
   const resolved={};
   for(const key of required) {

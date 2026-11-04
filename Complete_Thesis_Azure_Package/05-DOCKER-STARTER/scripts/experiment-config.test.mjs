@@ -23,19 +23,15 @@ function baseConfig(){
     auditWindowSeconds:300,
     deployments:{
       azure_vm:{kind:'http',agentUrl:'https://vm.example',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
-      azure_functions_flex:{kind:'http',resourceUrl:'https://res.example',collectorUrl:'https://col.example'},
-      azure_custom_sessions_hyperv:{kind:'session',managementEndpoint:'https://thesissessionpool.envabc123.eastus.azurecontainerapps.io',
-        resourceUrl:'https://res.example',collectorUrl:'https://col.example',
-        poolName:'thesissessionpool',region:'eastus',sessionRegistryUrl:'https://reg.blob.core.windows.net/session-mappings',
-        fixtureBlobEndpoint:'https://fixture.blob.core.windows.net'}
+      azure_functions_flex:{kind:'http',resourceUrl:'https://res.example',collectorUrl:'https://col.example'}
     },
     routes
   };
 }
 
-test('the revision-2 eight-route configuration validates',()=>{
+test('the revision-3 six-route configuration validates',()=>{
   const config=validateExperimentConfig(baseConfig());
-  assert.equal(config.routes.length,8);
+  assert.equal(config.routes.length,6);
   assert.equal(config.auditWindowSeconds,300);
 });
 
@@ -54,14 +50,14 @@ test('a reused workload principal is rejected',()=>{
 test('a missing route is rejected',()=>{
   const config=baseConfig();
   config.routes.pop();
-  assert.throws(()=>validateExperimentConfig(config),/exactly 8 revision-2 routes/);
+  assert.throws(()=>validateExperimentConfig(config),/exactly 6 revision-3 routes/);
 });
 
-test('a withdrawn custom-session P3 route is rejected by revision 2',()=>{
+test('ACA routes are rejected after revision 3 removes the session arms',()=>{
   const config=baseConfig();
-  config.routes.push({...config.routes.find(route=>route.deployment==='azure_custom_sessions_hyperv' && route.profile==='P2'),
-    profile:'P3',principalObjectId:guid(99),credentials:{controller:'SESSION_P3_KEY'}});
-  assert.throws(()=>validateExperimentConfig(config),/exactly 8 revision-2 routes/);
+  config.routes.push({deployment:'azure_custom_sessions_hyperv',profile:'P1',principalObjectId:guid(99),
+    credentials:{controller:'SESSION_KEY',resourceAdmin:'RESOURCE_KEY',collectorAdmin:'COLLECTOR_KEY'}});
+  assert.throws(()=>validateExperimentConfig(config),/exactly 6 revision-3 routes/);
 });
 
 test('a duplicate route is rejected',()=>{
@@ -94,12 +90,6 @@ test('plain HTTP is refused for anything but loopback',()=>{
   assert.throws(()=>validateExperimentConfig(config),/must use HTTPS/);
 });
 
-test('session registry must use the dedicated mapping container',()=>{
-  const config=baseConfig();
-  config.deployments.azure_custom_sessions_hyperv.sessionRegistryUrl='https://reg.blob.core.windows.net/session-map';
-  assert.throws(()=>validateExperimentConfig(config),/dedicated \/session-mappings container/);
-});
-
 test('an out-of-range audit window is rejected',()=>{
   const config=baseConfig();
   config.auditWindowSeconds=9000;
@@ -110,7 +100,7 @@ test('credentials resolve from the environment and name what is missing',()=>{
   const config=validateExperimentConfig(baseConfig());
   const env={};
   for(const route of config.routes) for(const name of Object.values(route.credentials)) env[name]=`value-for-${name}`;
-  assert.equal(resolveCredentials(config,env).routes.length,8);
+  assert.equal(resolveCredentials(config,env).routes.length,6);
   delete env[config.routes[0].credentials.controller];
   assert.throws(()=>resolveCredentials(config,env),/missing credential environment variables: KEY_CONTROLLER_1/);
 });

@@ -16,10 +16,6 @@ async function fixture(t) {
   raw.deployments.azure_functions_flex.collectorUrl='https://fn-collector.example.test';
   for(const route of raw.routes.filter(route=>route.deployment==='azure_functions_flex'))
     route.agentUrl=`https://${route.profile.toLowerCase()}-functions.example.test/api`;
-  raw.deployments.azure_custom_sessions_hyperv.poolName='fake-session-pool';
-  raw.deployments.azure_custom_sessions_hyperv.managementEndpoint='https://fake-session-pool.testenv.eastus.azurecontainerapps.io';
-  raw.deployments.azure_custom_sessions_hyperv.sessionRegistryUrl='https://registry.example.test/session-mappings';
-  raw.deployments.azure_custom_sessions_hyperv.fixtureBlobEndpoint='https://fixture.example.test';
   const configPath=join(directory,'experiment.json');
   await writeFile(configPath,JSON.stringify(raw));
   const env={};

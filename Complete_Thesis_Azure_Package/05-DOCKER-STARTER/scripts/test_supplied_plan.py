@@ -7,11 +7,11 @@ from validate_supplied_plan import PLAN, SUPERSEDED, validate
 
 class PlanValidationTest(unittest.TestCase):
     def test_supplied_plan(self):
-        # Revision 2 withdrew the 50 session-arm P3 cells.
+        # Revision 3 removed both ACA cells and retained six balanced VM/Functions cells.
         report = validate()
-        self.assertEqual(report['rows'], 400)
+        self.assertEqual(report['rows'], 300)
         self.assertEqual(report['blocks'], 5)
-        self.assertEqual(report['rowsPerBlock'], 80)
+        self.assertEqual(report['rowsPerBlock'], 60)
 
     def test_superseded_plan_is_still_intact(self):
         # Revision 1 is the record of what was planned; it must stay unmodified.
