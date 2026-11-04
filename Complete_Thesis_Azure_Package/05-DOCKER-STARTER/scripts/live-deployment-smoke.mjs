@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Non-trial deployment smoke check for revision 2.
+ * Non-trial deployment smoke check for revision 3.
  *
  * It checks credential presence and performs read-only HTTP health/network
  * probes. It never resets fixtures, creates a session, invokes a scenario, or

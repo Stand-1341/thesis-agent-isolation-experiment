@@ -98,10 +98,9 @@ test('a halted run exits 2, so success and failure stay distinguishable',()=>{
   assert.notEqual(out.code,0);
 });
 
-test('the full revision-2 matrix now executes end to end',()=>{
+test('the simulated revision-3 300-row matrix can execute end to end',()=>{
   const {deps,evidence}=scaffold(PASSING_DEPS);
-  // Revision 2 withdrew the 50 session-arm P3 cells, so an unfiltered selection has no
-  // unsupported rows left: the whole 400-row matrix runs in one pass.
+  // This uses mocked passing capabilities to test runner behavior, not cloud readiness.
   const out=run(['--config',CONFIG,'--deps',deps,'--gates',GATES,'--json']);
   assert.ok(out.summary,`expected a JSON summary, got:\n${out.stdout}\n${out.stderr}`);
   assert.equal(out.summary.executed,300);

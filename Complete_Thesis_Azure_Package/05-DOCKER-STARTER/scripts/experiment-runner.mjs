@@ -62,7 +62,7 @@ export async function runExperiment({planBytes,planSha256,routes,gates,verifier,
   // trials may only overlap when they cannot observe each other's state.
   if(!Number.isInteger(concurrency) || concurrency<1) throw new Error('invalid concurrency');
   const fullMatrixSelected=rows.length===plan.rows.length && rows.every((row,index)=>row.planned_run_id===plan.rows[index].planned_run_id);
-  // `rows` is a filtered view of the already digest-verified 400-row plan.
+  // `rows` is a filtered view of the already digest-verified active plan.
   const results=concurrency===1?await runSchedule(rows,runOne,{validatedSubset:true}):await runScheduleParallel(rows,runOne,{laneFor,concurrency});
   Object.defineProperties(results,{
     fullMatrixSelected:{value:mode==='measured' && fullMatrixSelected,enumerable:false},

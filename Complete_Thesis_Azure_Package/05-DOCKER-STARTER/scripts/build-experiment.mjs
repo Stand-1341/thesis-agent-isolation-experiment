@@ -1,7 +1,7 @@
 /**
  * Compose the active revision-3 deployment/profile routes the runner requires.
  *
- * `createTrialAdapterRouter` demands exactly the active revision-2 routes, each with its own
+ * `createTrialAdapterRouter` demands exactly the active revision-3 routes, each with its own
  * workload principal and a reset/execute/collect adapter, and nothing in the
  * package built them — which is why no measured trial could ever start. This
  * module is that missing step and only that step: it does not decide whether the
