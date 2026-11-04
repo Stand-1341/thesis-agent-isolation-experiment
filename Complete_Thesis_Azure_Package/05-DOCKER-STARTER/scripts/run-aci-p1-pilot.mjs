@@ -71,11 +71,13 @@ export async function runAciP1Pilot({bytes,protocol,readiness,dependencies}) {
   const inspection=inspectAciP1Readiness({bytes,protocol,readiness});
   if(!inspection.runnable) throw new Error(`ACI P1 pilot is blocked: ${inspection.blockers.join('; ')}`);
   if(typeof dependencies!=='function') throw new Error('ACI pilot dependencies are required');
-  const deps=await dependencies({mode:'non_counted_pilot',countedAsStudyTrials:false});
+  const rows=rowsFromBytes(bytes);
+  const deps=await dependencies({mode:'non_counted_pilot',countedAsStudyTrials:false,
+    rows:rows.map(row=>({...row,scenario_id:row.scenario_id,permission_profile:row.permission_profile??row.profile})),
+    scheduleSha256:inspection.sha256});
   if(!deps || typeof deps!=='object' || !deps.adapter || !deps.evidenceStore ||
       typeof deps.evidenceStore.claim!=='function' || typeof deps.evidenceStore.save!=='function' ||
       typeof deps.verifier!=='function') throw new Error('ACI pilot requires adapter, verifier, and exclusive evidence store');
-  const rows=rowsFromBytes(bytes);
   return runSchedule(rows,async row=>{
     const trial={runId:row.planned_run_id,deployment:'azure_container_instances',profile:'P1',scenario:row.scenario_id,
       block:row.block,order:row.order_in_block,planSha256:inspection.sha256};
