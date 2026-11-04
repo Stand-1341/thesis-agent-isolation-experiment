@@ -20,11 +20,14 @@ test('Functions P3 route permits only the configured research and fixture Blob I
   assert.match(deny,/action: \{ type: 'Deny' \}/);
 });
 
-test('Functions P3 forces firewall routing and preserves symmetric returns for session and P3 subnets',()=>{
+test('Functions P3 forces firewall routing and appends symmetric returns without dropping existing routes',()=>{
   assert.match(template,/addressPrefix: '0\.0\.0\.0\/0'[\s\S]*?nextHopType: 'VirtualAppliance'/);
-  assert.match(template,/name: 'session-return-via-firewall'[\s\S]*?addressPrefix: sessionSubnetPrefix/);
+  assert.match(template,/param serviceReturnExistingRoutes array/);
+  assert.match(template,/param privateEndpointReturnExistingRoutes array/);
+  assert.match(template,/routes: concat\(filter\(serviceReturnExistingRoutes,[\s\S]*?name: 'functions-p3-return-via-firewall'/);
+  assert.match(template,/routes: concat\(filter\(privateEndpointReturnExistingRoutes,[\s\S]*?name: 'functions-p3-return-via-firewall'/);
   assert.match(template,/name: 'functions-p3-return-via-firewall'[\s\S]*?addressPrefix: functionP3SubnetPrefix/);
-  assert.equal((template.match(/functions-p3-return-via-firewall/g)??[]).length,2);
+  assert.equal((template.match(/\{ name: 'functions-p3-return-via-firewall'/g)??[]).length,2);
 });
 
 test('firewall application and network rule logs are sent to the chosen workspace',()=>{

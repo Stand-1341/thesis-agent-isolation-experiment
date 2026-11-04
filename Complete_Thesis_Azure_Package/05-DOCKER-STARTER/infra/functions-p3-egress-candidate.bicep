@@ -12,8 +12,6 @@ param firewallName string
 param firewallPolicyName string
 @description('Existing Functions P3 integration subnet prefix. Dedicated Flex subnet, delegated to Microsoft.App/environments.')
 param functionP3SubnetPrefix string
-@description('Existing candidate session subnet prefix; preserved in service and private-endpoint return routes.')
-param sessionSubnetPrefix string
 @description('Research API private IP and TCP port. Must be confirmed from the deployed service NIC and listener.')
 param researchServicePrivateIp string
 @minValue(1)
@@ -32,6 +30,10 @@ param requiredFunctionFqdns array
 param functionsP3RouteTableName string
 param serviceReturnRouteTableName string
 param privateEndpointReturnRouteTableName string
+@description('Every existing route in the research-service subnet return route table. Read the live table before deployment; these entries are retained and the Functions P3 return route is appended.')
+param serviceReturnExistingRoutes array
+@description('Every existing route in the evidence-private-endpoints subnet return route table. Read the live table before deployment; these entries are retained and the Functions P3 return route is appended.')
+param privateEndpointReturnExistingRoutes array
 param logWorkspaceId string
 
 resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' existing = {
@@ -163,27 +165,25 @@ resource functionsP3RouteTable 'Microsoft.Network/routeTables@2023-09-01' = if (
   }
 }
 
-// These replacement route tables retain the existing session return routes and
-// add symmetric paths for Functions P3. Review live route tables before enabling:
-// Bicep replaces the route lists on these named resources.
+// Azure Resource Manager replaces route lists on these resources. Require the
+// operator to read and pass every current route, then append the P3 return path;
+// this avoids silently dropping unrelated routes when the candidate is enabled.
 resource serviceReturnRoutes 'Microsoft.Network/routeTables@2023-09-01' = if (enableCandidate) {
   name: serviceReturnRouteTableName
   location: location
   properties: {
-    routes: [
-      { name: 'session-return-via-firewall', properties: { addressPrefix: sessionSubnetPrefix, nextHopType: 'VirtualAppliance', nextHopIpAddress: firewall.properties.ipConfigurations[0].properties.privateIPAddress } }
+    routes: concat(filter(serviceReturnExistingRoutes, route => route.name != 'functions-p3-return-via-firewall'), [
       { name: 'functions-p3-return-via-firewall', properties: { addressPrefix: functionP3SubnetPrefix, nextHopType: 'VirtualAppliance', nextHopIpAddress: firewall.properties.ipConfigurations[0].properties.privateIPAddress } }
-    ]
+    ])
   }
 }
 resource privateEndpointReturnRoutes 'Microsoft.Network/routeTables@2023-09-01' = if (enableCandidate) {
   name: privateEndpointReturnRouteTableName
   location: location
   properties: {
-    routes: [
-      { name: 'session-return-via-firewall', properties: { addressPrefix: sessionSubnetPrefix, nextHopType: 'VirtualAppliance', nextHopIpAddress: firewall.properties.ipConfigurations[0].properties.privateIPAddress } }
+    routes: concat(filter(privateEndpointReturnExistingRoutes, route => route.name != 'functions-p3-return-via-firewall'), [
       { name: 'functions-p3-return-via-firewall', properties: { addressPrefix: functionP3SubnetPrefix, nextHopType: 'VirtualAppliance', nextHopIpAddress: firewall.properties.ipConfigurations[0].properties.privateIPAddress } }
-    ]
+    ])
   }
 }
 

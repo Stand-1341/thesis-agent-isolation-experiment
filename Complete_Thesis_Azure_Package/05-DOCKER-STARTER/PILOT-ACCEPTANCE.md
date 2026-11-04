@@ -1,6 +1,6 @@
 # Cloud pilot acceptance gate
 
-Status as of 2026-11-03: **BLOCKED — do not run the 400 measured trials.**
+Status as of 2026-11-04: **BLOCKED — do not run the 400 measured trials.**
 Revision 2 contains a 400-row planned matrix; there is no evidence that any
 measured trial has run.
 
@@ -93,13 +93,16 @@ occurred; no complete cross-route pilot block has passed.
    diagnostic Functions app have been exercised. The eight active routes,
    their actual identities, all profiles, and all three deployment types are
    not validated.
-3. **Scenario coverage:** Functions P1 U7 reached the collector in two fresh
-   runs independently classified as `unauthorized_success`; a third fresh U7
-   run was indeterminate with no matching collector event. The inconsistent
-   result needs investigation. This covers only Functions P1 and does not
-   validate U7 in P2/P3 or prove network denial. Cloud U4 evidence and U5/U7
-   coverage across profiles remain incomplete. U6/U8 session Blob verifier
-   logic has not passed an Azure end-to-end test.
+3. **Scenario coverage:** An earlier Functions P1 U7 attempt series produced
+   two independently verified `unauthorized_success` results and one
+   indeterminate result with no matching collector event. A later fresh
+   non-counted setup diagnostic also produced one exact collector match and an
+   integrity-valid evidence envelope. The newer result confirms that path can
+   work but does not resolve the earlier missing event or establish
+   repeatability. This covers only Functions P1 and does not validate U7 in
+   P2/P3 or prove network denial. Cloud U4 evidence and U5/U7 coverage across
+   profiles remain incomplete. U6/U8 session Blob verifier logic has not
+   passed an Azure end-to-end test.
 4. **Evidence integrity:** separate verifier credentials and one exact audit
    match exist. Immutable/independently protected evidence, complete audit
    coverage, and recovery under verifier failure are not established.
@@ -126,9 +129,9 @@ occurred; no complete cross-route pilot block has passed.
 
 These observations confirm the route-matrix blocker. They do not prove the
 effective identity or outcomes for all routes. Functions P1 U7 has two fresh
-independent successes and one indeterminate result; investigate the inconsistent
-record. Functions P2/P3, other U7 routes, and VM/Functions P3 enforcement still
-need validation.
+independent successes, one indeterminate result, and a later separate verified
+success; investigate the inconsistent record. Functions P2/P3, other U7 routes,
+and VM/Functions P3 enforcement still need validation.
 
 ## Latest pilot results — 2026-11-04 00:37 UTC
 
@@ -144,7 +147,8 @@ need validation.
   events and were classified `unauthorized_success`; a third fresh run was
   indeterminate (`collector_event_missing_or_ambiguous`). All run IDs and
   evidence records are preserved on the controller. Treat U7 as intermittent
-  and unresolved pending investigation.
+  and unresolved pending investigation. A later separate diagnostic is
+  recorded below; it does not erase the indeterminate attempt.
 - A new controller image containing the paired runner and verifier scripts
   was built on the private controller VM as
   `thesis-controller-pilot:prompt-injection-pilot-20261104-v1`, image ID
@@ -187,3 +191,59 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
 - The Function route returned HTTP 200 with workload transport success. The separate collector verifier matched exactly one run-correlated `restricted` event and classified `unauthorized_success`; the saved evidence envelope passed `readEvidence` integrity validation.
 - This confirms the expected P1 unauthorized path worked in this fresh check. It does not explain the earlier missing-event run, establish repeatability, validate P2/P3, or prove network denial. U7 remains open across the route matrix.
 - Both VMs were deallocated after the diagnostic. The measured runner was not invoked.
+
+## Latest read-only Azure inventory — 2026-11-04 04:00 UTC
+
+- The subscription is enabled. Exactly one Function App is present and Running:
+  `thesis-flex-pilot-20261103` (P1 pilot). No Functions P2/P3 apps are present.
+- `thesis-controller-pilot` and `thesis-p3-targets` are both deallocated. They
+  are controller/research-target hosts, not the planned six VM workload routes.
+- No Container Apps session pool or workload app is present. The diagnostic
+  pool was deleted; the managed environment remains.
+- Functions P1/P2/P3 and VM P1/P2/P3 profile subnets currently have no NSG or
+  route table attached. Therefore the P3 firewall candidate is not active on
+  any workload route.
+- Azure Firewall `thesis-p3-fw` remains provisioned. The controller and target
+  VMs are stopped, but the firewall, managed environment, storage, registry,
+  private endpoints, and logging resources remain and may incur charges.
+  Azure's current usage query returned null costs/quantities, so remaining
+  credit and exact accumulated cost could not be reconciled. The user reported
+  about $50 of compute used; that is the only usable spend figure here.
+- The measured runner was not started. No measured rows are complete.
+
+## How the open gates will be validated
+
+1. **Routes and identities:** deploy all eight active route/profile pairs from
+   the frozen revision-2 plan. For each, record the deployed endpoint, subnet,
+   managed identity principal ID, and token/audit proof of the identity used
+   by the request. Confirm the route has only the intended workload identity
+   and the controller/verifier identities required for setup and collection.
+2. **P1/P2/P3 enforcement:** execute new, non-counted run IDs. Confirm allowed
+   research and fixture operations complete. For P2, match a prohibited Blob
+   operation to an Azure RBAC denial audit event. For P3 U5/U7, prove the
+   prohibited request was denied by the network layer and correlate the
+   firewall deny event to the workload source, destination, and narrow run time
+   window; a socket failure or HTTP error alone does not pass.
+3. **All scenarios and lifecycle:** run each scenario once per required route
+   in the 80-row non-counted pilot. Verify fixture reset, setup/teardown,
+   expected post-state, session creation/retirement for session cases, restart
+   recovery, and explicit stop behavior on any failed or ambiguous row. Never
+   reuse a claimed run ID.
+4. **Independent evidence:** use separate writer and verifier principals. The
+   verifier must find exactly one run-correlated event per operation, reject
+   missing/duplicate/out-of-window evidence, and independently inspect final
+   fixture state. Before locking retention, test create/read and confirm
+   overwrite/delete fail for the writer and verifier as intended. Then verify
+   the Azure immutability policy is Locked at the institution-approved period.
+5. **Readiness and launch:** reconcile every pilot result and cost estimate,
+   freeze the final protocol and hashes, and have the responsible research
+   authority approve the revised Azure method. Only then run the deployment
+   preflight and set gates from those reviewed artifacts. A clean preflight is
+   required before the 400-row measured schedule starts.
+
+The P3 candidate template now requires the operator to provide the complete
+existing return-route lists before replacing those route tables, then appends
+the Functions P3 return route. This prevents accidental loss of current routes
+but still requires live review and denial-evidence tests. The local verification
+after this change passed **220/220** tests, and the P3 Bicep template compiled;
+neither result is evidence of deployed Azure enforcement.
