@@ -1,4 +1,5 @@
 """Remote, non-counted ACI create/health/delete probe for the controller identity."""
+import email.utils
 import json
 import re
 import secrets
@@ -16,6 +17,7 @@ PULL_IDENTITY_ID = "__PULL_IDENTITY_ID__"
 SUBNET_ID = "__SUBNET_ID__"
 IMAGE = "__IMAGE_DIGEST_REFERENCE__"
 REGISTRY_SERVER = "__REGISTRY_SERVER__"
+BLOB_ENDPOINT = "__BLOB_ENDPOINT__"
 LOCATION = "eastus"
 API = "2023-05-01"
 
@@ -61,19 +63,43 @@ def managed_token(resource, client_id):
         return None
 
 
+def blob_request(url, method, token, body=None):
+    headers = {
+        "Authorization": "Bearer " + token,
+        "x-ms-version": "2023-11-03",
+        "x-ms-date": email.utils.formatdate(usegmt=True),
+    }
+    raw = None
+    if body is not None:
+        headers.update({"x-ms-blob-type": "BlockBlob", "Content-Type": "application/json", "If-None-Match": "*"})
+        raw = json.dumps(body).encode("utf-8")
+    request = urllib.request.Request(url, data=raw, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+    except Exception:
+        return 0
+
+
 def safe_error(body):
     code = body.get("error", {}).get("code", "") if isinstance(body, dict) else ""
     return code if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", code) else "unknown"
 
 
 def main():
-    results = {"armList": "FAIL", "create": "NOT_RUN", "health": "NOT_RUN", "delete": "NOT_RUN"}
+    results = {"armList": "FAIL", "create": "NOT_RUN", "health": "NOT_RUN",
+               "blobSeed": "NOT_RUN", "blobIdentity": "NOT_RUN", "blobCleanup": "NOT_RUN", "delete": "NOT_RUN"}
 
     arm_token = managed_token("https://management.azure.com/", CONTROLLER_CLIENT_ID)
     if not arm_token:
         print("ACI_ARM_LIST=FAIL_TOKEN")
         print("ACI_CREATE=NOT_RUN")
         print("ACI_HEALTH=NOT_RUN")
+        print("ACI_BLOB_SEED=NOT_RUN")
+        print("ACI_BLOB_IDENTITY=NOT_RUN")
+        print("ACI_BLOB_CLEANUP=NOT_RUN")
         print("ACI_DELETE=NOT_RUN")
         print("ACI_GROUP_NAME=none")
         print("PROBE_FINISHED=YES")
@@ -90,7 +116,6 @@ def main():
     results["groupName"] = name
     workload_token = secrets.token_urlsafe(36)
     request_key = secrets.token_urlsafe(36)
-    blob_account = "acihealth" + secrets.token_hex(7)
     body = {
         "location": LOCATION,
         "identity": {"type": "UserAssigned", "userAssignedIdentities": {
@@ -105,7 +130,7 @@ def main():
                     {"name": "PORT", "value": "8080"},
                     {"name": "AZURE_TOKEN_MODE", "value": "managed"},
                     {"name": "AZURE_CLIENT_ID", "value": WORKLOAD_CLIENT_ID},
-                    {"name": "AZURE_BLOB_ENDPOINT", "value": "https://" + blob_account + ".blob.core.windows.net/"},
+                    {"name": "AZURE_BLOB_ENDPOINT", "value": BLOB_ENDPOINT},
                     {"name": "RESEARCH_URL", "value": "https://aci-health-smoke.invalid"},
                     {"name": "COLLECTOR_URL", "value": "https://aci-health-smoke.invalid"},
                     {"name": "WORKLOAD_TOKEN", "secureValue": workload_token},
@@ -121,6 +146,10 @@ def main():
 
     created = False
     group_ip = None
+    seeded_blob = False
+    probe_id = "deployment-smoke-" + secrets.token_hex(10)
+    marker = "SYNTHETIC-aci-smoke-" + secrets.token_hex(12)
+    blob_url = BLOB_ENDPOINT.rstrip("/") + "/authorized-docs/" + probe_id + ".json"
     try:
         status, response_body = json_request(url, method="PUT", token=arm_token, payload=body, timeout=60)
         if status in (200, 201, 202):
@@ -164,6 +193,34 @@ def main():
                 time.sleep(3)
             if results["health"] == "NOT_RUN":
                 results["health"] = "FAIL_CONNECTIVITY"
+
+        if results["health"] == "PASS":
+            storage_token = managed_token("https://storage.azure.com/", CONTROLLER_CLIENT_ID)
+            if not storage_token:
+                results["blobSeed"] = "FAIL_CONTROLLER_TOKEN"
+            else:
+                seed_status = blob_request(blob_url, "PUT", storage_token, {"marker": marker})
+                results["blobSeed"] = "PASS" if seed_status in (200, 201) else "FAIL_HTTP_" + str(seed_status)
+                seeded_blob = seed_status in (200, 201)
+
+            if seeded_blob:
+                payload = json.dumps({"runId": probe_id, "scenario": "L1"}).encode("utf-8")
+                request = urllib.request.Request(
+                    "http://" + group_ip + ":8080/run", data=payload,
+                    headers={"Content-Type": "application/json", "x-trial-key": request_key}, method="POST",
+                )
+                try:
+                    with direct_opener.open(request, timeout=20) as response:
+                        result = json.loads(response.read())
+                        ok = (response.status == 200 and result.get("runId") == probe_id and
+                              result.get("scenario") == "L1" and result.get("transportOk") is True and
+                              result.get("status") == 200 and isinstance(result.get("body"), dict) and
+                              result["body"].get("marker") == marker)
+                        results["blobIdentity"] = "PASS_MARKER_READ" if ok else "FAIL_RESPONSE"
+                except urllib.error.HTTPError as error:
+                    results["blobIdentity"] = "FAIL_AGENT_HTTP_" + str(error.code)
+                except Exception:
+                    results["blobIdentity"] = "FAIL_CONNECTIVITY"
     finally:
         if created:
             delete_status, _ = json_request(url, method="DELETE", token=arm_token, timeout=60)
@@ -179,14 +236,23 @@ def main():
                     results["delete"] = "FAIL_TIMEOUT"
             else:
                 results["delete"] = "FAIL_HTTP_" + str(delete_status)
+        if seeded_blob:
+            storage_token = managed_token("https://storage.azure.com/", CONTROLLER_CLIENT_ID)
+            delete_status = blob_request(blob_url, "DELETE", storage_token) if storage_token else 0
+            results["blobCleanup"] = "PASS" if delete_status in (202, 404) else "FAIL_HTTP_" + str(delete_status)
 
     print("ACI_ARM_LIST=" + results["armList"])
     print("ACI_CREATE=" + results["create"])
     print("ACI_HEALTH=" + results["health"])
+    print("ACI_BLOB_SEED=" + results["blobSeed"])
+    print("ACI_BLOB_IDENTITY=" + results["blobIdentity"])
+    print("ACI_BLOB_CLEANUP=" + results["blobCleanup"])
     print("ACI_DELETE=" + results["delete"])
     print("ACI_GROUP_NAME=" + results["groupName"])
     print("PROBE_FINISHED=YES")
-    return 0 if all(results[key] == "PASS" or (key == "armList" and results[key].startswith("PASS_")) for key in ("armList", "create", "health", "delete")) else 2
+    return 0 if all(results[key] == "PASS" or (key == "armList" and results[key].startswith("PASS_")) or
+                     (key == "blobIdentity" and results[key] == "PASS_MARKER_READ")
+                     for key in ("armList", "create", "health", "delete", "blobSeed", "blobIdentity", "blobCleanup")) else 2
 
 
 main()

@@ -9,6 +9,7 @@ param(
   [string]$PullIdentityId = '/subscriptions/dddc5a29-1701-44ad-b367-50b466089d4b/resourceGroups/rg-thesis-research-pilot-eus/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-thesis-acr-pull',
   [string]$SubnetId = '/subscriptions/dddc5a29-1701-44ad-b367-50b466089d4b/resourceGroups/RG-THESIS-RESEARCH-PILOT-EUS/providers/Microsoft.Network/virtualNetworks/vnet-thesis-pilot-eus/subnets/aci-experiment',
   [string]$RegistryServer = 'thesisacr74a95224.azurecr.io',
+  [string]$BlobEndpoint = 'https://thesisfixture20261103.blob.core.windows.net/',
   [string]$ImageDigestReference = 'thesisacr74a95224.azurecr.io/thesis-agent-aci-pilot@sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b'
 )
 
@@ -40,6 +41,7 @@ $replacements = @{
   '__PULL_IDENTITY_ID__' = $PullIdentityId
   '__SUBNET_ID__' = $SubnetId
   '__REGISTRY_SERVER__' = $RegistryServer
+  '__BLOB_ENDPOINT__' = $BlobEndpoint
   '__IMAGE_DIGEST_REFERENCE__' = $ImageDigestReference
 }
 foreach ($key in $replacements.Keys) { $python = $python.Replace($key, $replacements[$key]) }
@@ -76,7 +78,7 @@ try {
   if ($LASTEXITCODE -ne 0 -and -not $raw) { throw 'Controller-managed ACI health smoke failed to return.' }
   $result = ($raw -join "`n") | ConvertFrom-Json -ErrorAction Stop
   $messages = (@($result.value) | ForEach-Object { [string]$_.message }) -join "`n"
-  foreach ($key in @('ACI_ARM_LIST','ACI_CREATE','ACI_HEALTH','ACI_DELETE','ACI_GROUP_NAME')) {
+  foreach ($key in @('ACI_ARM_LIST','ACI_CREATE','ACI_HEALTH','ACI_BLOB_SEED','ACI_BLOB_IDENTITY','ACI_BLOB_CLEANUP','ACI_DELETE','ACI_GROUP_NAME')) {
     if ($messages -match "(?m)^$key=([^\r\n]+)") { $outcomes[$key] = $matches[1] }
   }
 } finally {
@@ -107,6 +109,9 @@ if ($groupName -and $groupName -ne 'none') {
   aciArmList = $outcomes['ACI_ARM_LIST']
   groupCreate = $outcomes['ACI_CREATE']
   privateHealth = $outcomes['ACI_HEALTH']
+  blobProbeSeed = $outcomes['ACI_BLOB_SEED']
+  workloadIdentityBlobRead = $outcomes['ACI_BLOB_IDENTITY']
+  blobProbeCleanup = $outcomes['ACI_BLOB_CLEANUP']
   groupDelete = $outcomes['ACI_DELETE']
   groupName = $groupName
   controllerVmDeallocated = $vmStopped
@@ -117,4 +122,6 @@ if ($groupName -and $groupName -ne 'none') {
 } | ConvertTo-Json -Compress
 
 if (-not $vmStateRestored) { throw 'Controller VM state was not restored.' }
-if ($outcomes['ACI_CREATE'] -ne 'PASS' -or $outcomes['ACI_HEALTH'] -ne 'PASS' -or $outcomes['ACI_DELETE'] -ne 'PASS') { exit 2 }
+if ($outcomes['ACI_CREATE'] -ne 'PASS' -or $outcomes['ACI_HEALTH'] -ne 'PASS' -or
+    $outcomes['ACI_BLOB_SEED'] -ne 'PASS' -or $outcomes['ACI_BLOB_IDENTITY'] -ne 'PASS_MARKER_READ' -or
+    $outcomes['ACI_BLOB_CLEANUP'] -ne 'PASS' -or $outcomes['ACI_DELETE'] -ne 'PASS') { exit 2 }

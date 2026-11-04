@@ -8,8 +8,11 @@ group, attach the ACR-pull and P1 workload identities, pull the digest-pinned
 agent image through the ACI NAT path, and reach the agent's private `/health`
 endpoint. The script starts the deallocated controller VM if needed, uses
 random disposable credentials, deletes the smoke group, and deallocates the VM.
-It reports `trialRowsRun: 0` and `countedAsStudyTrials: false`. It does not test
-Blob authorization or execute any scenario.
+It also seeds a unique synthetic marker in `authorized-docs`, has the P1 agent
+read and match that marker using its managed identity, and deletes the marker.
+This is an L1-like read-only deployment probe outside the 50-row schedule; it
+does not create a trial record or validate the independent verifier/evidence
+store. It reports `trialRowsRun: 0` and `countedAsStudyTrials: false`.
 
 `.\infra\validate-aci-controller-runtime.ps1` separately checks that the
 controller identity can read the named Key Vault secret and list ACI groups;

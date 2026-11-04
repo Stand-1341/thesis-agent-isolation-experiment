@@ -131,8 +131,11 @@ value was displayed. A subsequent controller-identity health-only smoke
 successfully created and deleted an ACI group, pulled the pinned image through
 the NAT-backed ACR path, and received the private agent health response. This
 proves controller group create/delete and identity attach for this deployment,
-but not Blob workload access, scenario execution, or experiment readiness.
-Both VMs are deallocated. The 50-row ACI draft remains
+and the P1 workload identity subsequently read an exact synthetic marker from
+the private fixture Blob endpoint; the controller deleted that marker. This
+single L1-like probe is not a scheduled scenario record and does not validate
+the independent verifier/evidence store or overall experiment readiness. Both
+VMs are deallocated. The 50-row ACI draft remains
 non-runnable pending method approval, U6/U8 analogs, and a live Azure adapter/
 verifier/protected evidence store. A fail-closed sequential runner and dry-run
 exist, but its cloud dependencies are not wired or validated. No measured trial

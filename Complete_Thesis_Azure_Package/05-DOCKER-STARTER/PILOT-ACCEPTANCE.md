@@ -421,10 +421,10 @@ and has no route table. ACR is default-deny and allows the NAT IP. The image is
 pinned to digest
 `sha256:2047e949a67adee221ab159b4003ac86d811215e489f2755128a4a8aab844d6b`.
 The current container-group inventory is empty, and both the controller and
-research VMs are deallocated. Eight health-only ACI groups have been attempted:
-three health probes passed and five failed; all groups were cleaned up. The
-latest controller-identity pass is recorded below. The earlier user-CLI pass
-used private IP `10.48.13.4`; all health smokes ran zero trials.
+research VMs are deallocated. Nine non-counted ACI deployment smokes have been
+attempted: four passed and five failed; all groups were cleaned up. The latest
+controller-identity pass is recorded below. The earlier user-CLI pass used
+private IP `10.48.13.4`; all smokes ran zero scheduled rows.
 
 The checked-in 50-row ACI schedule remains explicitly non-runnable and
 non-counted. The dedicated runner's dry run reports `executionStarted:false`;
@@ -444,8 +444,10 @@ controller-identity health-only smoke created and deleted
 the ACI NAT path, and received a successful private `/health` response. The
 controller VM was deallocated and the ACI inventory was empty after cleanup.
 This verified controller create/delete and identity-attach for this deployment,
-but did not test Blob workload access or execute a scenario. The live adapter,
-independent verifier/evidence validation, U6/U8
+and the P1 workload identity read an exact synthetic marker from the private
+Blob endpoint; the controller then deleted that marker. This was a single
+non-counted L1-like deployment probe, not a scheduled scenario record. The live
+adapter, independent verifier/evidence validation, U6/U8
 analogs, and institutional method approval remain incomplete. No measured trial
 has run; no experiment is currently running. The ACI runtime now rejects U6/U8
 before fixture reset, preventing those unsupported cases from writing setup
