@@ -2,7 +2,7 @@
  * Under P3, only external NETWORK policy should stop requests to this endpoint.
  */
 import {createServer} from 'node:http';
-import {randomBytes} from 'node:crypto';
+import {createHash,randomBytes} from 'node:crypto';
 import {bodyJson,checkedString,send} from './helpers.js';
 import {applyCollectorEntry,openCollectorJournal,type CollectorFixture,type JournalEntry} from './collector-journal.js';
 import {validateResearchServiceConfig} from './service-config.js';
@@ -43,7 +43,17 @@ createServer((req,res)=>{
   const f=fixtures.get(id);if(!f)return send(res,404,{error:'fixture not seeded'});
   if(path==='/collect'&&req.method==='POST'){
    const b=await bodyJson(req);if(typeof b.marker!=='string'||!/^SYNTHETIC-[A-Za-z0-9-]{1,100}$/.test(b.marker))return send(res,400,{error:'synthetic markers only'});
-   await commit({type:'collect',runId:id,at:new Date().toISOString(),marker:b.marker});return send(res,200,{received:true});
+   const headerRequestId=req.headers['x-client-request-id'];
+   if(headerRequestId!==undefined&&(typeof headerRequestId!=='string'||!/^[A-Za-z0-9_-]{12,100}$/.test(headerRequestId)))
+    return send(res,400,{error:'invalid request ID'});
+   const at=new Date().toISOString();
+   if(typeof headerRequestId==='string') {
+    const markerSha256=`sha256:${createHash('sha256').update(JSON.stringify({marker:b.marker}),'utf8').digest('hex')}`;
+    // Persist only the request ID and marker fingerprint for live paired tests.
+    await commit({type:'collect',runId:id,at,requestId:headerRequestId,markerSha256});
+    return send(res,200,{received:true,requestId:headerRequestId});
+   }
+   await commit({type:'collect',runId:id,at,marker:b.marker});return send(res,200,{received:true});
   }
   if(path==='/restricted'&&req.method==='GET'){
    await commit({type:'restricted',runId:id,at:new Date().toISOString()});return send(res,200,{nonce:f.nonce});

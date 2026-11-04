@@ -23,6 +23,7 @@ import {createVerifierRouter} from './verifier-router.mjs';
 import {createMeasuredEvidenceStoreFromEnvironment} from './azure-measured-evidence-store.mjs';
 import {createAciPreprovisionedIdentityProvider,buildAciRunIdentitySpecs} from './aci-preprovisioned-identity-provider.mjs';
 import {readFile} from 'node:fs/promises';
+import {createAciAzureLifecycleObserver,createFailClosedCredentialPathReviewer} from './aci-azure-lifecycle-observer.mjs';
 import {createAzureEffectiveBlobAccessReviewer} from './azure-effective-blob-access-reviewer.mjs';
 import {createAciBlobSessionAzureCallbacks} from './aci-blob-session-azure-callbacks.mjs';
 import {createAciBlobSessionAnalog} from './aci-blob-session-analog.mjs';
@@ -198,6 +199,8 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
     verifierRouter:createVerifierRouter,
     evidenceStore:createMeasuredEvidenceStoreFromEnvironment,
     markerProofRuntime:createAciMarkerProofEvidenceRuntime,
+    lifecycleObserverFactory:createAciAzureLifecycleObserver,
+    reviewCredentialPaths:createFailClosedCredentialPathReviewer(),
     effectiveAccessReviewer:createAzureEffectiveBlobAccessReviewer,
     runIdentityProvider:createAciPreprovisionedIdentityProvider,
     sessionCallbacks:createAciBlobSessionAzureCallbacks,
@@ -214,9 +217,6 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
     let approval=false;
     try {approval=await c.verifyMethodApproval(c.methodDecision);} catch {approval=false;}
     if(approval!==true) throw new Error('ACI U6/U8 method decision was not independently verified');
-    const missing=['reviewCredentialPaths','observeGroup','readAciLifecycleEvidence']
-      .filter(name=>typeof c[name]!=='function');
-    if(missing.length) throw new Error(`ACI U6/U8 default composition requires independently implemented evidence callbacks: ${missing.join(', ')}`);
     if(c.methodDecision.reviewerPrincipalId?.toLowerCase()===cfg.THESIS_ACI_AUDIT_PRINCIPAL_OBJECT_ID.toLowerCase())
       throw new Error('ACI method-decision reviewer must differ from the independent evidence/audit observer');
     const lifecycleRoleDefinitionId=c.identityLifecycleRoleDefinitionId??env.THESIS_ACI_IDENTITY_LIFECYCLE_ROLE_DEFINITION_ID;
@@ -247,6 +247,11 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
   const getControllerStorageToken=c.storageProvider({clientId:cfg.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID,createCredential:()=>controllerIdentity});
   const getFixtureVerifierStorageToken=c.storageProvider({clientId:cfg.THESIS_ACI_FIXTURE_VERIFIER_IDENTITY_CLIENT_ID,createCredential:()=>fixtureReaderIdentity});
   const getAuditToken=c.logsProvider({clientId:cfg.THESIS_ACI_AUDIT_IDENTITY_CLIENT_ID,createCredential:()=>auditIdentity});
+  const getAuditManagementToken=tokenFor(auditIdentity,'https://management.azure.com/.default','ACI independent audit observer');
+  const lifecycleObserver=c.lifecycleObserverFactory({subscriptionId:cfg.THESIS_ACI_SUBSCRIPTION_ID,
+    resourceGroup:cfg.THESIS_ACI_RESOURCE_GROUP,getManagementToken:getAuditManagementToken,fetchImpl});
+  const observeGroup=typeof c.observeGroup==='function'?c.observeGroup:lifecycleObserver.observeGroup;
+  const readLifecycleEvidence=typeof c.readAciLifecycleEvidence==='function'?c.readAciLifecycleEvidence:lifecycleObserver.readAciLifecycleEvidence;
   const secret=async key=>c.readSecret({vaultUri:cfg.THESIS_KEY_VAULT_URI,name:cfg[SECRET_NAMES[key]],
     getToken:tokenFor(controllerIdentity,'https://vault.azure.net/.default','Key Vault'),fetchImpl});
   const [resourceAdmin,collectorAdmin,controllerKey,workloadToken,collectorVerifierKey,resourceVerifierKey]=await Promise.all([
@@ -266,7 +271,7 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
   if(hasLifecycle) {
     proofRuntime=c.markerProofRuntime({env,fetchImpl});
     const getGraphToken=tokenFor(auditIdentity,'https://graph.microsoft.com/.default','Azure Graph access review');
-    const accessReviewer=c.effectiveAccessReviewer({getManagementToken,getGraphToken,
+    const accessReviewer=c.effectiveAccessReviewer({getManagementToken:getAuditManagementToken,getGraphToken,
       observerPrincipalId:cfg.THESIS_ACI_AUDIT_PRINCIPAL_OBJECT_ID,reviewCredentialPaths:c.reviewCredentialPaths,
       persistSnapshot:({snapshot})=>proofRuntime.writeProtectedSnapshot({snapshot,observerPrincipalId:proofRuntime.observerPrincipalId}),
       fetchImpl});
@@ -314,7 +319,7 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
           buildBody:c.groupBody});
         const created=await groupClient.create(cleanupName,body);
         const group={...created,identityObjectId:identity.objectId,ready:created.provisioningState==='Succeeded'};
-        const observed=await c.observeGroup({group,runId:trial.runId,scenario:trial.scenario,phase:'cleanup',identity,getManagementToken,fetchImpl});
+        const observed=await observeGroup({group,runId:trial.runId,scenario:trial.scenario,phase:'cleanup',identity,getManagementToken:getAuditManagementToken,fetchImpl});
         if(observed?.state!=='Running'||observed.name!==cleanupName||observed.identityObjectId?.toLowerCase()!==identity.objectId.toLowerCase())
           throw new Error('ACI cleanup identity group lacks independent live observation');
         let output,operationError;
@@ -332,7 +337,7 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
       createCredential:clientId=>c.identity(clientId),groupBodyForIdentity,profileForRun,identityProvider:identityCallbacks,
       effectiveAccessEvaluator:accessReviewer.evaluateEffectiveAccess,blobOperations:markerOperations,
       agentSessionCallbacks,independentMarkerReader:args=>markerOperations.readMarker(args),
-      persistMarkerContentProof:proofRuntime.persistMarkerContentProof,observeGroup:c.observeGroup,fetchImpl,
+      persistMarkerContentProof:proofRuntime.persistMarkerContentProof,observeGroup,fetchImpl,
       groupClientFactory:()=>groupClient,storageTokenProvider:c.storageProvider,logsTokenProvider:c.logsProvider,
       auditReaderFactory:c.auditReader,groupBodyBuilder:c.groupBody});
     sessionAnalog=c.sessionAnalogFactory({methodDecision:c.methodDecision,verifyMethodApproval:c.verifyMethodApproval,
@@ -357,7 +362,7 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
         readerPrincipalId:cfg.THESIS_ACI_AUDIT_PRINCIPAL_OBJECT_ID};
     };
     const readAciLifecycleEvidence=async args=>{
-      const observation=await c.readAciLifecycleEvidence({...args,getManagementToken,fetchImpl});
+      const observation=await readLifecycleEvidence({...args,getManagementToken:getAuditManagementToken,fetchImpl});
       const snapshot=observation?.snapshot;
       if(observation?.source!=='azure_aci_arm_activity_snapshot_v1'||observation.readOnly!==true||
         observation.observerPrincipalId?.toLowerCase()!==proofRuntime.observerPrincipalId.toLowerCase()||

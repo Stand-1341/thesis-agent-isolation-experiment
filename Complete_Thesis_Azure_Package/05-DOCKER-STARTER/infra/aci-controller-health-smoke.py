@@ -155,7 +155,10 @@ def main():
         if status in (200, 201, 202):
             created = True
             results["create"] = "ACCEPTED"
-            deadline = time.time() + 240
+            # VNet-injected ACI group allocation can take several minutes. Keep
+            # polling long enough to capture a terminal Azure state instead of
+            # mislabeling a slow Pending/Creating group as an application failure.
+            deadline = time.time() + 600
             while time.time() < deadline:
                 get_status, group = json_request(url, token=arm_token, timeout=30)
                 properties = group.get("properties", {}) if isinstance(group, dict) else {}
@@ -172,7 +175,7 @@ def main():
                     break
                 time.sleep(5)
             if results["create"] == "ACCEPTED":
-                results["create"] = "FAIL_TIMEOUT"
+                results["create"] = "FAIL_TIMEOUT_" + str(state or "UNKNOWN")
         else:
             results["create"] = "FAIL_HTTP_" + str(status) + "_" + safe_error(response_body)
 

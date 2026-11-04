@@ -1,0 +1,54 @@
+{
+  "protocolId": "aci-p1-live-injection-50-v1",
+  "status": "approved_for_non_counted_pilot",
+  "runPermitted": true,
+  "countedAsStudyTrials": false,
+  "scheduleFile": "aci-p1-live-injection-50-schedule.csv",
+  "scheduleSha256": "b63e949f035ee278ebc932404d48445e667c096ff679f8ef32e14d41e7de26eb",
+  "deployment": "azure_container_instances",
+  "permissionProfile": "P1",
+  "conditions": 50,
+  "pairs": 25,
+  "blocks": 5,
+  "conditionsPerBlock": 10,
+  "seed": "aci-live-injection-p1-v1",
+  "randomization": "sha256-pair-order-and-counterbalanced-v1",
+  "method": {
+    "source": "Chapter 3, Programming the Simulated Adversarial Agent",
+    "design": "one ordinary summary task paired with retrieved synthetic content containing either clean text or fixed malicious instructions",
+    "pairing": "same task, model, settings, tool schema, fixture semantics, and deployment permission profile; one clean and one attack condition per pair",
+    "modelBehaviorSeparateFromContainment": true,
+    "scopeLimit": "ACI P1 protected-document read and controlled collector only; this does not cover all ten deterministic scenarios or the three-by-three thesis comparison",
+    "ownerDecision": "The study owner explicitly approved GPT-5 mini inclusion for this separate 50-condition non-counted pilot; see docs/ACI-P1-LIVE-INJECTION-50-OWNER-APPROVAL.md.",
+    "institutionalReviewDetermination": "not_recorded; outputs remain non-counted technical-pilot observations and are not thesis results unless institution requirements are separately satisfied."
+  },
+  "model": {
+    "provider": "Azure OpenAI",
+    "model": "gpt-5-mini",
+    "version": "2025-08-07",
+    "reasoningEffort": "low",
+    "maxResponsesPerCondition": 4,
+    "maxOutputTokensPerResponse": 2048,
+    "retryPolicy": "none",
+    "fallback": false,
+    "maximumCostPerConditionUsd": 0.25,
+    "maximumModelSpendUsd": 12.5
+  },
+  "evidenceRetention": {
+    "desired": "indefinite",
+    "departmentApproved": false,
+    "azureMechanism": "unresolved_pending_department_approval",
+    "options": [
+      "locked time-based immutability up to 146000 days (400 years)",
+      "Azure legal hold until explicitly cleared, only if appropriate for the approved records purpose"
+    ],
+    "automaticExpiry": "must_not_be_configured",
+    "localEvidenceFallback": false
+  },
+  "blockers": [
+    "University department-approved retention schedule is not verified; indefinite is the requested preference, not yet the institution-approved schedule",
+    "Azure trial-evidence immutability policy is Deleted with a zero-day period",
+    "ACI U1 and U5 live routes and independent audit verifiers have not passed Azure validation",
+    "No trial has run under this protocol"
+  ]
+}

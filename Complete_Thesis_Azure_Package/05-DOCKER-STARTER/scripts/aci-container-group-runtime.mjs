@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {randomUUID} from 'node:crypto';
 
 const API='2023-05-01';
 const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -145,6 +146,40 @@ export function createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTr
     if(!response.ok) throw new Error(`ACI private agent HTTP ${response.status}`);
     return result;
   }
+  async function createWorkloadContext(trial,fixture) {
+    const name=aciGroupName(trial.runId,trial.profile);
+    let group;
+    try {group=await groupClient.create(name,await groupBodyForTrial(trial,fixture));}
+    catch(error) {throw new Error(`ACI container group create outcome requires reconciliation (${error instanceof Error?error.message:'Error'})`);}
+    if(group?.name!==name || !RFC1918(group?.privateIp) || group.provisioningState!=='Succeeded') throw new Error('ACI container group returned invalid private endpoint');
+    groups.set(trial.runId,group);
+    const endpoint=`http://${group.privateIp}:8080`;
+    const deadline=Date.now()+readinessTimeoutMs;
+    let ready=false;
+    while(Date.now()<deadline) {
+      try {
+        const health=await call(`${endpoint}/health`,{method:'GET'});
+        if(health?.ready===true) {ready=true;break;}
+        throw new Error('invalid ACI health response');
+      } catch(error) {
+        if(error.message==='invalid ACI health response') throw error;
+        const remaining=deadline-Date.now(); if(remaining>0) await new Promise(resolve=>setTimeout(resolve,Math.min(pollIntervalMs,remaining)));
+      }
+    }
+    if(!ready) throw new Error('ACI private agent readiness timed out');
+    return {name,privateIp:group.privateIp,endpoint,trial};
+  }
+  async function executeInContext(context,trial,fixture,{operationId}={}) {
+    const operation=trial.scenario;
+    if(operationId!==undefined && !/^[0-9a-f-]{36}$/i.test(operationId)) throw new Error('invalid ACI interaction operation ID');
+    const headers={'content-type':'application/json','x-trial-key':controllerToken};
+    if(operationId) headers['x-ms-client-request-id']=operationId;
+    const output=await call(`${context.endpoint}/run`,{method:'POST',headers,
+      body:JSON.stringify({runId:trial.runId,scenario:operation,...(operationId?{requestId:operationId}:{}),
+        ...(operation==='U5'&&typeof fixture?.u5Marker==='string'?{u5Marker:fixture.u5Marker}:{})})});
+    if(output?.runId!==trial.runId || output?.scenario!==operation) throw new Error('ACI workload response did not match the claimed operation');
+    return {...output,aciContainerGroup:context.name,aciPrivateIp:context.privateIp,...(operationId?{operationId}: {})};
+  }
   return {
     // The runner must delete deterministic group names after execute/reset
     // failures, verifier indeterminacy, or timeouts. This also reconciles a
@@ -177,30 +212,38 @@ export function createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTr
           throw new Error('ACI session analogue result did not match the claimed row');
         return {runId:trial.runId,scenario:trial.scenario,aciSessionAnalog:analogResult};
       }
-      const name=aciGroupName(trial.runId,trial.profile);
-      let group;
-      try {group=await groupClient.create(name,await groupBodyForTrial(trial,fixture));}
-      catch(error) {throw new Error(`ACI container group create outcome requires reconciliation (${error instanceof Error?error.message:'Error'})`);}
-      if(group?.name!==name || !RFC1918(group?.privateIp) || group.provisioningState!=='Succeeded') throw new Error('ACI container group returned invalid private endpoint');
-      groups.set(trial.runId,group);
-      const endpoint=`http://${group.privateIp}:8080`;
-      const deadline=Date.now()+readinessTimeoutMs;
-      let ready=false;
-      while(Date.now()<deadline) {
-        try {
-          const health=await call(`${endpoint}/health`,{method:'GET'});
-          if(health?.ready===true) {ready=true;break;}
-          throw new Error('invalid ACI health response');
-        } catch(error) {
-          if(error.message==='invalid ACI health response') throw error;
-          const remaining=deadline-Date.now(); if(remaining>0) await new Promise(resolve=>setTimeout(resolve,Math.min(pollIntervalMs,remaining)));
-        }
-      }
-      if(!ready) throw new Error('ACI private agent readiness timed out');
-      const output=await call(`${endpoint}/run`,{method:'POST',headers:{'content-type':'application/json','x-trial-key':controllerToken},
-        body:JSON.stringify({runId:trial.runId,scenario:trial.scenario,...(trial.scenario==='U5'&&typeof fixture?.u5Marker==='string'?{u5Marker:fixture.u5Marker}:{})})});
-      if(output?.runId!==trial.runId || output?.scenario!==trial.scenario) throw new Error('ACI workload response did not match the claimed row');
-      return {...output,aciContainerGroup:name,aciPrivateIp:group.privateIp};
+      const context=await createWorkloadContext(trial,fixture);
+      return executeInContext(context,trial,fixture);
+    },
+    /**
+     * Open one ACI workload group for the live prompt-injection pair. Only the
+     * U1 protected read followed by the U5 collector send is allowed. The
+     * ordinary execute() API remains one-shot and unchanged for deterministic
+     * trials. Each operation receives its own request correlation ID.
+     */
+    async beginInjectionPair(trial,fixture) {
+      if(!/^[A-Za-z0-9_-]{1,150}$/.test(trial?.runId||'') || trial?.profile!=='P1' || trial?.scenario!=='U1')
+        throw new Error('ACI prompt-injection pair must start from a P1 U1 trial');
+      if(claimed.has(trial.runId)) throw new Error('ACI run ID already claimed');
+      claimed.add(trial.runId);
+      const context=await createWorkloadContext(trial,fixture);
+      const operations=['U1','U5'];
+      const completed=[];
+      let closed=false;
+      return Object.freeze({
+        async executeOperation(scenario) {
+          if(closed) throw new Error('ACI injection pair session is closed');
+          const expected=operations[completed.length];
+          if(scenario!==expected) throw new Error(`ACI injection pair operation order violation; expected ${expected||'no more operations'}`);
+          const operationId=randomUUID();
+          const operationTrial={...trial,scenario};
+          const output=await executeInContext(context,operationTrial,fixture,{operationId});
+          completed.push({scenario,operationId});
+          return output;
+        },
+        observations:()=>completed.map(item=>({...item})),
+        close() {closed=true;}
+      });
     },
     collect:(trial,fixture,output,timing)=>{
       if(isAnalogTrial(trial)) {

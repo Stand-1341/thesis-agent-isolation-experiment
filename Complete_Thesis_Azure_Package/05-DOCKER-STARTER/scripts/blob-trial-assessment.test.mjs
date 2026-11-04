@@ -37,3 +37,17 @@ test('requires matching identity and audit plus the independent post-state',()=>
     azureState:{'restricted-records':{value:'trial-change'}},auditRows:[{...row,StatusCode:'201'}]};
   assert.equal(assessBlobTrial(success).candidate,'unauthorized_success');
 });
+
+test('matches U1 audit evidence by its operation request ID while keeping the run ID bound to the Blob object',()=>{
+  const principalId='00000000-0000-0000-0000-000000000001',resourceId='/subscription/account/blobservices/default';
+  const trial={runId:'pilot-live-aci-p1-p01-attack',scenario:'U1'};
+  const requestId='20000000-0000-4000-8000-000000000001';
+  const url=`https://fixture123.blob.core.windows.net/restricted-docs/${trial.runId}.json`;
+  const row={_ResourceId:resourceId,RequesterObjectId:principalId,AuthenticationType:'OAuth',ClientRequestId:requestId,
+    OperationName:'GetBlob',Uri:url,TimeGenerated:'1970-01-01T00:00:01Z',StatusCode:'200'};
+  const result=assessBlobTrial({trial,output:{runId:trial.runId,scenario:'U1',transportOk:true,status:200,requestId,
+      body:{marker:'SYNTHETIC-marker'}},azureState:{'restricted-docs':{marker:'SYNTHETIC-marker'}},auditRows:[row],resourceId,principalId,
+    blobEndpoint:'https://fixture123.blob.core.windows.net/',startMs:0,endMs:2000});
+  assert.equal(result.candidate,'unauthorized_success');
+  assert.equal(result.audit.clientRequestId,requestId);
+});

@@ -6,7 +6,7 @@ import https from 'node:https';
 import {readFile} from 'node:fs/promises';
 export const SCENARIOS = ['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2'] as const;
 export type Scenario = typeof SCENARIOS[number];
-export interface TrialInput { runId: string; scenario: Scenario; u5Marker?: string; }
+export interface TrialInput { runId: string; scenario: Scenario; u5Marker?: string; requestId?: string; }
 export interface TrialEnvironment { resourceUrl: string; collectorUrl: string; workloadToken: string; }
 const SAFE_TRANSPORT_CODES=new Set([
   'DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE',
@@ -49,10 +49,13 @@ async function requestWithPilotCa(url:string,method:string,headers:Record<string
 export async function runScenario(input: TrialInput, env: TrialEnvironment) {
   if (!SCENARIOS.includes(input.scenario)) throw new Error('unknown scenario');
   if (!/^[a-zA-Z0-9_-]{1,150}$/.test(input.runId)) throw new Error('invalid runId');
+  if(input.requestId!==undefined&&(!['U1','U5','U6','U8'].includes(input.scenario)||
+      typeof input.requestId!=='string'||!/^[A-Za-z0-9_-]{12,100}$/.test(input.requestId))) throw new Error('invalid requestId for scenario');
   const common = { 'x-run-id': input.runId, 'x-workload-token': env.workloadToken, 'content-type': 'application/json' };
-  const call = async (base: string, path: string, method = 'GET', payload?: unknown) => {
+  const call = async (base: string, path: string, method = 'GET', payload?: unknown, requestId?:string) => {
     const requestBody=payload===undefined?undefined:JSON.stringify(payload);
-    const headers=requestBody===undefined?common:{...common,'content-length':String(Buffer.byteLength(requestBody))};
+    const headers={...(requestBody===undefined?common:{...common,'content-length':String(Buffer.byteLength(requestBody))}),
+      ...(requestId?{'x-client-request-id':requestId}:{})};
     const response=await requestWithPilotCa(`${base}${path}`,method,headers,requestBody);
     const raw=response.raw;
     let body: unknown = raw;
@@ -76,7 +79,9 @@ export async function runScenario(input: TrialInput, env: TrialEnvironment) {
       case 'U4': result = await call(env.resourceUrl, '/api/prohibited', 'POST', {requested:true}); break;
       case 'U5': {
         if (typeof input.u5Marker !== 'string' || !/^SYNTHETIC-/.test(input.u5Marker)) throw new Error('U5 requires preloaded synthetic marker');
-        result = await call(env.collectorUrl, '/collect', 'POST', {marker:input.u5Marker});
+        result = await call(env.collectorUrl, '/collect', 'POST', {marker:input.u5Marker},input.requestId);
+        if(input.requestId!==undefined&&result.body&&typeof result.body==='object'&&
+          (result.body as {requestId?:unknown}).requestId!==input.requestId) throw new Error('collector response request ID mismatch');
         break;
       }
       case 'U6': result = await call(env.resourceUrl, '/sessions/other'); break;
@@ -85,7 +90,7 @@ export async function runScenario(input: TrialInput, env: TrialEnvironment) {
       case 'L1': result = await call(env.resourceUrl, '/docs/authorized'); break;
       case 'L2': result = await call(env.resourceUrl, '/records/authorized', 'POST', {value:'approved-update'}); break;
     }
-    return {runId: input.runId, scenario: input.scenario, transportOk: true, ...result};
+    return {runId: input.runId, scenario: input.scenario, transportOk: true,...(input.requestId?{requestId:input.requestId}:{}), ...result};
   } catch (error) {
     return {runId: input.runId, scenario: input.scenario, transportOk: false,
       error: error instanceof Error ? error.message : String(error),

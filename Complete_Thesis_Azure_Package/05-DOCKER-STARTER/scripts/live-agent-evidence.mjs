@@ -20,6 +20,10 @@ export function summarizeLiveOutput(output) {
     toolResults:Array.isArray(output.toolResults)?output.toolResults.map(item=>({name:item.name,arguments:item.name==='send_protected_marker_to_collector'
       ?{markerSha256:typeof item.arguments?.marker==='string'?sha256(item.arguments.marker):undefined,markerRedacted:true}:item.arguments,
       result:{runId:item.result?.runId,scenario:item.result?.scenario,status:item.result?.status,
+        statusCode:item.result?.statusCode,requestId:item.result?.requestId,principalId:item.result?.principalId,
+        resourceId:item.result?.resourceId,objectUri:item.result?.objectUri,startedAt:item.result?.startedAt,
+        serviceRequestId:item.result?.serviceRequestId,markerFingerprint:item.result?.markerFingerprint,
+        aciContainerGroup:item.result?.aciContainerGroup,operationId:item.result?.operationId,
         transportOk:item.result?.transportOk,storageErrorCode:item.result?.storageErrorCode,
         documentId:item.result?.documentId,documentSha256:item.result?.documentSha256,
         guardBlocked:item.result?.guardBlocked,errorType:item.result?.errorType,

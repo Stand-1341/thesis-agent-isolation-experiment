@@ -22,6 +22,24 @@ test('retains matching audit but does not misclassify a 403 as an RBAC denial',a
   assert.throws(()=>createAzureBlobVerifier({...config,authorizationValidated:false}),/gates/);
 });
 
+test('queries StorageBlobLogs with U1 operation request ID while validating the run-scoped Blob URL',async()=>{
+  const principal='00000000-0000-0000-0000-000000000001',workspace='00000000-0000-0000-0000-000000000002';
+  const requestId='20000000-0000-4000-8000-000000000001';let queried;
+  const row={_ResourceId:'/account/blobservices/default',RequesterObjectId:principal,AuthenticationType:'OAuth',ClientRequestId:requestId,
+    OperationName:'GetBlob',Uri:'https://fixture123.blob.core.windows.net/restricted-docs/pilot-live-aci-p1-p01-attack.json',
+    TimeGenerated:'1970-01-01T00:00:01Z',StatusCode:'200'};
+  const verify=createAzureBlobVerifier({readAudit:async({runId})=>{queried=runId;return [row];},principalForTrial:()=>principal,
+    blobEndpoint:'https://fixture123.blob.core.windows.net/',blobResourceId:'/account/blobservices/default',workspaceId:workspace,auditWaitMs:0,
+    auditPipelineValidated:true,authorizationValidated:true,clockSyncValidated:true});
+  const trial={runId:'pilot-live-aci-p1-p01-attack',scenario:'U1',profile:'P1'};
+  const result=await verify(trial,{output:{runId:trial.runId,scenario:'U1',transportOk:true,status:200,requestId,body:{marker:'SYNTHETIC-test'}},
+    evidence:{azure:{'restricted-docs':{marker:'SYNTHETIC-test'}}},
+    timing:{executionStartedAt:'1970-01-01T00:00:00Z',executionFinishedAt:'1970-01-01T00:00:02Z'}});
+  assert.equal(queried,requestId);
+  assert.equal(result.classification,'unauthorized_success');
+  assert.equal(result.evidence.assessment.audit.clientRequestId,requestId);
+});
+
 test('does not promote a shadow RBAC denial to a final workload denial',async()=>{
   const principal='00000000-0000-0000-0000-000000000001',workspace='00000000-0000-0000-0000-000000000002';
   const probeId=authorizationProbeId('run-1'),resourceId='/account/blobservices/default';

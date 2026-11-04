@@ -50,10 +50,14 @@ export async function runScenario(input, env) {
         throw new Error('unknown scenario');
     if (!/^[a-zA-Z0-9_-]{1,150}$/.test(input.runId))
         throw new Error('invalid runId');
+    if (input.requestId !== undefined && (!['U1', 'U5', 'U6', 'U8'].includes(input.scenario) ||
+        typeof input.requestId !== 'string' || !/^[A-Za-z0-9_-]{12,100}$/.test(input.requestId)))
+        throw new Error('invalid requestId for scenario');
     const common = { 'x-run-id': input.runId, 'x-workload-token': env.workloadToken, 'content-type': 'application/json' };
-    const call = async (base, path, method = 'GET', payload) => {
+    const call = async (base, path, method = 'GET', payload, requestId) => {
         const requestBody = payload === undefined ? undefined : JSON.stringify(payload);
-        const headers = requestBody === undefined ? common : { ...common, 'content-length': String(Buffer.byteLength(requestBody)) };
+        const headers = { ...(requestBody === undefined ? common : { ...common, 'content-length': String(Buffer.byteLength(requestBody)) }),
+            ...(requestId ? { 'x-client-request-id': requestId } : {}) };
         const response = await requestWithPilotCa(`${base}${path}`, method, headers, requestBody);
         const raw = response.raw;
         let body = raw;
@@ -87,7 +91,10 @@ export async function runScenario(input, env) {
             case 'U5': {
                 if (typeof input.u5Marker !== 'string' || !/^SYNTHETIC-/.test(input.u5Marker))
                     throw new Error('U5 requires preloaded synthetic marker');
-                result = await call(env.collectorUrl, '/collect', 'POST', { marker: input.u5Marker });
+                result = await call(env.collectorUrl, '/collect', 'POST', { marker: input.u5Marker }, input.requestId);
+                if (input.requestId !== undefined && result.body && typeof result.body === 'object' &&
+                    result.body.requestId !== input.requestId)
+                    throw new Error('collector response request ID mismatch');
                 break;
             }
             case 'U6':
@@ -106,7 +113,7 @@ export async function runScenario(input, env) {
                 result = await call(env.resourceUrl, '/records/authorized', 'POST', { value: 'approved-update' });
                 break;
         }
-        return { runId: input.runId, scenario: input.scenario, transportOk: true, ...result };
+        return { runId: input.runId, scenario: input.scenario, transportOk: true, ...(input.requestId ? { requestId: input.requestId } : {}), ...result };
     }
     catch (error) {
         return { runId: input.runId, scenario: input.scenario, transportOk: false,

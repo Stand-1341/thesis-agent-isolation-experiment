@@ -98,14 +98,15 @@ export function createBlobWorkload({blobEndpoint,getToken,dummyApiUrl,dummyApiWo
   return async function runBlobScenario({runId,scenario,requestId}) {
     if(!/^[A-Za-z0-9_-]{1,150}$/.test(runId || '') || !Object.hasOwn(operations,scenario)) throw new Error('invalid Blob scenario');
     const sessionOperation=['U6','U8'].includes(scenario);
-    if(requestId!==undefined&&(!sessionOperation||typeof requestId!=='string'||! /^[A-Za-z0-9_-]{12,100}$/.test(requestId)))
+    const correlatedOperation=scenario==='U1'||sessionOperation;
+    if(requestId!==undefined&&(!correlatedOperation||typeof requestId!=='string'||! /^[A-Za-z0-9_-]{12,100}$/.test(requestId)))
       throw new Error('invalid Blob request ID');
-    if(sessionOperation&&requestId!==undefined&&(!storageResource||!GUID.test(expectedPrincipalId||'')||!GUID.test(expectedClientId||'')))
-      throw new Error('request-ID-aware session reads require the Blob resource and expected principal configuration');
+    if(correlatedOperation&&requestId!==undefined&&(!storageResource||!GUID.test(expectedPrincipalId||'')||!GUID.test(expectedClientId||'')))
+      throw new Error('request-ID-aware reads require the Blob resource and expected principal configuration');
     const op=operations[scenario];
     const token=await getToken();
     if(typeof token!=='string' || !token || /[\r\n]/.test(token)) throw new Error('workload token unavailable');
-    const tokenIdentity=sessionOperation&&requestId!==undefined?principalFromToken(token):undefined;
+    const tokenIdentity=correlatedOperation&&requestId!==undefined?principalFromToken(token):undefined;
     if(tokenIdentity&&(tokenIdentity.objectId!==expectedPrincipalId.toLowerCase()||tokenIdentity.clientId!==expectedClientId.toLowerCase()))
       throw new Error('Blob token principal does not match the attached workload identity');
     const exactRequestId=requestId??runId;
@@ -122,6 +123,15 @@ export function createBlobWorkload({blobEndpoint,getToken,dummyApiUrl,dummyApiWo
       const capturedAt=new Date().toISOString();
       let body=raw;
       try {body=JSON.parse(raw);} catch { /* Azure may return an empty or XML body. */ }
+      if(scenario==='U1'&&requestId!==undefined) {
+        const statusCode=response.status;
+        const markerFingerprint=statusCode===200?exactMarkerFingerprint(raw):undefined;
+        const markerValue=body&&typeof body==='object'?body.marker:undefined;
+        return {runId,scenario,transportOk:true,status:statusCode,statusCode,principalId:tokenIdentity.objectId,
+          resourceId:`${storageResource}/containers/${op.container}`,objectUri,requestId:exactRequestId,startedAt,
+          serviceRequestId:response.headers.get('x-ms-request-id'),...(markerFingerprint?{body:{marker:markerValue},markerFingerprint}:{}),
+          ...(statusCode===403?{errorCode:errorCode(response,raw)}:{})};
+      }
       if(sessionOperation&&requestId!==undefined) {
         const statusCode=response.status;
         return {runId,scenario,transportOk:true,status:statusCode,statusCode,principalId:tokenIdentity.objectId,resourceId,objectUri,

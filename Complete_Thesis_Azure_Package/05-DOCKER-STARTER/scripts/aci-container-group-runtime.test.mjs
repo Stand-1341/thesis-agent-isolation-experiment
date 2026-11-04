@@ -100,6 +100,44 @@ test('ACI adapter creates one group, health-checks, sends exactly one matching t
   assert.ok(events.some(event=>event.startsWith('delete:thesis-aci-p1-')));
 });
 
+test('ACI injection-pair session executes U1 then U5 in one P1 group with distinct operation correlation IDs',async()=>{
+  const events=[],reset={u5Marker:'SYNTHETIC-marker-01'};
+  let creates=0,deletes=0;
+  const fixtureAdapter={reset:async()=>reset,collect:async()=>({proof:'independent'})};
+  const groupClient={create:async name=>{creates++;return {name,privateIp:'10.48.13.19',provisioningState:'Succeeded'};},
+    delete:async name=>{deletes++;return {name,deleted:true,alreadyAbsent:false};}};
+  const adapter=createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTrial:async()=>({safe:true}),
+    controllerToken:config.trialRequestKey,readinessTimeoutMs:1000,pollIntervalMs:100,
+    fetchImpl:async(url,options)=>{
+      if(url.endsWith('/health')) return new Response(JSON.stringify({ready:true}),{status:200});
+      const body=JSON.parse(options.body);
+      events.push({body,correlation:options.headers['x-ms-client-request-id']});
+      return new Response(JSON.stringify({runId:body.runId,scenario:body.scenario,transportOk:true}),{status:200});
+    }});
+  const trial={runId:'pilot-live-pair-01',profile:'P1',scenario:'U1'};
+  const fixture=await adapter.reset(trial);
+  const pair=await adapter.beginInjectionPair(trial,fixture);
+  await assert.rejects(pair.executeOperation('U5'),/expected U1/);
+  const read=await pair.executeOperation('U1');
+  await assert.rejects(pair.executeOperation('U1'),/expected U5/);
+  const send=await pair.executeOperation('U5');
+  await assert.rejects(pair.executeOperation('U5'),/no more operations/);
+  assert.equal(read.scenario,'U1');
+  assert.equal(send.scenario,'U5');
+  assert.equal(send.u5Marker,undefined);
+  assert.equal(creates,1);
+  assert.equal(events.length,2);
+  assert.deepEqual(events.map(item=>item.body.scenario),['U1','U5']);
+  assert.ok(events.every(item=>/^[0-9a-f-]{36}$/i.test(item.correlation)));
+  assert.notEqual(events[0].correlation,events[1].correlation);
+  assert.deepEqual(events.map(item=>item.body.requestId),events.map(item=>item.correlation));
+  assert.deepEqual(pair.observations().map(item=>item.scenario),['U1','U5']);
+  pair.close();
+  await assert.rejects(pair.executeOperation('U1'),/closed/);
+  assert.equal((await adapter.cleanup(trial)).deleted,true);
+  assert.equal(deletes,1);
+});
+
 test('ACI adapter refuses public addresses and unconfirmed cleanup',async()=>{
   const fixtureAdapter={reset:async()=>({}),collect:async()=>({})};
   const groupClient={create:async name=>({name,privateIp:'8.8.8.8',provisioningState:'Succeeded'}),delete:async()=>({deleted:false})};

@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,appendFile,rm} from 'node:fs/promises';
+import {mkdtemp,appendFile,readFile,rm} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawn} from 'node:child_process';
@@ -41,9 +42,21 @@ test('collector serves the same event after a process restart',async()=>{
     await start();const base=`http://127.0.0.1:${port}`;
     assert.equal((await fetch(`${base}/admin/reset`,{method:'POST',headers:{'x-admin-token':'admin','content-type':'application/json'},body:JSON.stringify({runId:'run-1'})})).status,200);
     assert.equal((await fetch(`${base}/collect`,{method:'POST',headers:{'x-run-id':'run-1','content-type':'application/json'},body:JSON.stringify({marker:'SYNTHETIC-test'})})).status,200);
+    const marker='SYNTHETIC-private-marker',requestId='20000000-0000-4000-8000-000000000006';
+    assert.equal((await fetch(`${base}/admin/reset`,{method:'POST',headers:{'x-admin-token':'admin','content-type':'application/json'},body:JSON.stringify({runId:'run-2'})})).status,200);
+    const correlated=await fetch(`${base}/collect`,{method:'POST',headers:{'x-run-id':'run-2','x-client-request-id':requestId,'content-type':'application/json'},body:JSON.stringify({marker})});
+    assert.deepEqual(await correlated.json(),{received:true,requestId});
     await stop();await start();
     const response=await fetch(`${base}/admin/evidence?runId=run-1`,{headers:{'x-verifier-token':'verifier'}});
     const evidence=await response.json();assert.equal(response.status,200);assert.equal(evidence.events[0].marker,'SYNTHETIC-test');
+    const correlatedResponse=await fetch(`${base}/admin/evidence?runId=run-2`,{headers:{'x-verifier-token':'verifier'}});
+    const correlatedEvidence=await correlatedResponse.json();
+    const markerSha256=`sha256:${createHash('sha256').update(JSON.stringify({marker}),'utf8').digest('hex')}`;
+    assert.equal(correlatedEvidence.received.length,0);
+    assert.deepEqual(correlatedEvidence.receivedFingerprints,[markerSha256]);
+    assert.deepEqual(correlatedEvidence.events[0],{runId:'run-2',operation:'collect',at:correlatedEvidence.events[0].at,requestId,markerSha256});
+    assert.equal(JSON.stringify(correlatedEvidence).includes(marker),false);
+    assert.equal((await readFile(path,'utf8')).includes(marker),false);
     assert.equal((await fetch(`${base}/admin/reset`,{method:'POST',headers:{'x-admin-token':'admin','content-type':'application/json'},body:JSON.stringify({runId:'run-1'})})).status,409);
   } finally {await stop();await rm(directory,{recursive:true,force:true});}
 });

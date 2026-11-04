@@ -103,6 +103,10 @@ createServer(async (req,res) => {
     const scenario = checkedString(body.scenario,'scenario');
     const runId = checkedString(body.runId,'runId');
     if (!(SCENARIOS as readonly string[]).includes(scenario)) return send(res,400,{error:'unknown scenario'});
+    if(body.requestId!==undefined) {
+      if(!['U1','U5','U6','U8'].includes(scenario)) throw new Error('request IDs are only accepted for U1, U5, U6, and U8 operations');
+      body.requestId=checkedRequestId(body.requestId);
+    }
     if(['U6','U8'].includes(scenario)&&process.env.AZURE_PRINCIPAL_OBJECT_ID) {
       rejectCredentialFields(body);
       if(authMode==='managed'&&(!process.env.THESIS_BLOB_RESOURCE_ID||!process.env.AZURE_BLOB_ENDPOINT))
@@ -117,6 +121,7 @@ createServer(async (req,res) => {
       ...(typeof body.requestId==='string'?{requestId:body.requestId}:{})}));
     if(delegatedFactory && blobScenarios.has(scenario)) return send(res,200,await delegatedFactory(body)({runId,scenario,
       ...(typeof body.requestId==='string'?{requestId:body.requestId}:{})}));
-    return send(res,200,await runScenario({runId,scenario:scenario as Scenario,u5Marker},{workloadToken,resourceUrl,collectorUrl}));
+    return send(res,200,await runScenario({runId,scenario:scenario as Scenario,u5Marker,
+      ...(typeof body.requestId==='string'?{requestId:body.requestId}:{})},{workloadToken,resourceUrl,collectorUrl}));
   } catch (error) { return send(res,400,{error:error instanceof Error?error.message:String(error)}); }
 }).listen(port,'0.0.0.0',()=>console.log(`agent listening on ${port}`));

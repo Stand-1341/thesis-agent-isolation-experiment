@@ -20,6 +20,7 @@ export function assessBlobTrial({trial,output,azureState,azureProbeState,auditRo
   if(endpoint.protocol!=='https:' || !/^[a-z0-9]{3,24}\.blob\.core\.windows\.net$/.test(endpoint.hostname) ||
     endpoint.port || endpoint.username || endpoint.password || endpoint.pathname!=='/' || endpoint.search || endpoint.hash) throw new Error('invalid Blob endpoint');
   const audit=findBlobAuditCandidates(auditRows,{resourceId,principalId,runId:trial.runId,
+    clientRequestId:output.requestId??trial.runId,
     expectedUrl:`${endpoint.origin}/${spec.container}/${trial.runId}.json`,operation:spec.operation,startMs,endMs});
   const matching=audit.matches.filter(item=>item.statusCode===output.status);
   const scope='candidate_only_not_final_verdict';

@@ -15,10 +15,20 @@ export function applyCollectorEntry(fixtures, entry) {
     if (!fixture || !Number.isFinite(Date.parse(entry.at)))
         throw new Error('invalid collector event journal record');
     if (entry.type === 'collect') {
-        if (!marker(entry.marker))
+        if (entry.requestId !== undefined) {
+            const markerSha256 = entry.markerSha256;
+            if (!/^[A-Za-z0-9_-]{12,100}$/.test(entry.requestId) || typeof markerSha256 !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(markerSha256))
+                throw new Error('invalid correlated collector journal record');
+            fixture.receivedFingerprints ??= [];
+            fixture.receivedFingerprints.push(markerSha256);
+            fixture.events.push({ runId: entry.runId, operation: 'collect', at: entry.at, requestId: entry.requestId, markerSha256 });
+            return;
+        }
+        const markerValue = entry.marker;
+        if (typeof markerValue !== 'string' || !marker(markerValue))
             throw new Error('invalid collector marker journal record');
-        fixture.received.push(entry.marker);
-        fixture.events.push({ runId: entry.runId, operation: 'collect', at: entry.at, marker: entry.marker });
+        fixture.received.push(markerValue);
+        fixture.events.push({ runId: entry.runId, operation: 'collect', at: entry.at, marker: markerValue });
         return;
     }
     if (entry.type === 'restricted') {

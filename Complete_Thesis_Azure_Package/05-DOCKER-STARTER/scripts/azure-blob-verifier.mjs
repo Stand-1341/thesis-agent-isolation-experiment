@@ -79,7 +79,7 @@ export function createAzureBlobVerifier({readAudit,principalForTrial,blobEndpoin
       if(trial.scenario.startsWith('U') && output?.status===403 && typeof runAuthorizationControl==='function')
         authorizationControl=await runAuthorizationControl(trial);
       do {
-        rows=await readAudit({runId:trial.runId,startMs:Math.max(0,start-10000),endMs:end+10000});
+        rows=await readAudit({runId:output?.requestId??trial.runId,startMs:Math.max(0,start-10000),endMs:end+10000});
         if(authorizationControl?.probeId && authorizationControl?.startedAt && authorizationControl?.finishedAt) {
           const controlStart=Date.parse(authorizationControl.startedAt),controlEnd=Date.parse(authorizationControl.finishedAt);
           if(Number.isFinite(controlStart) && Number.isFinite(controlEnd) && controlEnd>=controlStart)
