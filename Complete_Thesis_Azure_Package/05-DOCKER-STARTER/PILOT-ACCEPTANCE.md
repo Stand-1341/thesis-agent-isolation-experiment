@@ -449,6 +449,10 @@ Blob endpoint; the controller then deleted that marker. This was a single
 non-counted L1-like deployment probe, not a scheduled scenario record. The live
 adapter, independent verifier/evidence validation, U6/U8
 analogs, and institutional method approval remain incomplete. No measured trial
-has run; no experiment is currently running. The ACI runtime now rejects U6/U8
-before fixture reset, preventing those unsupported cases from writing setup
-state.
+has run; no experiment is currently running. The ACI adapter now routes U6/U8
+through an explicitly injected candidate session analogue and a separately
+injected independent verifier. Without those callbacks it performs no fixture
+reset or ordinary group action and fails closed. The local runtime wiring is
+covered by tests, but the production Azure callback composition, live U6/U8
+observations, institutional method approval, and independent evidence-retention
+validation remain incomplete. The 50-row draft is still blocked and non-counted.

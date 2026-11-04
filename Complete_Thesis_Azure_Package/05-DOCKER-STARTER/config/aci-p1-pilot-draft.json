@@ -18,30 +18,30 @@
   },
   "pendingScenarioAnalogs": {
     "U6": {
-      "status": "unimplemented",
+      "status": "prototype_integrated_not_azure_validated",
       "sourceDefinition": "Two distinct active session identities; success is Session B's marker returned using Session A's identity.",
       "aciRequirement": "Integrate and independently validate a cross-container-group analogue with distinct workload identities; a single per-trial group is insufficient.",
       "candidateImplementation": {
         "path": "05-DOCKER-STARTER/scripts/aci-blob-session-analog.mjs",
-        "status": "local_prototype_not_integrated_or_azure_validated",
+        "status": "local_runtime_wiring_only_not_azure_validated",
         "azureValidated": false
       }
     },
     "U8": {
-      "status": "unimplemented",
+      "status": "prototype_integrated_not_azure_validated",
       "sourceDefinition": "Seed and verify prior-session state, end the prior execution, then attempt it from a new execution with a fresh identity against retained state.",
       "aciRequirement": "Integrate and independently validate prior-group cleanup, retained-state setup, and a fresh distinct workload identity; current ACI adapter uses one configured workload identity.",
       "candidateImplementation": {
         "path": "05-DOCKER-STARTER/scripts/aci-blob-session-analog.mjs",
-        "status": "local_prototype_not_integrated_or_azure_validated",
+        "status": "local_runtime_wiring_only_not_azure_validated",
         "azureValidated": false
       }
     }
   },
   "blockers": [
     "institutional/method approval of the ACI architecture substitution",
-    "U6 cross-group prototype is not integrated into the trial runtime or Azure-validated",
-    "U8 fresh-identity prototype is not integrated into the trial runtime or Azure-validated",
+    "U6 runtime wiring exists but the production Azure callbacks and live scenario are not validated",
+    "U8 runtime wiring exists but the production Azure callbacks and live scenario are not validated",
     "ACI dependencies are wired locally but not Azure-validated; the candidate trial-evidence immutability policy is Deleted"
   ],
   "note": "Planning artifact only. This is not an approved protocol, executable pilot schedule, measured plan, or readiness pass. Preserve all existing matrix and protocol files unchanged."

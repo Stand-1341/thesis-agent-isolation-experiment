@@ -108,12 +108,30 @@ export function createAciContainerGroupClient({subscriptionId,resourceGroup,getM
 }
 
 export function createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTrial,controllerToken,fetchImpl=fetch,timeoutMs=30000,
-  readinessTimeoutMs=180000,pollIntervalMs=2000}) {
+  readinessTimeoutMs=180000,pollIntervalMs=2000,sessionAnalog}) {
   if(!fixtureAdapter || typeof fixtureAdapter.reset!=='function' || typeof fixtureAdapter.collect!=='function' ||
     !groupClient || typeof groupClient.create!=='function' || typeof groupClient.delete!=='function' || typeof groupBodyForTrial!=='function' ||
     typeof controllerToken!=='string' || controllerToken.length<16 || typeof fetchImpl!=='function') throw new Error('invalid ACI trial adapter configuration');
   if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>60000 || !Number.isInteger(readinessTimeoutMs)||readinessTimeoutMs<1000 || readinessTimeoutMs>300000 || !Number.isInteger(pollIntervalMs)||pollIntervalMs<100 || pollIntervalMs>10000) throw new Error('invalid ACI adapter timing');
+  if(sessionAnalog!==undefined && typeof sessionAnalog!=='function') throw new Error('invalid ACI session analogue dependency');
   const groups=new Map(),claimed=new Set();
+  const ANALOG_SCENARIOS=new Set(['U6','U8']);
+  const isAnalogTrial=trial=>ANALOG_SCENARIOS.has(trial?.scenario);
+  function sanitizeAnalogEvidence(value,depth=0) {
+    if(depth>10) return '[depth-limited]';
+    if(value===null || typeof value==='boolean' || typeof value==='number') return value;
+    if(typeof value==='string') return value.slice(0,2048);
+    if(Array.isArray(value)) return value.slice(0,500).map(item=>sanitizeAnalogEvidence(item,depth+1));
+    if(typeof value==='object') {
+      const safe={};
+      for(const [key,item] of Object.entries(value)) {
+        if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(key) || /(token|secret|password|credential|authorization|securevalue|sas)/i.test(key)) continue;
+        safe[key]=sanitizeAnalogEvidence(item,depth+1);
+      }
+      return safe;
+    }
+    return undefined;
+  }
   async function call(url,options) {
     let response;
     try {response=await fetchImpl(url,{...options,redirect:'error',signal:AbortSignal.timeout(timeoutMs)});} catch {throw new Error('ACI private agent request failed');}
@@ -127,26 +145,32 @@ export function createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTr
     // create request whose response was ambiguous without retrying the trial.
     cleanupOnFailure:true,
     async reset(trial) {
-      // Refuse unsupported cross-group scenarios before fixture reset writes
-      // any cloud state. The execute guard below is retained as defense in
-      // depth for direct adapter callers that skip reset.
-      if(trial?.scenario==='U6' || trial?.scenario==='U8')
-        throw new Error(`ACI ${trial.scenario} cross-group lifecycle analogue is not implemented`);
+      // U6/U8 fixture setup belongs wholly to the explicitly injected analog.
+      // In its absence this is an inert sentinel: no legacy fixture or Azure
+      // resource operation is attempted, and execute will fail closed.
+      if(isAnalogTrial(trial)) return {scope:'aci_session_analog',runId:trial.runId,scenario:trial.scenario};
       return fixtureAdapter.reset(trial);
     },
     async execute(trial,fixture) {
       if(!/^[A-Za-z0-9_-]{1,150}$/.test(trial?.runId||'') || !['P1','P2'].includes(trial.profile) || !/^(U[1-8]|L[12])$/.test(trial.scenario||'')) throw new Error('invalid ACI trial');
-      // The base ACI adapter has no validated cross-group isolation analogue.
-      // U6 requires two simultaneously active, distinct workload identities;
-      // U8 requires an independently verified stale-state transition between
-      // two identities. The Blob-backed legacy fixture does not prove either
-      // property for disposable ACI groups, so refuse these scenarios before
-      // allocating a billable container group until a dedicated lifecycle
-      // adapter is wired into the run path.
-      if(trial.scenario==='U6' || trial.scenario==='U8')
-        throw new Error(`ACI ${trial.scenario} cross-group lifecycle analogue is not implemented`);
       if(claimed.has(trial.runId)) throw new Error('ACI run ID already claimed');
       claimed.add(trial.runId);
+      if(isAnalogTrial(trial)) {
+        if(!sessionAnalog) throw new Error(`ACI ${trial.scenario} session analogue is not configured`);
+        let analogResult;
+        try {analogResult=await sessionAnalog(trial);}
+        catch(error) {
+          // trial-runner persists this separately as partialEvidence. Preserve
+          // the candidate analogue's already-sanitized progress on failure.
+          if(error && typeof error==='object' && error.partialEvidence!==undefined)
+            error.partialEvidence=sanitizeAnalogEvidence(error.partialEvidence);
+          throw error;
+        }
+        if(!analogResult || typeof analogResult!=='object' || !analogResult.evidence ||
+          analogResult.evidence.runId!==trial.runId || analogResult.evidence.scenario!==trial.scenario)
+          throw new Error('ACI session analogue result did not match the claimed row');
+        return {runId:trial.runId,scenario:trial.scenario,aciSessionAnalog:analogResult};
+      }
       const name=aciGroupName(trial.runId,trial.profile);
       let group;
       try {group=await groupClient.create(name,await groupBodyForTrial(trial,fixture));}
@@ -172,8 +196,20 @@ export function createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTr
       if(output?.runId!==trial.runId || output?.scenario!==trial.scenario) throw new Error('ACI workload response did not match the claimed row');
       return {...output,aciContainerGroup:name,aciPrivateIp:group.privateIp};
     },
-    collect:(trial,fixture,output,timing)=>fixtureAdapter.collect(trial,fixture,output,timing),
+    collect:(trial,fixture,output,timing)=>{
+      if(isAnalogTrial(trial)) {
+        const result=output?.aciSessionAnalog;
+        if(!result || result.evidence?.runId!==trial.runId || result.evidence?.scenario!==trial.scenario)
+          throw new Error('ACI session analogue evidence is missing or mismatched');
+        return {aciSessionAnalog:{classification:result.classification,evidence:sanitizeAnalogEvidence(result.evidence)}};
+      }
+      return fixtureAdapter.collect(trial,fixture,output,timing);
+    },
     async cleanup(trial) {
+      // The candidate analogue owns its auxiliary groups, identities and
+      // marker cleanup. Never infer or delete the ordinary deterministic
+      // workload group for U6/U8; those rows do not create one here.
+      if(isAnalogTrial(trial)) return {scope:'aci_session_analog',cleanupDelegated:true,normalGroupSkipped:true};
       const group=groups.get(trial.runId)??{name:aciGroupName(trial.runId,trial.profile)};
       const result=await groupClient.delete(group.name);
       if(result?.deleted!==true) throw new Error('ACI container group deletion not confirmed');

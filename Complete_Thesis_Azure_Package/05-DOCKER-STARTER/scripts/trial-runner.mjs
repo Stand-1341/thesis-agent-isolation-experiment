@@ -108,7 +108,8 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
       try {await store.save({runId:trial.runId, trial, startedAt,
         executionStartedAt,executionFinishedAt,executionElapsedMs,finishedAt:new Date().toISOString(), classification:'indeterminate', failedStage:stage,
         errorType:safeErrorType(error), reset, output, ...(partialReset?{partialResetEvidence:partialReset}:{}), ...(azureFixtureProgress?{azureFixtureProgress}:{}),
-        ...(error?.partial===undefined?{}:{partialModelEvidence:error.partial}), evidence, verificationEvidence, arm, mode});}
+        ...(error?.partial===undefined?{}:{partialModelEvidence:error.partial}),
+        ...(error?.partialEvidence===undefined?{}:{partialEvidence:error.partialEvidence}), evidence, verificationEvidence, arm, mode});}
       catch {failureRecordSaveError=true;}
     }
     // ACI groups are billable resources created during execute(). Even a failed

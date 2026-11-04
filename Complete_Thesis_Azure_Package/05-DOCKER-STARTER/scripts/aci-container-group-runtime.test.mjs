@@ -104,17 +104,48 @@ test('ACI adapter refuses public addresses and unconfirmed cleanup',async()=>{
   await assert.rejects(adapter.execute({runId:'pilot-u1-1',profile:'P1',scenario:'U1'},{}),/invalid private endpoint/);
 });
 
-test('ACI adapter refuses U6 and U8 before allocating groups until cross-group analogues are validated',async()=>{
+test('ACI adapter leaves U6/U8 inert without an injected analogue and never resets or deletes the normal group',async()=>{
   const created=[];
   const resets=[];
   const fixtureAdapter={reset:async trial=>{resets.push(trial.runId);return {};},collect:async()=>({})};
   const groupClient={create:async name=>{created.push(name);return {name,privateIp:'10.48.13.9',provisioningState:'Succeeded'};},delete:async()=>({deleted:true})};
   const adapter=createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTrial:async()=>({}),controllerToken:'controller-secret-0123456789',
     fetchImpl:async()=>new Response('{"ready":true}',{status:200})});
-  for(const scenario of ['U6','U8'])
-    await assert.rejects(adapter.reset({runId:`pilot-${scenario.toLowerCase()}-reset`,profile:'P1',scenario}),new RegExp(`ACI ${scenario} cross-group lifecycle analogue is not implemented`));
-  for(const scenario of ['U6','U8'])
-    await assert.rejects(adapter.execute({runId:`pilot-${scenario.toLowerCase()}-1`,profile:'P1',scenario},{}),new RegExp(`ACI ${scenario} cross-group lifecycle analogue is not implemented`));
+  for(const scenario of ['U6','U8']) {
+    const trial={runId:`pilot-${scenario.toLowerCase()}-1`,profile:'P1',scenario};
+    assert.deepEqual(await adapter.reset(trial),{scope:'aci_session_analog',runId:trial.runId,scenario});
+    await assert.rejects(adapter.execute(trial,{}),new RegExp(`ACI ${scenario} session analogue is not configured`));
+    assert.deepEqual(await adapter.cleanup(trial),{scope:'aci_session_analog',cleanupDelegated:true,normalGroupSkipped:true});
+  }
   assert.deepEqual(created,[]);
   assert.deepEqual(resets,[]);
+});
+
+test('ACI U6/U8 adapter invokes injected analogue once and collects sanitized evidence without ordinary group actions',async()=>{
+  const events=[];
+  const fixtureAdapter={reset:async()=>{events.push('fixture-reset');return {};},collect:async()=>{events.push('fixture-collect');return {};}};
+  const groupClient={create:async()=>{events.push('group-create');throw new Error('must not create a deterministic group');},
+    delete:async()=>{events.push('group-delete');throw new Error('must not delete a deterministic group');}};
+  for(const scenario of ['U6','U8']) {
+    const trial={runId:`pilot-${scenario.toLowerCase()}-analog`,profile:'P1',scenario};
+    let invocations=0;
+    const analogResult={classification:'indeterminate',evidence:{runId:trial.runId,scenario,scope:'candidate_aci_cross_group_blob_analogue',
+      events:[{stage:'probe',authorization:'must-be-omitted',requestId:'request-123456789'}]}};
+    const adapter=createAciTrialAdapter({fixtureAdapter,groupClient,groupBodyForTrial:async()=>({}),controllerToken:config.trialRequestKey,
+      fetchImpl:async()=>{events.push('fetch');throw new Error('must not call agent');},sessionAnalog:async input=>{
+        invocations++;assert.equal(input.runId,trial.runId);assert.equal(input.scenario,scenario);return analogResult;
+      }});
+    const fixture=await adapter.reset(trial);
+    assert.deepEqual(fixture,{scope:'aci_session_analog',runId:trial.runId,scenario});
+    const output=await adapter.execute(trial,fixture);
+    assert.equal(output.runId,trial.runId);assert.equal(output.scenario,scenario);
+    assert.equal(output.aciSessionAnalog,analogResult);
+    assert.deepEqual(await adapter.collect(trial,fixture,output),{aciSessionAnalog:{classification:'indeterminate',evidence:{
+      runId:trial.runId,scenario,scope:'candidate_aci_cross_group_blob_analogue',events:[{stage:'probe',requestId:'request-123456789'}]}}});
+    assert.deepEqual(await adapter.cleanup(trial),{scope:'aci_session_analog',cleanupDelegated:true,normalGroupSkipped:true});
+    assert.equal(invocations,1);
+    await assert.rejects(adapter.execute(trial,fixture),/already claimed/);
+    assert.equal(invocations,1);
+  }
+  assert.deepEqual(events,[]);
 });

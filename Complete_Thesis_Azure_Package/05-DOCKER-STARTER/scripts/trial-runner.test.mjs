@@ -180,3 +180,16 @@ test('ACI opt-in cleanup runs and is recorded after an execution failure',async(
     assert.equal((await readEvidence(join(dir,`${cleanupId}.json`))).status,'completed');
   } finally {await rm(dir,{recursive:true,force:true});}
 });
+
+test('persists ACI session analogue partial evidence when its delegated execution fails',async()=>{
+  const records=[];
+  const evidenceStore={claim:async()=>{},save:async record=>records.push(record)};
+  const partialEvidence={scope:'candidate_aci_cross_group_blob_analogue',scenario:'U6',runId:'pilot-aci-u6-failed',events:[{stage:'marker_seeded'}]};
+  const adapter={cleanupOnFailure:true,reset:async trial=>({scope:'aci_session_analog',runId:trial.runId,scenario:trial.scenario}),
+    execute:async()=>{throw Object.assign(new Error('ACI session analogue is indeterminate'),{partialEvidence});},collect:async()=>({}),
+    cleanup:async()=>({scope:'aci_session_analog',cleanupDelegated:true,normalGroupSkipped:true})};
+  await assert.rejects(runTrial({trial:{runId:'pilot-aci-u6-failed',scenario:'U6'},gates:{},adapter,
+    verifier:async()=> 'indeterminate',evidenceStore,mode:'non_counted_pilot'}),/ACI session analogue is indeterminate/);
+  assert.deepEqual(records[0].partialEvidence,partialEvidence);
+  assert.deepEqual(records[1].outcome,{scope:'aci_session_analog',cleanupDelegated:true,normalGroupSkipped:true});
+});

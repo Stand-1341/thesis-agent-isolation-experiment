@@ -64,7 +64,7 @@ function parseDraftCsv(bytes) {
 
 /**
  * Validate integrity and full one-cell shape. This draft is deliberately never
- * runnable: U6/U8 integration/validation and method approval are hard blockers.
+ * runnable: U6/U8 live Azure validation and method approval are hard blockers.
  */
 export function validateAciP1DraftSchedule({bytes, protocol}) {
   const draft=protocol?.status==='draft_not_approved' && protocol?.runPermitted===false;
@@ -75,8 +75,9 @@ export function validateAciP1DraftSchedule({bytes, protocol}) {
   if (protocol.deployment !== 'azure_container_instances' || protocol.profile !== 'P1' ||
       protocol.trials !== 50 || protocol.blocks !== 5 || protocol.scenariosPerBlock !== 10)
     throw new Error('ACI draft protocol must describe one P1 cell with 50 rows in five blocks');
-  if (draft && (protocol.pendingScenarioAnalogs?.U6?.status !== 'unimplemented' || protocol.pendingScenarioAnalogs?.U8?.status !== 'unimplemented'))
-    throw new Error('ACI draft U6/U8 analogs must remain explicitly pending');
+  const pending=['unimplemented','prototype_integrated_not_azure_validated'];
+  if (draft && (!pending.includes(protocol.pendingScenarioAnalogs?.U6?.status) || !pending.includes(protocol.pendingScenarioAnalogs?.U8?.status)))
+    throw new Error('ACI draft U6/U8 analogs must remain explicitly unvalidated');
   if (approved && (!protocol.pendingScenarioAnalogs.U6.evidenceReference || !protocol.pendingScenarioAnalogs.U8.evidenceReference))
     throw new Error('ACI approved U6/U8 analogs require evidence references');
   const actualHash = sha256(bytes);
@@ -112,7 +113,7 @@ export function validateAciP1DraftSchedule({bytes, protocol}) {
     if (cells.some((cell,index)=>cell.order!==index+1)) throw new Error(`ACI draft block ${block} order must be contiguous`);
   }
   return {
-    status: approved ? 'approved_non_counted_pilot' : 'draft_blocked_pending_method_approval_u6_u8_integration_and_validation',
+    status: approved ? 'approved_non_counted_pilot' : 'draft_blocked_pending_method_approval_and_u6_u8_azure_validation',
     runnable: approved,
     countedAsStudyTrials: false,
     rows: 50,

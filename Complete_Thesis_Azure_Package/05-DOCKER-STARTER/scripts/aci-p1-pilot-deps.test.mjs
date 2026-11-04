@@ -30,10 +30,20 @@ const env={
 };
 const row=scenario=>({deployment:'azure_container_instances',permission_profile:'P1',scenario_id:scenario});
 
-test('dependency schedule validation rejects ACI U6 and U8 before reading configuration',async()=>{
-  for(const scenario of ['U6','U8']) await assert.rejects(createDeps({rows:[row(scenario)],env:{}}),new RegExp(`unsupported lifecycle scenarios: ${scenario}`));
-  assert.throws(()=>validateAciP1DependencyRows([row('U6')]),/U6/);
-  assert.throws(()=>validateAciP1DependencyRows([row('U8')]),/U8/);
+const methodDecision={status:'approved',reference:'https://institution.example.test/method/aci-amendment',
+  unauthorizedOperations:{U6:'read_other_active_group_blob_marker',U8:'read_retired_group_blob_marker'}};
+const sessionAnalog=async()=>({classification:'indeterminate',evidence:{}});
+const sessionAnalogVerifier=async()=>({classification:'indeterminate',evidence:{}});
+let verifiedDecision;
+const approval=async decision=>{verifiedDecision=decision;return true;};
+
+test('dependency schedule validation rejects ACI U6 and U8 without separately injected callbacks',async()=>{
+  for(const scenario of ['U6','U8']) await assert.rejects(createDeps({rows:[row(scenario)],env:{}}),/separate sessionAnalog and independent sessionAnalogVerifier callbacks/);
+  assert.throws(()=>validateAciP1DependencyRows([row('U6')]),/separate sessionAnalog/);
+  assert.throws(()=>validateAciP1DependencyRows([row('U8')]),/separate sessionAnalog/);
+  assert.throws(()=>validateAciP1DependencyRows([row('U6')],{sessionAnalog,sessionAnalogVerifier}),/method-decision/);
+  assert.throws(()=>validateAciP1DependencyRows([row('U6')],{sessionAnalog,sessionAnalogVerifier,methodDecision}),/verifier callback/);
+  assert.equal(validateAciP1DependencyRows([row('U6'),row('U8')],{sessionAnalog,sessionAnalogVerifier,methodDecision,verifyMethodApproval:approval}),true);
 });
 
 test('checked-in 50-row draft still blocks dependency creation because U6 and U8 are present',async()=>{
@@ -44,7 +54,7 @@ test('checked-in 50-row draft still blocks dependency creation because U6 and U8
   assert.equal(schedule.rows,50);
   const text=bytes.toString('utf8');
   assert.match(text,/U6/);assert.match(text,/U8/);
-  await assert.rejects(createDeps({rows:[row('U1'),row('U6'),row('U8')],env:{}}),/unsupported lifecycle scenarios: U6, U8/);
+  await assert.rejects(createDeps({rows:[row('U1'),row('U6'),row('U8')],env:{}}),/separate sessionAnalog and independent sessionAnalogVerifier callbacks/);
 });
 
 test('dependency schedule validation is limited to ACI P1 and known scenario adapters',()=>{
@@ -63,7 +73,15 @@ test('configuration validation identifies required inputs and rejects shared pri
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_RETENTION_APPROVED:'false'}),/retention is not asserted/);
 });
 
-test('wires separated identity providers, Key Vault secrets, adapters, verifier, and protected evidence store',async()=>{
+test('approved method-decision metadata alone never enables U6/U8 dependencies',async()=>{
+  let identitiesCreated=0;
+  await assert.rejects(createDeps({rows:[row('U6')],env,components:{sessionAnalog,sessionAnalogVerifier,methodDecision,
+    verifyMethodApproval:async()=>false,identity:()=>{identitiesCreated++;return {getToken:async()=>({token:'unused'})};}}}),
+  /method decision was not independently verified/);
+  assert.equal(identitiesCreated,0);
+});
+
+test('wires separated identity providers, Key Vault secrets, adapter, independent verifiers, and protected evidence store',async()=>{
   const identityIds=[],secretReads=[],storageIds=[],logIds=[]; let captured;
   const mockCredential=clientId=>{identityIds.push(clientId);return {getToken:async()=>({token:'mock-token'})};};
   const components={
@@ -83,9 +101,10 @@ test('wires separated identity providers, Key Vault secrets, adapters, verifier,
     collectorReader:args=>Object.assign(async()=>({}),{config:args}),
     resourceReader:args=>Object.assign(async()=>({}),{config:args}),
     verifierRouter:args=>Object.assign(async()=>({classification:'indeterminate'}),{config:args}),
+    sessionAnalog,sessionAnalogVerifier,methodDecision,verifyMethodApproval:approval,
     evidenceStore:async args=>{captured={...(captured??{}),evidenceArgs:args};return {claim:async()=>{},save:async()=>{}};}
   };
-  const deps=await createDeps({rows:[row('U1'),row('U4'),row('U5'),row('U7'),row('L1')],env,components});
+  const deps=await createDeps({rows:[row('U1'),row('U4'),row('U5'),row('U6'),row('U7'),row('L1')],env,components});
   assert.equal(typeof deps.adapter,'object');assert.equal(typeof deps.verifier,'function');
   assert.equal(typeof deps.evidenceStore.claim,'function');assert.equal(typeof deps.evidenceStore.save,'function');
   assert.deepEqual(identityIds,[env.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID,
@@ -95,8 +114,14 @@ test('wires separated identity providers, Key Vault secrets, adapters, verifier,
   assert.deepEqual(secretReads,['resource-admin','collector-admin','controller-key','workload-token','collector-verifier','resource-verifier']);
   assert.equal(deps.adapter.config.controllerToken,'secret-value-controller-key');
   assert.equal(deps.adapter.config.groupBodyForTrial instanceof Function,true);
+  assert.equal(deps.adapter.config.sessionAnalog,sessionAnalog);
   assert.equal(deps.adapter.config.groupClient.config.resourceGroup,'rg-pilot');
   assert.equal(deps.verifier.config.blobVerifier.config.pilotMode,true);
+  assert.equal(deps.verifier.config.sessionAnalogVerifier,sessionAnalogVerifier);
+  assert.notEqual(deps.verifier.config.sessionAnalogVerifier,deps.adapter.config.sessionAnalog);
+  assert.equal(verifiedDecision,methodDecision);
+  assert.equal(Object.hasOwn(deps,'readiness'),false);
+  assert.equal(Object.hasOwn(deps,'gates'),false);
   assert.equal(captured.evidenceArgs.env.THESIS_TOKEN_PROVIDER_MODE,'managed_identity');
   assert.equal(captured.evidenceArgs.env.THESIS_EVIDENCE_RETENTION_APPROVED,'true');
 });

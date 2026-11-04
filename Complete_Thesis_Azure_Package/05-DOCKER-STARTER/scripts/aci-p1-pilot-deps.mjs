@@ -24,7 +24,7 @@ import {createMeasuredEvidenceStoreFromEnvironment} from './azure-measured-evide
 
 const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ARM_ID=/^\/subscriptions\/[0-9a-f-]{36}\/resourceGroups\/[A-Za-z0-9._()-]+\/providers\/Microsoft\.(?:ManagedIdentity\/userAssignedIdentities|Network\/virtualNetworks)\//i;
-const ACCEPTED=new Set(['U1','U2','U3','U4','U5','U7','L1','L2']);
+const ACCEPTED=new Set(['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2']);
 const REQUIRED=[
   'THESIS_ACI_SUBSCRIPTION_ID','THESIS_ACI_RESOURCE_GROUP','THESIS_ACI_LOCATION',
   'THESIS_ACI_IMAGE_DIGEST_REFERENCE','THESIS_ACI_REGISTRY_SERVER',
@@ -62,10 +62,20 @@ function safeUrl(value,name,{blob=false}={}) {
     throw new Error(`${name} must be an Azure Blob service endpoint`);
   return url.href.replace(/\/$/,'');
 }
-function validateRows(rows) {
+function validateRows(rows,{sessionAnalog,sessionAnalogVerifier,methodDecision,verifyMethodApproval}={}) {
   if(!Array.isArray(rows)||rows.length===0) throw new Error('ACI pilot rows are required for dependency validation');
   const unsupported=[...new Set(rows.map(row=>row?.scenario_id??row?.scenario).filter(s=>s==='U6'||s==='U8'))];
-  if(unsupported.length) throw new Error(`ACI dependency wiring refuses unsupported lifecycle scenarios: ${unsupported.join(', ')}`);
+  if(unsupported.length) {
+    if(typeof sessionAnalog!=='function'||typeof sessionAnalogVerifier!=='function'||sessionAnalog===sessionAnalogVerifier)
+      throw new Error(`ACI U6/U8 rows require separate sessionAnalog and independent sessionAnalogVerifier callbacks: ${unsupported.join(', ')}`);
+    if(methodDecision?.status!=='approved'||typeof methodDecision.reference!=='string'||
+      !/^(https:\/\/|urn:|file:)[^\r\n]{1,290}$/i.test(methodDecision.reference)||
+      methodDecision.unauthorizedOperations?.U6!=='read_other_active_group_blob_marker'||
+      methodDecision.unauthorizedOperations?.U8!=='read_retired_group_blob_marker')
+      throw new Error('ACI U6/U8 rows require an explicit approved method-decision record with both prohibited-operation definitions');
+    if(typeof verifyMethodApproval!=='function')
+      throw new Error('ACI U6/U8 rows require an independent method-decision verifier callback');
+  }
   for(const [index,row] of rows.entries()) {
     const scenario=row?.scenario_id??row?.scenario,profile=row?.permission_profile??row?.profile;
     if(row?.deployment!=='azure_container_instances'||profile!=='P1'||!ACCEPTED.has(scenario))
@@ -73,6 +83,7 @@ function validateRows(rows) {
   }
   return true;
 }
+
 function makeIdentity(clientId,Credential=ManagedIdentityCredential) {
   if(!GUID.test(clientId||'')) throw new Error('invalid managed identity client ID');
   const credential=new Credential({clientId});
@@ -154,7 +165,7 @@ async function readVaultSecret({vaultUri,name,getToken,fetchImpl}) {
  * use Azure SDK managed identities and existing fail-closed Azure adapters.
  */
 export default async function createAciP1PilotDependencies({rows,env=process.env,fetchImpl=fetch,components={}}={}) {
-  validateRows(rows);
+  validateRows(rows,components);
   const c={
     identity:makeIdentity,
     storageProvider:createManagedStorageTokenProvider,
@@ -175,7 +186,13 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
     readSecret:readVaultSecret,
     ...components
   };
+  const hasLifecycle=rows.some(row=>['U6','U8'].includes(row?.scenario_id??row?.scenario));
   const cfg=validateConfig(env);
+  if(hasLifecycle) {
+    let approval=false;
+    try {approval=await c.verifyMethodApproval(c.methodDecision);} catch {approval=false;}
+    if(approval!==true) throw new Error('ACI U6/U8 method decision was not independently verified');
+  }
   const controllerIdentity=c.identity(cfg.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID);
   const fixtureReaderIdentity=c.identity(cfg.THESIS_ACI_FIXTURE_VERIFIER_IDENTITY_CLIENT_ID);
   const auditIdentity=c.identity(cfg.THESIS_ACI_AUDIT_IDENTITY_CLIENT_ID);
@@ -197,12 +214,14 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
   const groupClient=c.groupClient({subscriptionId:cfg.THESIS_ACI_SUBSCRIPTION_ID,resourceGroup:cfg.THESIS_ACI_RESOURCE_GROUP,
     getManagementToken,fetchImpl});
   const aciAdapter=c.trialAdapter({fixtureAdapter,groupClient,controllerToken:controllerKey,fetchImpl,
+    ...(hasLifecycle?{sessionAnalog:c.sessionAnalog}:{}),
     groupBodyForTrial:async()=>c.groupBody({location:cfg.THESIS_ACI_LOCATION,
       imageDigestReference:cfg.THESIS_ACI_IMAGE_DIGEST_REFERENCE,registryServer:cfg.THESIS_ACI_REGISTRY_SERVER,
       pullIdentityId:cfg.THESIS_ACI_PULL_IDENTITY_RESOURCE_ID,workloadIdentityId:cfg.THESIS_ACI_P1_IDENTITY_RESOURCE_ID,
       workloadIdentityClientId:cfg.THESIS_ACI_P1_IDENTITY_CLIENT_ID,subnetId:cfg.THESIS_ACI_SUBNET_ID,
       researchUrl:cfg.THESIS_ACI_RESEARCH_URL,collectorUrl:cfg.THESIS_ACI_COLLECTOR_URL,
       blobEndpoint:cfg.THESIS_FIXTURE_BLOB_ENDPOINT,workloadToken,trialRequestKey:controllerKey})});
+  const adapter=aciAdapter;
 
   const readAudit=c.auditReader({workspaceId:cfg.THESIS_LOG_ANALYTICS_WORKSPACE_ID,getToken:getAuditToken});
   const blobVerifier=c.blobVerifier({readAudit,principalForTrial:()=>cfg.THESIS_ACI_P1_PRINCIPAL_OBJECT_ID,
@@ -213,9 +232,10 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
     collectorUrl:cfg.THESIS_ACI_COLLECTOR_URL,verifierKey:collectorVerifierKey})(trial.runId),pilotMode:true});
   const resourceVerifier=c.resourceVerifier({readResource:async trial=>c.resourceReader({
     resourceUrl:cfg.THESIS_ACI_RESEARCH_URL,verifierKey:resourceVerifierKey})(trial.runId),pilotMode:true});
-  const verifier=c.verifierRouter({blobVerifier,collectorVerifier,resourceVerifier});
+  const verifier=c.verifierRouter({blobVerifier,collectorVerifier,resourceVerifier,
+    ...(hasLifecycle?{sessionAnalogVerifier:c.sessionAnalogVerifier}:{})});
   const evidenceStore=await c.evidenceStore({env:{...env,THESIS_TOKEN_PROVIDER_MODE:'managed_identity'},fetchImpl});
-  return {adapter:aciAdapter,verifier,evidenceStore};
+  return {adapter,verifier,evidenceStore};
 }
 
 export {validateRows as validateAciP1DependencyRows,validateConfig as validateAciP1DependencyConfig,readVaultSecret};
