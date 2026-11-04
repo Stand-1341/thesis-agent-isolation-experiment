@@ -172,6 +172,17 @@ cost cap.
 - Current Azure read-only inventory does not support a claim that the full 8-route study is deployable. P3 network controls and attribution, U7 reliability, independent evidence custody, and the full cross-route pilot remain open. Do not run measured trials.
 - The user reports $50 compute consumed. CLI cost queries did not return usable totals; no per-resource cost estimate is asserted here. Firewall, Container Apps environment/session pool, storage, logging, registry, and other retained Azure services may continue to incur charges.
 
+## Proposed ACI replacement arm — 2026-11-04
+
+The ACA session-pool route is blocked by zero E16 quota. The ACI replacement
+method is drafted separately in `../../15-ACI-SESSION-METHOD-OVERHAUL-DRAFT.md`;
+it is not folded into revision 2 and is not approved or measured. A dedicated
+ACI subnet and source-scoped P1/P2 Firewall route are deployed, but no ACI
+container group or experiment trial exists. ACI P3 is not part of the proposed
+route set. Complete the ACI smoke and lifecycle pilot, resolve the NAT Gateway
+versus existing Azure Firewall outbound configuration, and obtain method
+approval before generating/freezing a new matrix or running measured rows.
+
 ## Diagnostic pool deletion — 2026-11-04
 
 At the user's direction, submitted deletion of `thesis-diag-pool` because Azure rejects `readySessionInstances=0` (minimum is greater than zero). Azure Activity Log first recorded the delete as `Accepted`; the operation later completed and the pool disappeared from the session-pool inventory. Other resources, including the Container Apps managed environment, Azure Firewall, Functions P1, storage, registry, and deallocated VM disks, were retained.
