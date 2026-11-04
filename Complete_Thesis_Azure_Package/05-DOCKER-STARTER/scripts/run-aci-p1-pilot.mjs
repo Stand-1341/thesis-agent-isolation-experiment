@@ -31,7 +31,8 @@ is never counted as thesis data. A failed/indeterminate row halts the sequence.`
 export function inspectAciP1Readiness({bytes,protocol,readiness}) {
   const schedule=validateAciP1DraftSchedule({bytes,protocol});
   const blockers=[...schedule.blockers];
-  if(protocol.runPermitted!==true || protocol.status!=='approved_for_non_counted_pilot')
+  const ownerApprovedPending=protocol.status==='owner_approved_pending_validation'&&protocol.runPermitted===true;
+  if(protocol.runPermitted!==true || (protocol.status!=='approved_for_non_counted_pilot'&&!ownerApprovedPending))
     blockers.push('protocol does not explicitly authorize this non-counted pilot');
   if(protocol.countedAsStudyTrials!==false)
     blockers.push('ACI draft must remain explicitly non-counted');

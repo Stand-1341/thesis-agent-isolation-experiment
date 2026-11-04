@@ -1,0 +1,22 @@
+{
+  "approvals": {
+    "status": "approved",
+    "methodReference": "file:../../15-ACI-50-PILOT-APPROVAL.md",
+    "approvedByReference": "file:../../15-ACI-50-PILOT-APPROVAL.md"
+  },
+  "gates": {
+    "methodApproval": {
+      "passed": true,
+      "evidenceReference": "file:../../15-ACI-50-PILOT-APPROVAL.md"
+    },
+    "deploymentValidated": { "passed": false },
+    "isolationValidated": { "passed": false },
+    "verifierValidated": { "passed": false },
+    "independentEvidenceProtection": { "passed": false },
+    "u6Validated": { "passed": false },
+    "u8Validated": { "passed": false },
+    "credentialsValidated": { "passed": false }
+  },
+  "scheduleSha256": "63bda5ee7af173cfaa704970c114b2aedab7aa9ce3381dbd7149008dbe0d552f",
+  "countedAsStudyTrials": false
+}

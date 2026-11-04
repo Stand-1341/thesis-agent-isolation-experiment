@@ -1,6 +1,6 @@
 # Azure Container Instances replacement arm — method overhaul draft
 
-**Status: implementation draft, not an approved or measured protocol.** This
+**Status: approved by the study owner for a 50-row non-counted technical pilot; implementation and readiness are still unvalidated.** This
 replaces the unavailable Azure Container Apps custom-session arm with a
 container-group lifecycle based on Azure Container Instances (ACI). It is a
 method change; revision 2 and its frozen 400-row digest remain untouched.
@@ -58,8 +58,10 @@ identities, and synthetic objects. A failed or ambiguous lifecycle step halts
 the schedule and preserves evidence; it must not trigger a retry under the same
 run ID. These controls are prerequisites for implementation and a non-counted
 technical pilot, not proof that the candidate is equivalent to the thesis
-scenario. The advisor's written method decision must state whether the external
-Blob authorization boundary is an acceptable substitute for session isolation.
+scenario. The study owner approved this external Blob authorization boundary
+for the non-counted pilot. The difference from native ACA session-memory
+isolation must remain explicit in any report; this approval does not make the
+treatments equivalent or validate the implementation.
 
 A local candidate orchestrator now exists in
 `05-DOCKER-STARTER/scripts/aci-blob-session-analog.mjs`, with eight mock-based

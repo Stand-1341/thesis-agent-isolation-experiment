@@ -68,15 +68,18 @@ function parseDraftCsv(bytes) {
  */
 export function validateAciP1DraftSchedule({bytes, protocol}) {
   const draft=protocol?.status==='draft_not_approved' && protocol?.runPermitted===false;
+  const ownerApprovedPending=protocol?.status==='owner_approved_pending_validation'&&protocol?.runPermitted===true&&
+    protocol?.methodApproval?.status==='approved'&&typeof protocol?.methodApproval?.methodReference==='string'&&
+    typeof protocol?.methodApproval?.approvedByReference==='string';
   const approved=protocol?.status==='approved_for_non_counted_pilot' && protocol?.runPermitted===true &&
     protocol?.pendingScenarioAnalogs?.U6?.status==='validated' && protocol?.pendingScenarioAnalogs?.U8?.status==='validated';
-  if ((!draft && !approved) || protocol?.countedAsStudyTrials !== false)
-    throw new Error('ACI schedule metadata must be either explicitly blocked draft or explicitly approved non-counted pilot');
+  if ((!draft&&!ownerApprovedPending&&!approved) || protocol?.countedAsStudyTrials !== false)
+    throw new Error('ACI schedule metadata must be blocked draft, owner-approved pending validation, or fully validated non-counted pilot');
   if (protocol.deployment !== 'azure_container_instances' || protocol.profile !== 'P1' ||
       protocol.trials !== 50 || protocol.blocks !== 5 || protocol.scenariosPerBlock !== 10)
     throw new Error('ACI draft protocol must describe one P1 cell with 50 rows in five blocks');
   const pending=['unimplemented','prototype_integrated_not_azure_validated'];
-  if (draft && (!pending.includes(protocol.pendingScenarioAnalogs?.U6?.status) || !pending.includes(protocol.pendingScenarioAnalogs?.U8?.status)))
+  if ((draft||ownerApprovedPending) && (!pending.includes(protocol.pendingScenarioAnalogs?.U6?.status) || !pending.includes(protocol.pendingScenarioAnalogs?.U8?.status)))
     throw new Error('ACI draft U6/U8 analogs must remain explicitly unvalidated');
   if (approved && (!protocol.pendingScenarioAnalogs.U6.evidenceReference || !protocol.pendingScenarioAnalogs.U8.evidenceReference))
     throw new Error('ACI approved U6/U8 analogs require evidence references');
@@ -113,7 +116,7 @@ export function validateAciP1DraftSchedule({bytes, protocol}) {
     if (cells.some((cell,index)=>cell.order!==index+1)) throw new Error(`ACI draft block ${block} order must be contiguous`);
   }
   return {
-    status: approved ? 'approved_non_counted_pilot' : 'draft_blocked_pending_method_approval_and_u6_u8_azure_validation',
+    status: approved ? 'approved_non_counted_pilot' : ownerApprovedPending ? 'owner_approved_blocked_pending_validation' : 'draft_blocked_pending_method_approval_and_u6_u8_azure_validation',
     runnable: approved,
     countedAsStudyTrials: false,
     rows: 50,
@@ -122,7 +125,7 @@ export function validateAciP1DraftSchedule({bytes, protocol}) {
     unauthorized: 40,
     legitimate: 10,
     sha256: actualHash,
-    blockers: approved ? [] : protocol.blockers,
+    blockers: approved ? [] : (ownerApprovedPending?(protocol.blockers||[]).filter(item=>!String(item).toLowerCase().includes('method approval')):protocol.blockers),
   };
 }
 

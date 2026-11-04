@@ -15,6 +15,18 @@ test('ACI draft preflight reports blocked and non-counted with the exact schedul
   assert.ok(result.blockers.some(item=>item.includes('U6')));
 });
 
+test('records the study-owner approval without marking unvalidated Azure gates as passed',async()=>{
+  const readiness=JSON.parse(await readFile(new URL('../config/aci-p1-pilot-readiness.json',import.meta.url),'utf8'));
+  const result=inspectAciP1Readiness({bytes,protocol,readiness});
+  assert.equal(protocol.status,'owner_approved_pending_validation');
+  assert.equal(readiness.approvals.status,'approved');
+  assert.equal(readiness.gates.methodApproval.passed,true);
+  assert.equal(result.runnable,false);
+  assert.ok(!result.blockers.includes('protocol does not explicitly authorize this non-counted pilot'));
+  assert.ok(result.blockers.includes('readiness gate u6Validated is not passed with an evidence reference'));
+  assert.ok(result.blockers.includes('readiness gate u8Validated is not passed with an evidence reference'));
+});
+
 test('run refuses before loading dependencies or claiming a row when readiness is blocked',async()=>{
   let loaded=false;
   await assert.rejects(runAciP1Pilot({bytes,protocol,dependencies:async()=>{loaded=true;return {};}}),/ACI P1 pilot is blocked/);

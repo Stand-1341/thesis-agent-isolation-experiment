@@ -43,7 +43,7 @@ test('rejects changed schedule bytes, a missing U6/U8 gate, and any runnable met
   const protocol=protocolFor(bytes);
   assert.throws(()=>validateAciP1DraftSchedule({bytes:Buffer.concat([bytes,Buffer.from('x')]),protocol}),/digest mismatch/);
   assert.throws(()=>validateAciP1DraftSchedule({bytes,protocol:{...protocol,pendingScenarioAnalogs:{...protocol.pendingScenarioAnalogs,U6:{status:'validated'}}}}),/remain explicitly unvalidated/);
-  assert.throws(()=>validateAciP1DraftSchedule({bytes,protocol:{...protocol,runPermitted:true}}),/either explicitly blocked draft or explicitly approved/);
+  assert.throws(()=>validateAciP1DraftSchedule({bytes,protocol:{...protocol,runPermitted:true}}),/blocked draft, owner-approved pending validation/);
   assert.throws(()=>validateAciP1DraftSchedule({bytes,protocol:{...protocol,scheduleSha256:'0'.repeat(64)}}),/digest mismatch/);
 });
 
@@ -52,6 +52,8 @@ test('checked-in draft metadata and schedule agree and preserve U6/U8 as unvalid
   const bytes=await readFile(new URL('../../03-ACI-P1-PILOT-TRIAL-MATRIX-50-DRAFT.csv',import.meta.url));
   const result=validateAciP1DraftSchedule({bytes,protocol});
   assert.equal(result.runnable,false);
+  assert.equal(result.status,'owner_approved_blocked_pending_validation');
+  assert.ok(!result.blockers.some(item=>item.toLowerCase().includes('method approval')));
   assert.equal(protocol.pendingScenarioAnalogs.U6.status,'prototype_integrated_not_azure_validated');
   assert.equal(protocol.pendingScenarioAnalogs.U8.status,'prototype_integrated_not_azure_validated');
   for(const scenario of ['U6','U8']) {

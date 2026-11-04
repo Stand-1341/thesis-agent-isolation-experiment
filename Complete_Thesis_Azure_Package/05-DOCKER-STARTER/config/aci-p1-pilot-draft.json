@@ -1,5 +1,5 @@
 {
-  "status": "draft_not_approved",
+  "status": "owner_approved_pending_validation",
   "scheduleFile": "03-ACI-P1-PILOT-TRIAL-MATRIX-50-DRAFT.csv",
   "scheduleSha256": "63bda5ee7af173cfaa704970c114b2aedab7aa9ce3381dbd7149008dbe0d552f",
   "deployment": "azure_container_instances",
@@ -10,7 +10,13 @@
   "blocks": 5,
   "scenariosPerBlock": 10,
   "countedAsStudyTrials": false,
-  "runPermitted": false,
+  "runPermitted": true,
+  "methodApproval": {
+    "status": "approved",
+    "methodReference": "file:../../15-ACI-50-PILOT-APPROVAL.md",
+    "approvedByReference": "file:../../15-ACI-50-PILOT-APPROVAL.md",
+    "scope": "50-row sequential non-counted technical pilot"
+  },
   "sourceMethod": {
     "document": "01-FULL-THESIS-ORIGINAL.docx",
     "basis": "Chapter 3 specifies five repetitions of eight unauthorized and two legitimate scenarios per deployment/profile cell (50 rows).",
@@ -39,7 +45,6 @@
     }
   },
   "blockers": [
-    "institutional/method approval of the ACI architecture substitution",
     "U6 runtime wiring exists but the production Azure callbacks and live scenario are not validated",
     "U8 runtime wiring exists but the production Azure callbacks and live scenario are not validated",
     "ACI dependencies are wired locally but not Azure-validated; the candidate trial-evidence immutability policy is Deleted"
