@@ -116,9 +116,9 @@ try {
     '--query','{id:id,clientId:clientId}','-o','json')
   $workloadIdentity = Invoke-AzJson -Arguments @(
     'identity','show','--subscription',$SubscriptionId,'--resource-group',$ResourceGroup,'--name',$WorkloadIdentityName,
-    '--query','{id:id,clientId:clientId}','-o','json')
+    '--query','{id:id,clientId:clientId,principalId:principalId}','-o','json')
   if (-not $pullIdentity.id -or -not $workloadIdentity.id -or
-      $pullIdentity.id -eq $workloadIdentity.id -or -not $workloadIdentity.clientId) {
+      $pullIdentity.id -eq $workloadIdentity.id -or -not $workloadIdentity.clientId -or -not $workloadIdentity.principalId) {
     throw 'ACI identity preflight failed: separate ACR-pull and workload identities are required.'
   }
   $controllerState = Invoke-AzCapture -Arguments @(
@@ -135,6 +135,8 @@ try {
   # name has no credentials or configured account and is never contacted by /health.
   $dummyEndpoint = 'https://aci-health-smoke.invalid'
   $dummyBlobEndpoint = 'https://acihealth' + [Guid]::NewGuid().ToString('N').Substring(0, 15) + '.blob.core.windows.net/'
+  $dummyStorageAccount = ([Uri]$dummyBlobEndpoint).Host.Split('.')[0]
+  $dummyBlobResourceId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Storage/storageAccounts/$dummyStorageAccount/blobServices/default"
   $parameterObject = @{
     '$schema' = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#'
     contentVersion = '1.0.0.0'
@@ -147,6 +149,8 @@ try {
       pullIdentityId = @{ value = $pullIdentity.id }
       workloadIdentityId = @{ value = $workloadIdentity.id }
       workloadIdentityClientId = @{ value = $workloadIdentity.clientId }
+      workloadPrincipalObjectId = @{ value = $workloadIdentity.principalId }
+      blobResourceId = @{ value = $dummyBlobResourceId }
       researchUrl = @{ value = $dummyEndpoint }
       collectorUrl = @{ value = $dummyEndpoint }
       blobEndpoint = @{ value = $dummyBlobEndpoint }

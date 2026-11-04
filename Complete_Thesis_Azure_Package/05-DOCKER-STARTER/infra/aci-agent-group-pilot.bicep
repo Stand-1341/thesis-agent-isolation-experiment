@@ -12,6 +12,8 @@ param registryServer string
 param pullIdentityId string
 param workloadIdentityId string
 param workloadIdentityClientId string
+param workloadPrincipalObjectId string
+param blobResourceId string
 param researchUrl string
 param collectorUrl string
 param blobEndpoint string
@@ -46,6 +48,8 @@ resource group 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
           { name: 'PORT', value: '8080' }
           { name: 'AZURE_TOKEN_MODE', value: 'managed' }
           { name: 'AZURE_CLIENT_ID', value: workloadIdentityClientId }
+          { name: 'AZURE_PRINCIPAL_OBJECT_ID', value: workloadPrincipalObjectId }
+          { name: 'THESIS_BLOB_RESOURCE_ID', value: blobResourceId }
           { name: 'AZURE_BLOB_ENDPOINT', value: blobEndpoint }
           { name: 'RESEARCH_URL', value: researchUrl }
           { name: 'COLLECTOR_URL', value: collectorUrl }

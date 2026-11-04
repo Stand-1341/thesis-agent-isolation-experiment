@@ -10,6 +10,10 @@ test('ACI health smoke is isolated to a private, digest-pinned non-trial group',
   assert.match(script, /@sha256:\[a-fA-F0-9\]\{64\}/);
   assert.match(script, /StartsWith\("\$RegistryServer\//);
   assert.match(groupTemplate, /type: 'Private'/);
+  assert.match(groupTemplate, /AZURE_PRINCIPAL_OBJECT_ID/);
+  assert.match(groupTemplate, /THESIS_BLOB_RESOURCE_ID/);
+  assert.match(script, /workloadPrincipalObjectId = \@\{ value = \$workloadIdentity\.principalId \}/);
+  assert.match(script, /blobResourceId = \@\{ value = \$dummyBlobResourceId \}/);
   assert.match(groupTemplate, /restartPolicy: 'Never'/);
   assert.match(script, /trials=0/);
   assert.doesNotMatch(script, /\/run(?:\b|['"])/i);
