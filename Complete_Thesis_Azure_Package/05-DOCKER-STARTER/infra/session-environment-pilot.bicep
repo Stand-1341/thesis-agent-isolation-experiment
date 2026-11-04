@@ -7,6 +7,8 @@ param infrastructureSubnetId string
 @description('Existing Log Analytics workspace customer ID.')
 param logCustomerId string
 param workspaceName string
+@description('Set false to deploy the workload-profiles environment with Consumption only so the environment-scoped E-series quota can be requested in the portal. Add E16 only after quota approval.')
+param includeE16Profile bool = true
 @minValue(0)
 @maxValue(1)
 @description('Minimum E16 instances. Keep at zero to avoid reserving an idle dedicated node; a ready custom session still allocates E16 capacity and is billable.')
@@ -33,15 +35,15 @@ resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
     // Consumption-only environment cannot be converted in place. One ready session
     // can allocate this E16 profile, so only deploy after checking quota and eligible
     // credit. The cap prevents an accidental multi-node scale-out during the pilot.
-    workloadProfiles: [
-      { name: 'Consumption', workloadProfileType: 'Consumption' }
-      {
+    workloadProfiles: concat(
+      [{ name: 'Consumption', workloadProfileType: 'Consumption' }],
+      includeE16Profile ? [{
         name: 'session-e16'
         workloadProfileType: 'E16'
         minimumCount: sessionE16MinimumCount
         maximumCount: sessionE16MaximumCount
-      }
-    ]
+      }] : []
+    )
   }
 }
 output environmentId string = environment.id

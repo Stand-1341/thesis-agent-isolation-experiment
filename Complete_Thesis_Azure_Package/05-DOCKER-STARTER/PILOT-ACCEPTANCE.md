@@ -276,6 +276,19 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
   `WorkloadProfileMaximumCoresConstraint` (E16 maximum cores must be zero).
   Final readback shows both subnets `Succeeded`, no ACA environment, and no
   session pool. No paid E16 compute or trial was created.
+- To make the documented environment-scoped quota request available without
+  allocating E16, the deployment template now supports `includeE16Profile=false`.
+  A Workload Profiles environment `cae-thesis-experiment-eus` was deployed on
+  `sessions-experiment` with the Consumption profile only. It reports
+  `Succeeded`; `az containerapp env list-usages` reports
+  `ManagedEnvironmentMemoryOptimizedCores` current 0, limit 0. No E16 profile,
+  session pool, or ready session exists, and no quota request has been submitted.
+  Microsoft's current path is Portal → Azure Container Apps → this environment
+  → Settings → Quota → Managed Environment Memory Optimized Cores; request a
+  new limit of 16 for one E16 node in East US. The request might be fulfilled
+  automatically or routed to Microsoft Support. After approval, add the E16
+  profile with min 0/max 1, verify the quota, and deploy the session pool only
+  when ready to run the pilot. Source: [quota request instructions](https://learn.microsoft.com/en-us/azure/container-apps/quota-requests).
 - Microsoft troubleshooting guidance recommends removing the associated VNet
   for a stuck deletion, but this VNet contains the rest of the experiment
   infrastructure and was not deleted. Microsoft Q&A guidance for a
@@ -310,6 +323,8 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
   `1ceff4e46e3e2305f301d50d68c66034bda800c7ea79b224a5da27472d7ec4f4`; the
   separate Node 22.23.4 Linux runtime matches the installer-pinned binary hash.
   Neither local artifact has been deployed.
+- After adding the conditional E16 profile to the environment template,
+  `az bicep build` succeeded and `npm run verify` passed **227/227** tests.
 - Commit `4739dab` was pushed to the private GitHub repository. No measured
   trial was started.
 

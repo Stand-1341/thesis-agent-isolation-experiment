@@ -8,6 +8,8 @@ const subnetTemplate=await readFile(new URL('../infra/session-experiment-subnet.
 test('custom session environment includes bounded E16 profile for Azure custom-container pools',()=>{
   assert.match(environmentTemplate,/workloadProfileType: 'Consumption'/);
   assert.match(environmentTemplate,/workloadProfileType: 'E16'/);
+  assert.match(environmentTemplate,/param includeE16Profile bool = true/);
+  assert.match(environmentTemplate,/includeE16Profile \? \[\{[\s\S]*?workloadProfileType: 'E16'[\s\S]*?\}\] : \[\]/);
   assert.match(environmentTemplate,/minimumCount: sessionE16MinimumCount/);
   assert.match(environmentTemplate,/maximumCount: sessionE16MaximumCount/);
   assert.match(environmentTemplate,/@maxValue\(1\)[\s\S]*?param sessionE16MaximumCount int = 1/);
