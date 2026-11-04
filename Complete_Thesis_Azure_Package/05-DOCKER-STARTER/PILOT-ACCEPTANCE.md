@@ -192,14 +192,41 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
 - This confirms the expected P1 unauthorized path worked in this fresh check. It does not explain the earlier missing-event run, establish repeatability, validate P2/P3, or prove network denial. U7 remains open across the route matrix.
 - Both VMs were deallocated after the diagnostic. The measured runner was not invoked.
 
-## Latest read-only Azure inventory — 2026-11-04 04:00 UTC
+## Latest read-only Azure inventory — 2026-11-04 04:27 UTC
 
 - The subscription is enabled. Exactly one Function App is present and Running:
   `thesis-flex-pilot-20261103` (P1 pilot). No Functions P2/P3 apps are present.
 - `thesis-controller-pilot` and `thesis-p3-targets` are both deallocated. They
   are controller/research-target hosts, not the planned six VM workload routes.
 - No Container Apps session pool or workload app is present. The diagnostic
-  pool was deleted; the managed environment remains.
+  pool was deleted. The remaining `cae-thesis-diagnostic` environment is
+  confirmed Consumption-only; custom-container session pools need a new
+  workload-profiles environment with dedicated E16 capacity, which can be
+  billable while a ready session exists. The environment template now includes
+  an E16 profile capped at one instance. The old environment cannot be converted
+  in place.
+- A new delegated `sessions-experiment` subnet (`10.48.12.0/27`) has been
+  deployed for that future environment. It is additive network plumbing only:
+  it has no route table, NSG, environment, pool, or running compute attached.
+- The existing environment's `list-usages` result reports zero available
+  memory-optimized cores. That result is scoped to the old environment and does
+  not establish quota for a new environment; Azure's quota guidance requires a
+  workload-profile environment before requesting its E-series quota.
+- Attempted to create the replacement workload-profiles environment using the
+  new subnet. Azure rejected it during preflight with
+  `MaxNumberOfRegionalEnvironmentsInSubExceeded`: the subscription is limited
+  to one Container Apps environment in East US. No environment or E16 compute
+  was created. The unused diagnostic environment must be replaced or the
+  regional environment quota must be increased before session routes can be
+  deployed.
+- Current public East US retail-rate estimate for one E16 node: 16 vCPU ×
+  $0.057077/vCPU-hour + 128 GiB × $0.004978/GiB-hour + $0.10/hour dedicated
+  management = about **$1.65/hour or $39.61/day**. A continuously ready node is
+  about **$1,188 per 30 days**, before Firewall, storage, logging, networking,
+  or other resources. This is public retail pricing, not the account's final
+  rate or an estimate of remaining credit. Because the pool requires a ready
+  session, this is a material spend risk; no E16 environment or pool was
+  deployed.
 - Functions P1/P2/P3 and VM P1/P2/P3 profile subnets currently have no NSG or
   route table attached. Therefore the P3 firewall candidate is not active on
   any workload route.
@@ -207,8 +234,10 @@ At the user's direction, submitted deletion of `thesis-diag-pool` because Azure 
   VMs are stopped, but the firewall, managed environment, storage, registry,
   private endpoints, and logging resources remain and may incur charges.
   Azure's current usage query returned null costs/quantities, so remaining
-  credit and exact accumulated cost could not be reconciled. The user reported
-  about $50 of compute used; that is the only usable spend figure here.
+  The billing-profile API now reports $200 current and estimated credit, with
+  no pending eligible charges in that response; Azure consumption usage still
+  returned null quantities/costs, so charges may lag. The user reported about
+  $50 of compute used.
 - The measured runner was not started. No measured rows are complete.
 
 ## How the open gates will be validated
@@ -245,5 +274,6 @@ The P3 candidate template now requires the operator to provide the complete
 existing return-route lists before replacing those route tables, then appends
 the Functions P3 return route. This prevents accidental loss of current routes
 but still requires live review and denial-evidence tests. The local verification
-after this change passed **220/220** tests, and the P3 Bicep template compiled;
-neither result is evidence of deployed Azure enforcement.
+after the route and session-environment changes passed **222/222** tests, and
+both session-environment Bicep templates compiled; neither result is evidence
+that a session pool or Azure enforcement has been deployed.
