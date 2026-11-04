@@ -32,5 +32,6 @@ try {
     $manifest = [ordered]@{ scope='vm-workload-package-only'; files=$hashes; note='No credentials, Node runtime, configuration, deployment or Azure policy included.' }
     [System.IO.File]::WriteAllText((Join-Path $destination 'manifest.json'), (($manifest | ConvertTo-Json -Depth 4) + "`n"), [System.Text.UTF8Encoding]::new($false))
     Write-Host "Prepared VM workload package in $destination"
+    Write-Host "Record manifest SHA-256 separately: $((Get-FileHash -LiteralPath (Join-Path $destination 'manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant())"
     Write-Host 'No deployment or Azure configuration was performed.'
 } finally { Pop-Location }

@@ -39,6 +39,17 @@ param logWorkspaceId string
 resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' existing = {
   name: vnetName
 }
+// These subnet PUTs attach the new return routes. Read the current subnet
+// configuration so existing security and service-endpoint associations are
+// carried forward instead of being cleared by an incomplete resource body.
+resource existingResearchSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' existing = {
+  parent: vnet
+  name: 'research-services'
+}
+resource existingPrivateEndpointSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' existing = {
+  parent: vnet
+  name: 'evidence-private-endpoints'
+}
 resource firewall 'Microsoft.Network/azureFirewalls@2023-09-01' existing = {
   name: firewallName
 }
@@ -202,6 +213,11 @@ resource updateResearchSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09
   dependsOn: [functionsP3Subnet]
   properties: {
     addressPrefix: '10.48.9.0/24'
+    networkSecurityGroup: empty(existingResearchSubnet.properties.networkSecurityGroup) ? null : { id: existingResearchSubnet.properties.networkSecurityGroup.id }
+    serviceEndpoints: existingResearchSubnet.properties.serviceEndpoints
+    serviceEndpointPolicies: existingResearchSubnet.properties.serviceEndpointPolicies
+    delegations: existingResearchSubnet.properties.delegations
+    privateEndpointNetworkPolicies: existingResearchSubnet.properties.privateEndpointNetworkPolicies
     routeTable: { id: serviceReturnRoutes.id }
   }
 }
@@ -211,6 +227,10 @@ resource updatePrivateEndpointSubnet 'Microsoft.Network/virtualNetworks/subnets@
   dependsOn: [updateResearchSubnet]
   properties: {
     addressPrefix: '10.48.4.0/27'
+    networkSecurityGroup: empty(existingPrivateEndpointSubnet.properties.networkSecurityGroup) ? null : { id: existingPrivateEndpointSubnet.properties.networkSecurityGroup.id }
+    serviceEndpoints: existingPrivateEndpointSubnet.properties.serviceEndpoints
+    serviceEndpointPolicies: existingPrivateEndpointSubnet.properties.serviceEndpointPolicies
+    delegations: existingPrivateEndpointSubnet.properties.delegations
     privateEndpointNetworkPolicies: 'RouteTableEnabled'
     routeTable: { id: privateEndpointReturnRoutes.id }
   }
