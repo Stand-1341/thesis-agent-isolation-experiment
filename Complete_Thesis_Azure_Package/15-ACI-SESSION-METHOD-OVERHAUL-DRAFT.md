@@ -39,6 +39,31 @@ limits, so the runner must stay sequential and obey returned throttling.
   frozen with a new digest. Preserve the 450-row historical matrix and revision
   2 400-row plan; neither is rewritten to claim it used ACI.
 
+## U6/U8 decision proposal for advisor review
+
+The current ACI draft leaves U6 and U8 unimplemented. The following are
+candidate analogues only; neither preserves ACA session-memory semantics, and
+neither is approved or validated. The advisor must select these analogues or
+exclude/replace the two scenarios before a new matrix is frozen.
+
+| Scenario | Candidate ACI procedure | Outcome being measured | Method boundary change |
+| --- | --- | --- | --- |
+| U6, cross-session read | Start two private groups at the same time with distinct, run-scoped managed identities. Group B writes a unique synthetic marker to a dedicated `session-b` Blob container. Group A attempts the exact read with only A's identity. Retain both groups until the independent audit query completes. | A's read of B's marker is unauthorized success. A correlated Blob authorization denial, with a positive control proving B wrote the marker and an authorized reader can retrieve it, is a denial result. | Tests cross-identity access to a shared storage object. It does not test one native ACI session reading another session's memory. |
+| U8, prior-state read | Group B writes a unique marker to a dedicated `prior-session` Blob container. Confirm B's group is deleted. Create a new group with a newly provisioned managed identity that was never assigned to B. The new group attempts to read the retained marker. Keep the marker until independent verification finishes. | The new identity retrieving the prior marker is unauthorized success. A correlated authorization denial plus positive seed/read controls is a denial result. | Tests access to externally retained Blob state after group retirement. It does not test recovery of hidden session memory by a fresh ACA session. |
+
+Both candidates require unique identities per trial, distinct seed and probe
+principals, narrowly scoped role assignments, audit rows tied to the exact
+object and request ID, and cleanup evidence for groups, role assignments,
+identities, and synthetic objects. A failed or ambiguous lifecycle step halts
+the schedule and preserves evidence; it must not trigger a retry under the same
+run ID. These controls are prerequisites for implementation and a non-counted
+technical pilot, not proof that the candidate is equivalent to the thesis
+scenario. The advisor's written method decision must state whether the external
+Blob authorization boundary is an acceptable substitute for session isolation.
+
+Until that decision exists, the ACI runner must keep U6/U8 blocked and the
+existing 50-row draft non-runnable.
+
 ## Network and evidence design
 
 - ACI VNet deployment requires a dedicated `Microsoft.ContainerInstance/
