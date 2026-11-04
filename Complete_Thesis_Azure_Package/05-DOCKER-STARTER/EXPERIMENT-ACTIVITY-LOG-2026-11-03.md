@@ -176,3 +176,4 @@ Pool deletion completed on 2026-11-04. Azure's session-pool list no longer retur
 - The NAT Gateway remains allocated and may incur charges while no groups run. Cost Management returned no current dollar amount in this check.
 - The private controller VM was started only for the health probe and deallocated immediately afterward. The current Azure inventory again shows no ACI group and both VMs deallocated.
 - Two initial hash-comparison invocations returned no result. A shell-safe retry returned `P1_TOKEN_COMPARE=true`; the research VM was deallocated afterward. The Cost Management query returned HTTP 429, so no current dollar total was obtained.
+- A later controller-identity probe intended to confirm Key Vault secret reads and ACI ARM list access returned no parseable status markers. The role assignments are present, but runtime access remains unverified. The controller VM was deallocated; the ACI group inventory remains empty.

@@ -436,7 +436,8 @@ workload and controller secrets are stored in Key Vault; the workstation's
 temporary firewall exception was removed. Separate ACI identities now exist,
 with VM P1's eight Blob role scopes mirrored to the ACI P1 identity and no
 workload roles on P2. Controller lifecycle/subnet/identity-attach roles are
-deployed. The live adapter, independent verifier/evidence validation, U6/U8
+deployed, but a controller-identity Key Vault/ARM probe returned no parseable
+status; treat runtime permission as unverified. The live adapter, independent verifier/evidence validation, U6/U8
 analogs, and institutional method approval remain incomplete. No measured trial
 has run; no experiment is currently running. The ACI runtime now rejects U6/U8
 before fixture reset, preventing those unsupported cases from writing setup

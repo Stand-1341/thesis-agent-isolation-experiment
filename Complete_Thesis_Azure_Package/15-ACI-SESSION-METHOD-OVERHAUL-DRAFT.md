@@ -124,7 +124,9 @@ they match. Dedicated Key Vault secrets `aci-p1-workload-token` and
 exception was removed. New ACI P1/P2 user-assigned identities exist. P1 has the
 same eight container-scoped Blob role assignments as VM P1; P2 currently has
 none. The controller has narrow group lifecycle, subnet join, and selected
-identity-attach roles. Both VMs are deallocated. The 50-row ACI draft remains
+identity-attach roles. These assignments are configured, but controller
+managed-identity access to Key Vault and ACI ARM has not yet been verified.
+Both VMs are deallocated. The 50-row ACI draft remains
 non-runnable pending method approval, U6/U8 analogs, and a live Azure adapter/
 verifier/protected evidence store. A fail-closed sequential runner and dry-run
 exist, but its cloud dependencies are not wired or validated. No measured trial
