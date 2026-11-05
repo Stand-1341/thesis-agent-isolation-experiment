@@ -62,7 +62,7 @@ export function buildAciContainerGroupBody({location,imageDigestReference,regist
 }
 
 export function createAciContainerGroupClient({subscriptionId,resourceGroup,getManagementToken,fetchImpl=fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
-  pollIntervalMs=3000,createTimeoutMs=300000,deleteTimeoutMs=180000,now=()=>Date.now()}) {
+  pollIntervalMs=3000,createTimeoutMs=900000,deleteTimeoutMs=180000,now=()=>Date.now()}) {
   if(!/^[0-9a-f-]{36}$/i.test(subscriptionId||'') || !/^[A-Za-z0-9_.()\-]{1,90}$/.test(resourceGroup||'') || typeof getManagementToken!=='function' || typeof fetchImpl!=='function') throw new Error('invalid ACI ARM client configuration');
   if(!Number.isInteger(pollIntervalMs)||pollIntervalMs<10 || !Number.isInteger(createTimeoutMs)||createTimeoutMs<100 || !Number.isInteger(deleteTimeoutMs)||deleteTimeoutMs<100) throw new Error('invalid ACI polling configuration');
   const urlFor=name=>`https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${encodeURIComponent(resourceGroup)}/providers/Microsoft.ContainerInstance/containerGroups/${encodeURIComponent(name)}?api-version=${API}`;

@@ -40,3 +40,12 @@ Read-only Azure CLI inventory on the selected subscription found two running pri
 No measured trial was launched; no container group is active. Both VMs and the existing pilot resources remain allocated. The last reliable cost snapshot in the historical revision-2 report was **$84.8099 month-to-date at 2026-11-04 18:57 UTC**; billing can lag. The usage query in this check returned records without usable cost amounts, so it does not establish a newer total or remaining credit. The $125 budget is an alert threshold, not a hard spending cap.
 
 **Conclusion:** the revision-3 files and local runner are consistent, but the Azure study is not deploy-ready. Deploying now would not enable the full 300-row run; the routes, P3 evidence, secrets, protected evidence policy, pilot, and four readiness gates must be completed and evidenced first.
+
+## Checkpoint: 2026-11-05 00:29 UTC
+
+- Updated `/opt/thesis-research/dist/resource.js`, `collector.js`, and `collector-journal.js` on `thesis-p3-targets` to the checked-out build, verified their SHA-256 hashes, and restarted both systemd services. Both services are active; the controller receives `{"ready":true}` from each health endpoint.
+- The first diagnostic attempts exposed a controller trust-store issue: shell `curl` could validate the private TLS certificate, while Node `fetch` timed out. Running Node with `NODE_EXTRA_CA_CERTS=/opt/thesis-aci-runner-20261104/certs/thesis-pilot-ca.pem` fixed it.
+- A fresh, non-counted ACI P1 U1/U5 synthetic diagnostic then passed both operations with HTTP 200, matching request IDs, and matching collector correlation. Its ACI group was deleted. It made no GPT-5 mini call and is not a study trial.
+- Final Azure inventory shows no ACI groups running. The two support VMs remain running; no resources were deallocated.
+- The revision-3 measured preflight remains blocked exactly as listed above. No measured trial has started. The latest diagnostic does not validate the 300-row VM/Functions routes or clear the four measured-run gates.
+- To reproduce the diagnostic from the controller, set `NODE_EXTRA_CA_CERTS` to the installed pilot CA before starting Node. Do not treat an HTTP 200 health response from `curl` alone as proof that Node trusts the private certificate.

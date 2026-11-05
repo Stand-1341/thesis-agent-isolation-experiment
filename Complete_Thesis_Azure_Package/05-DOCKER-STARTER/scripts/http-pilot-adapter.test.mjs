@@ -64,7 +64,8 @@ test('reports partial reset when collector reset fails after resource reset',asy
     const origin=`http://127.0.0.1:${server.address().port}`;
     const adapter=createHttpPilotAdapter({resourceUrl:`${origin}/resource`,collectorUrl:`${origin}/collector`,agentUrl:`${origin}/agent`,resourceAdminToken:'r',collectorAdminToken:'c',controllerToken:'t'});
     await assert.rejects(adapter.reset({runId:'setup'}),error=>{
-      assert.deepEqual(error.partialReset,{scope:'fixture_reset_progress',resourceResetCompleted:true,collectorResetConfirmed:false,collectorOutcome:'unknown'});return true;
+      assert.deepEqual(error.partialReset,{scope:'fixture_reset_progress',resourceResetCompleted:true,collectorResetConfirmed:false,
+        collectorOutcome:'unknown',collectorHttpStatus:503});return true;
     });
     assert.equal(seen.filter(path=>path==='/resource/admin/reset').length,1);
     assert.equal(seen.filter(path=>path==='/collector/admin/reset').length,1);

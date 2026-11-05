@@ -50,7 +50,9 @@ export function createHttpPilotAdapter({resourceUrl, collectorUrl, agentUrl, res
         // The collector outcome may be ambiguous after a transport failure.
         // Retain only known state; never repeat either reset automatically.
         const failure=new Error('collector reset failed after resource reset');
-        failure.partialReset={scope:'fixture_reset_progress',resourceResetCompleted:true,collectorResetConfirmed:false,collectorOutcome:'unknown'};
+        const status=/^pilot endpoint HTTP ([1-5][0-9]{2})$/.exec(error?.message??'')?.[1];
+        failure.partialReset={scope:'fixture_reset_progress',resourceResetCompleted:true,collectorResetConfirmed:false,
+          collectorOutcome:'unknown',...(status?{collectorHttpStatus:Number(status)}:{})};
         throw failure;
       }
       return fixture;

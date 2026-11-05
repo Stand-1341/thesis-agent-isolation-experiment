@@ -66,9 +66,10 @@ function read(env,name,missing) {
   if(typeof value!=='string'||!value.trim()) {missing.push(name);return undefined;}
   return value.trim();
 }
-function safeUrl(value,name,{blob=false}={}) {
+function safeUrl(value,name,{blob=false,allowedPorts=[]}={}) {
   let url; try {url=new URL(value);} catch {throw new Error(`${name} must be an absolute URL`);}
-  if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.port)
+  if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||
+    (url.port&&!allowedPorts.includes(Number(url.port))))
     throw new Error(`${name} must be a credential-free HTTPS URL`);
   if(blob&&(!/^[a-z0-9]{3,24}\.blob\.core\.windows\.net$/i.test(url.hostname)||url.pathname!=='/'))
     throw new Error(`${name} must be an Azure Blob service endpoint`);
@@ -111,7 +112,7 @@ function tokenFor(credential,scope,label) {
     return result.token;
   };
 }
-function validateConfig(env) {
+function validateConfig(env,{diagnosticOnly=false}={}) {
   const missing=[]; const values={};
   for(const name of REQUIRED) values[name]=read(env,name,missing);
   for(const [key,name] of Object.entries(SECRET_NAMES)) values[name]=read(env,name,missing);
@@ -141,13 +142,17 @@ function validateConfig(env) {
   if(!/@sha256:[a-f0-9]{64}$/i.test(values.THESIS_ACI_IMAGE_DIGEST_REFERENCE)) throw new Error('ACI image reference must be pinned by digest');
   if(!/^[a-z0-9-]+\.azurecr\.io$/i.test(values.THESIS_ACI_REGISTRY_SERVER)) throw new Error('invalid ACI registry server');
   if(!/^[A-Za-z0-9_.()\-]{1,90}$/.test(values.THESIS_ACI_RESOURCE_GROUP)) throw new Error('invalid ACI resource group');
-  for(const name of ['THESIS_ACI_RESEARCH_URL','THESIS_ACI_COLLECTOR_URL']) values[name]=safeUrl(values[name],name);
+  values.THESIS_ACI_RESEARCH_URL=safeUrl(values.THESIS_ACI_RESEARCH_URL,'THESIS_ACI_RESEARCH_URL');
+  // The private collector reverse proxy intentionally listens on 8443; other
+  // custom ports remain rejected for these private service endpoints.
+  values.THESIS_ACI_COLLECTOR_URL=safeUrl(values.THESIS_ACI_COLLECTOR_URL,'THESIS_ACI_COLLECTOR_URL',{allowedPorts:[8443]});
   values.THESIS_FIXTURE_BLOB_ENDPOINT=safeUrl(values.THESIS_FIXTURE_BLOB_ENDPOINT,'THESIS_FIXTURE_BLOB_ENDPOINT',{blob:true});
   if(!/^\/subscriptions\/[0-9a-f-]{36}\/resourceGroups\/[A-Za-z0-9._()-]+\/providers\/Microsoft\.Storage\/storageAccounts\/[a-z0-9]{3,24}\/blobServices\/default$/i.test(values.THESIS_BLOB_RESOURCE_ID))
     throw new Error('THESIS_BLOB_RESOURCE_ID must be a storage Blob service ARM ID');
   if(new URL(values.THESIS_FIXTURE_BLOB_ENDPOINT).hostname!==`${values.THESIS_BLOB_RESOURCE_ID.split('/')[8]}.blob.core.windows.net`)
     throw new Error('fixture Blob endpoint does not match THESIS_BLOB_RESOURCE_ID');
-  if(values.THESIS_EVIDENCE_RETENTION_APPROVED!=='true') throw new Error('institution-approved evidence retention is not asserted');
+  if(values.THESIS_EVIDENCE_RETENTION_APPROVED!=='true'&&!diagnosticOnly)
+    throw new Error('institution-approved evidence retention is not asserted');
   if(!/^[1-9]\d*$/.test(values.THESIS_EVIDENCE_RETENTION_DAYS)) throw new Error('THESIS_EVIDENCE_RETENTION_DAYS must be a positive integer');
   const evidenceUrl=safeUrl(values.THESIS_EVIDENCE_BLOB_CONTAINER_URL,'THESIS_EVIDENCE_BLOB_CONTAINER_URL');
   if(!/^\/subscriptions\/[0-9a-f-]{36}\/resourceGroups\/[A-Za-z0-9._()-]+\/providers\/Microsoft\.Storage\/storageAccounts\/[a-z0-9]{3,24}\/blobServices\/default\/containers\/[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/i.test(values.THESIS_EVIDENCE_CONTAINER_RESOURCE_ID))
@@ -179,7 +184,10 @@ async function readVaultSecret({vaultUri,name,getToken,fetchImpl}) {
  * components is a test seam for local wiring tests. Production defaults always
  * use Azure SDK managed identities and existing fail-closed Azure adapters.
  */
-export default async function createAciP1PilotDependencies({rows,env=process.env,fetchImpl=fetch,components={}}={}) {
+async function createAciP1Dependencies({rows,env=process.env,fetchImpl=fetch,components={},diagnosticOnly=false}={}) {
+  if(diagnosticOnly && (!Array.isArray(rows)||rows.length!==1||(rows[0]?.scenario_id??rows[0]?.scenario)!=='U1'||
+    rows[0]?.deployment!=='azure_container_instances'||(rows[0]?.permission_profile??rows[0]?.profile)!=='P1'))
+    throw new Error('diagnostic-only ACI dependencies accept exactly one P1 U1 row; U5 is executed only as its paired operation');
   validateRows(rows,{...components,allowDefaultComposition:true});
   const c={
     identity:makeIdentity,
@@ -212,7 +220,7 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
     ...components
   };
   const hasLifecycle=rows.some(row=>['U6','U8'].includes(row?.scenario_id??row?.scenario));
-  const cfg=validateConfig(env);
+  const cfg=validateConfig(env,{diagnosticOnly});
   if(hasLifecycle) {
     let approval=false;
     try {approval=await c.verifyMethodApproval(c.methodDecision);} catch {approval=false;}
@@ -400,8 +408,18 @@ export default async function createAciP1PilotDependencies({rows,env=process.env
     resourceUrl:cfg.THESIS_ACI_RESEARCH_URL,verifierKey:resourceVerifierKey})(trial.runId),pilotMode:true});
   const verifier=c.verifierRouter({blobVerifier,collectorVerifier,resourceVerifier,
     ...(hasLifecycle?{sessionAnalogVerifier}:{})});
-  const evidenceStore=await c.evidenceStore({env:{...env,THESIS_TOKEN_PROVIDER_MODE:'managed_identity'},fetchImpl});
-  return {adapter,verifier,evidenceStore};
+  const evidenceStore=diagnosticOnly?undefined:
+    await c.evidenceStore({env:{...env,THESIS_TOKEN_PROVIDER_MODE:'managed_identity'},fetchImpl});
+  return {adapter,verifier,evidenceStore,...(diagnosticOnly?{diagnosticOnly:true}:{})};
+}
+
+export default async function createAciP1PilotDependencies(options={}) {
+  return createAciP1Dependencies({...options,diagnosticOnly:false});
+}
+
+/** One synthetic U1/U5 route check only; never constructs or writes evidence. */
+export async function createAciP1DiagnosticDependencies(options={}) {
+  return createAciP1Dependencies({...options,diagnosticOnly:true});
 }
 
 export {validateRows as validateAciP1DependencyRows,validateConfig as validateAciP1DependencyConfig,readVaultSecret};

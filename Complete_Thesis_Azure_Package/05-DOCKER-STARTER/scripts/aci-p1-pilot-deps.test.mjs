@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import createDeps,{validateAciP1DependencyConfig,validateAciP1DependencyRows} from './aci-p1-pilot-deps.mjs';
+import createDeps,{createAciP1DiagnosticDependencies,validateAciP1DependencyConfig,validateAciP1DependencyRows} from './aci-p1-pilot-deps.mjs';
 import {validateAciP1DraftSchedule} from './aci-p1-pilot-draft-validator.mjs';
 import {buildAciRunIdentitySpecs} from './aci-preprovisioned-identity-provider.mjs';
 
@@ -78,6 +78,12 @@ test('configuration validation identifies required inputs and rejects shared pri
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_IDENTITY_CLIENT_ID:env.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID}),/managed identities must be distinct/);
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_ACI_IMAGE_DIGEST_REFERENCE:'example.azurecr.io/agent:latest'}),/pinned by digest/);
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_RETENTION_APPROVED:'false'}),/retention is not asserted/);
+  assert.equal(validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_RETENTION_APPROVED:'false'},{diagnosticOnly:true})
+    .THESIS_EVIDENCE_RETENTION_APPROVED,'false');
+  assert.equal(validateAciP1DependencyConfig({...env,THESIS_ACI_COLLECTOR_URL:'https://10.48.9.5:8443'})
+    .THESIS_ACI_COLLECTOR_URL,'https://10.48.9.5:8443');
+  assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_ACI_COLLECTOR_URL:'https://10.48.9.5:9443'}),/credential-free HTTPS URL/);
+  assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_ACI_RESEARCH_URL:'https://10.48.9.4:8443'}),/credential-free HTTPS URL/);
 });
 
 test('approved method-decision metadata alone never enables U6/U8 dependencies',async()=>{
@@ -89,7 +95,7 @@ test('approved method-decision metadata alone never enables U6/U8 dependencies',
 });
 
 test('wires separated identity providers, Key Vault secrets, adapter, independent verifiers, and protected evidence store',async()=>{
-  const identityIds=[],secretReads=[],storageIds=[],logIds=[]; let captured;
+  const identityIds=[],secretReads=[],storageIds=[],logIds=[]; let captured,evidenceStoreCalls=0;
   const mockCredential=clientId=>{identityIds.push(clientId);return {getToken:async()=>({token:'mock-token'})};};
   const components={
     identityLifecycleRoleDefinitionId:`/subscriptions/${id(1)}/providers/Microsoft.Authorization/roleDefinitions/${id(15)}`,
@@ -119,7 +125,7 @@ test('wires separated identity providers, Key Vault secrets, adapter, independen
       createdAt:'2026-11-04T12:00:00Z'}),
     readAciLifecycleEvidence:async()=>({source:'azure_aci_arm_activity_snapshot_v1',readOnly:true,
       observerPrincipalId:env.THESIS_ACI_AUDIT_PRINCIPAL_OBJECT_ID,snapshot:{}}),
-    evidenceStore:async args=>{captured={...(captured??{}),evidenceArgs:args};return {claim:async()=>{},save:async()=>{}};}
+    evidenceStore:async args=>{evidenceStoreCalls++;captured={...(captured??{}),evidenceArgs:args};return {claim:async()=>{},save:async()=>{}};}
   };
   const deps=await createDeps({rows:[row('U1'),row('U4'),row('U5'),row('U7'),row('L1'),...lifecycleRows],env,components});
   assert.equal(typeof deps.adapter,'object');assert.equal(typeof deps.verifier,'function');
@@ -142,4 +148,11 @@ test('wires separated identity providers, Key Vault secrets, adapter, independen
   assert.equal(Object.hasOwn(deps,'gates'),false);
   assert.equal(captured.evidenceArgs.env.THESIS_TOKEN_PROVIDER_MODE,'managed_identity');
   assert.equal(captured.evidenceArgs.env.THESIS_EVIDENCE_RETENTION_APPROVED,'true');
+  const diagnostic=await createAciP1DiagnosticDependencies({rows:[{...row('U1'),planned_run_id:'diag-only-new-id'}],
+    env:{...env,THESIS_EVIDENCE_RETENTION_APPROVED:'false'},components});
+  assert.equal(diagnostic.diagnosticOnly,true);
+  assert.equal(diagnostic.evidenceStore,undefined);
+  assert.equal(evidenceStoreCalls,1,'diagnostic factory must not construct or write to the measured evidence store');
+  await assert.rejects(createAciP1DiagnosticDependencies({rows:[row('U1'),row('U5')],env,components}),/exactly one P1 U1 row/);
+  await assert.rejects(createAciP1DiagnosticDependencies({rows:[{...row('U1'),permission_profile:'P2'}],env,components}),/exactly one P1 U1 row/);
 });
