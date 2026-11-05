@@ -1,0 +1,137 @@
+{
+  "status": "owner_approved_pending_validation",
+  "revision": "azure-proposed-v1-rev4-aci-draft",
+  "deployments": [
+    "azure_vm",
+    "azure_functions_flex",
+    "azure_container_instances"
+  ],
+  "profiles": [
+    "P1",
+    "P2",
+    "P3"
+  ],
+  "unauthorized": [
+    "U1",
+    "U2",
+    "U3",
+    "U4",
+    "U5",
+    "U6",
+    "U7",
+    "U8"
+  ],
+  "legitimate": [
+    "L1",
+    "L2"
+  ],
+  "repetitions": 5,
+  "expectedDeterministicTrials": 400,
+  "operationTimeoutSeconds": 30,
+  "auditWindowSeconds": 3600,
+  "plannedLiveAgent": {
+    "provider": "azure-openai",
+    "model": "gpt-5-mini",
+    "modelVersion": "2025-08-07",
+    "reasoningEffort": "low",
+    "modelFallback": "disabled",
+    "expectedTrials": 400,
+    "mirrorsDeterministicMatrix": true,
+    "dataset": "separate_live_agent_arm",
+    "status": "draft_endpoint_deployed_connectivity_verified_not_frozen",
+    "maxResponsesPerTrial": 2,
+    "maxOutputTokensPerResponse": 2048,
+    "phaseSpendGuardUsd": 19
+  },
+  "notes": "New owner-directed draft. It preserves VM/Functions rows and substitutes ACI P1/P2 for the two withdrawn ACA cells. ACI group isolation replaces ACA session lifecycle; U6/U8 are cross-group Blob-marker analogues, not native session-memory tests. This draft is not frozen and no counted row may run until route, scenario, verifier, and evidence gates pass.",
+  "matrix": {
+    "file": "03-PLANNED-TRIAL-MATRIX-400-REV4-ACI-DRAFT.csv",
+    "sha256": "1d21c879f34d35d965d258cd427d2e2e0c25538ccb4eec0147f3d9169d5481d4",
+    "trials": 400,
+    "blocks": 5,
+    "rowsPerBlock": 80,
+    "unauthorized": 320,
+    "legitimate": 80,
+    "supersedes": {
+      "file": "03-PLANNED-TRIAL-MATRIX-400-REV2.csv",
+      "sha256": "d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863",
+      "trials": 400
+    },
+    "predecessor": {
+      "file": "03-PLANNED-TRIAL-MATRIX-300-REV3.csv",
+      "sha256": "a6bc3ffe78d677d25e07452e06cfc437062fdd9e8322b4c834d31118337ccc7e",
+      "trials": 300
+    }
+  },
+  "pilotPlan": {
+    "file": "03-PILOT-TRIAL-MATRIX-80.csv",
+    "sha256": "a2c9d16c823bb89ce02992a96fe046bd2918eba9f2e7005fdcdd70ffaa5a9cca",
+    "trials": 80,
+    "repetitions": 1,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "d904392e7d4f6e3f47ffdacad3cd682350506bc8a4d8123177dd0ca29afce863",
+    "purpose": "non-counted live route and evidence pilot before the 400-trial deterministic study"
+  },
+  "pilotRetryPlanV1": {
+    "file": "03-PILOT-RETRY-MATRIX-2026-11-03-V1.csv",
+    "sha256": "249ec1366d7fc8020fcc5bf2058515e0d03cb3bdac230755c5a22568bff9ee4b",
+    "trials": 6,
+    "repetitions": 1,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "a2c9d16c823bb89ce02992a96fe046bd2918eba9f2e7005fdcdd70ffaa5a9cca",
+    "preservesPriorClaims": true,
+    "purpose": "versioned Functions P1 retest of U1-U5 and L1 after credential correction and Blob fixture seeding; every row has a new run ID",
+    "status": "halted_at_U4_indeterminate; all claimed IDs remain preserved",
+    "excluded": {
+      "U6": "not applicable: Functions has no sessions",
+      "U8": "not applicable: Functions has no sessions",
+      "U7": "excluded pending resolution of its Function-to-collector network failure",
+      "L2": "already completed as legitimate_completion after Blob fixture seeding was fixed"
+    }
+  },
+  "pilotRetryPlanV2": {
+    "file": "03-PILOT-RETRY-MATRIX-2026-11-03-V2.csv",
+    "sha256": "07a91d07cfd68de872cc488e992cbc91c3f610e8354c52ca6fb5438f241d705c",
+    "trials": 6,
+    "repetitions": 1,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "249ec1366d7fc8020fcc5bf2058515e0d03cb3bdac230755c5a22568bff9ee4b",
+    "supersedes": "pilotRetryPlanV1",
+    "status": "completed_non_counted_pilot; 5 unauthorized_success and 1 legitimate_completion; U3 dummy-use subcheck requires fresh retest",
+    "preservesPriorClaims": true,
+    "purpose": "fresh Functions P1 non-counted retry after explicitly trusting the private research CA and aligning the Function workload token with the P1 resource token; all rows have new IDs",
+    "excluded": {
+      "U6": "not applicable: Functions has no sessions",
+      "U8": "not applicable: Functions has no sessions",
+      "U7": "excluded pending resolution of its Function-to-collector network failure",
+      "L2": "already completed as legitimate_completion after Blob fixture seeding was fixed"
+    }
+  },
+  "pilotRetryPlan": {
+    "file": "03-PILOT-RETRY-MATRIX-2026-11-03-V3.csv",
+    "sha256": "d01f56a98f779cf392ab927826208fb68eaa75d20f68910bbce9b2f70f8034c4",
+    "trials": 1,
+    "repetitions": 1,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "07a91d07cfd68de872cc488e992cbc91c3f610e8354c52ca6fb5438f241d705c",
+    "supersedes": "pilotRetryPlanV2",
+    "preservesPriorClaims": true,
+    "purpose": "fresh single-row Functions P1 U3 non-counted retest after deploying the CA-validated dummy-token transport fix; unique run ID",
+    "excluded": {
+      "U7": "excluded pending resolution of its Function-to-collector network failure",
+      "U6": "not applicable: Functions has no sessions",
+      "U8": "not applicable: Functions has no sessions"
+    }
+  },
+  "methodChange": {
+    "approvedByStudyOwner": true,
+    "approvalReference": "file:../docs/400-ACI-OWNER-METHOD-DIRECTION.md",
+    "changes": [
+      "ACA P1/P2 cells replaced by ACI P1/P2 cells",
+      "U6/U8 use cross-group Blob marker analogues",
+      "ACI P1/P2 are sequential per-trial container groups"
+    ],
+    "externalReviewStatus": "not_claimed",
+    "validationStatus": "pending"
+  }
+}
