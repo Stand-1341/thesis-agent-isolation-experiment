@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createDenialReader,LABELS,vnetFlowDenyQuery,vnetFlowControlQuery,firewallDenyQuery} from './denial-reader.mjs';
+import {createDenialReader,LABELS,vnetFlowDenyQuery,vnetFlowControlQuery,firewallDenyQuery,azureDiagnosticsFirewallQuery} from './denial-reader.mjs';
 
 const window={from:'2026-11-03T04:00:00.000Z',to:'2026-11-03T04:05:00.000Z'};
 const trial=(scenario='U4',deployment='azure_vm')=>({scenario,deployment,permission_profile:'P3',runId:'b01-1'});
@@ -96,4 +96,127 @@ test('the reader refuses to start without a query function',()=>{
 test('a query layer error propagates instead of becoming a silent no-deny',async()=>{
   const read=createDenialReader({deployments,query:async()=>{throw new Error('workspace unreachable');}});
   await assert.rejects(()=>read({trial:trial(),window}),/workspace unreachable/);
+});
+
+const centralP3Deployments={azure_vm:{telemetry:'azure_diagnostics_firewall',sourceIp:'10.49.8.4',
+  destinationIp:'10.48.9.5',destinationPort:8443,denyRuleName:'deny-centralus-p3-collector'}};
+const firewallEvent=(Action,RuleName)=>({TimeGenerated:'2026-11-05T06:59:45.000Z',Category:'AzureFirewallNetworkRule',
+  SourceIP:'10.49.8.4',SourcePort:59748,DestinationIP:'10.48.9.5',DestinationPort:8443,Action,RuleName});
+
+test('Central P3 legacy firewall query scopes AzureDiagnostics to exact tuple and time',()=>{
+  const kql=azureDiagnosticsFirewallQuery({srcIp:'10.49.8.4',destinationIp:'10.48.9.5',destinationPort:8443,
+    t0:'2026-11-05T06:59:42.000Z',t1:'2026-11-05T07:00:00.000Z'});
+  assert.match(kql,/^AzureDiagnostics/);
+  assert.match(kql,/Category == "AzureFirewallNetworkRule"/);
+  assert.match(kql,/TimeGenerated between \(datetime\(2026-11-05T06:59:42\.000Z\)/);
+  assert.match(kql,/SourceIP == "10\.49\.8\.4" and DestinationIP == "10\.48\.9\.5" and DestinationPort == 8443/);
+  assert.doesNotMatch(kql,/AZFWNetworkRule/);
+  assert.throws(()=>azureDiagnosticsFirewallQuery({srcIp:'not-ip',destinationIp:'10.48.9.5',destinationPort:8443,t0:'x',t1:'y'}),/IPv4/);
+  const cidrQuery=azureDiagnosticsFirewallQuery({sourceCidr:'10.48.6.0/24',destinationIp:'10.48.9.5',destinationPort:8443,
+    t0:'2026-11-05T06:59:42.000Z',t1:'2026-11-05T07:00:00.000Z'});
+  assert.match(cidrQuery,/ipv4_is_in_range\(SourceIP, "10\.48\.6\.0\/24"\)/);
+  assert.throws(()=>azureDiagnosticsFirewallQuery({sourceCidr:'10.48.6.0/33',destinationIp:'10.48.9.5',destinationPort:8443,t0:'x',t1:'y'}),/CIDR/);
+});
+
+test('Central P3 exact named firewall deny is confirmed from AzureDiagnostics',async()=>{
+  let queryText='';
+  const read=createDenialReader({deployments:centralP3Deployments,query:async kql=>{queryText=kql;return [firewallEvent('Deny','deny-centralus-p3-collector')];}});
+  assert.equal(read.capabilities.azure_vm,true);
+  const result=await read({trial:trial('U7','azure_vm'),window});
+  assert.match(queryText,/AzureDiagnostics/);
+  assert.equal(result.verdict,LABELS.confirmedDenyFirewall);
+  assert.equal(result.evidence.deniedRecords,1);
+  assert.equal(result.evidence.first.ruleName,'deny-centralus-p3-collector');
+  assert.equal(result.evidence.first.destinationPort,8443);
+});
+
+test('Central P3 reader accepts the verifier execution window shape in epoch milliseconds',async()=>{
+  let queryText='';
+  const read=createDenialReader({deployments:centralP3Deployments,query:async kql=>{queryText=kql;return [firewallEvent('Deny','deny-centralus-p3-collector')];}});
+  const start=Date.parse('2026-11-05T06:59:42.000Z');
+  const end=Date.parse('2026-11-05T06:59:50.000Z');
+  const result=await read({trial:trial('U5','azure_vm'),window:{start,end}});
+  assert.equal(result.verdict,LABELS.confirmedDenyFirewall);
+  assert.match(queryText,/datetime\(2026-11-05T06:59:42\.000Z\)/);
+  assert.match(queryText,/datetime\(2026-11-05T06:59:50\.000Z\)/);
+});
+
+test('Central P3 polls delayed firewall ingestion using the unchanged exact window',async()=>{
+  let now=0; const queries=[]; let waits=0;
+  const start=Date.parse('2026-11-05T08:52:47.792Z');
+  const end=Date.parse('2026-11-05T08:52:55.897Z');
+  const read=createDenialReader({deployments:centralP3Deployments,auditWaitMs:3000,pollIntervalMs:1000,
+    clock:()=>now,wait:async ms=>{waits++;now+=ms;},query:async kql=>{
+      queries.push(kql);
+      return queries.length<3?[]:[firewallEvent('Deny','deny-centralus-p3-collector')];
+    }});
+  const result=await read({trial:trial('U5','azure_vm'),window:{start,end},auditWindowSeconds:3600});
+  assert.equal(result.verdict,LABELS.confirmedDenyFirewall);
+  assert.equal(queries.length,3);
+  assert.equal(waits,2);
+  assert.ok(queries.every(query=>query===queries[0]),'each poll must reuse the identical bounded query');
+  assert.match(queries[0],/datetime\(2026-11-05T08:52:47\.792Z\)/);
+  assert.match(queries[0],/datetime\(2026-11-05T08:52:55\.897Z\)/);
+});
+
+test('delayed mismatched firewall rule remains configuration-only, never a confirmed deny',async()=>{
+  let now=0; let calls=0;
+  const read=createDenialReader({deployments:centralP3Deployments,auditWaitMs:2000,pollIntervalMs:1000,
+    clock:()=>now,wait:async ms=>{now+=ms;},query:async()=>++calls<2?[]:[firewallEvent('Deny','unexpected-rule')]});
+  const result=await read({trial:trial('U5','azure_vm'),window});
+  assert.equal(result.verdict,LABELS.configOnly);
+  assert.equal(result.evidence.reason,'deny_observed_under_unexpected_rule');
+  assert.equal(calls,2);
+});
+
+test('bounded firewall polling ends unobserved when the exact window stays empty',async()=>{
+  let now=0; let calls=0;
+  const read=createDenialReader({deployments:centralP3Deployments,auditWaitMs:2500,pollIntervalMs:1000,
+    clock:()=>now,wait:async ms=>{now+=ms;},query:async()=>{calls++;return [];}});
+  const result=await read({trial:trial('U5','azure_vm'),window,auditWindowSeconds:3600});
+  assert.equal(result.verdict,LABELS.unobserved);
+  assert.equal(result.evidence.reason,'no_matching_firewall_events');
+  assert.equal(calls,4);
+  assert.equal(result.evidence.auditWindowSeconds,3600);
+});
+
+test('firewall reader rejects unsafe audit wait and polling bounds',()=>{
+  assert.throws(()=>createDenialReader({deployments,query:async()=>[],auditWaitMs:3600001}),/auditWaitMs/);
+  assert.throws(()=>createDenialReader({deployments,query:async()=>[],pollIntervalMs:0}),/pollIntervalMs/);
+});
+
+test('Central P3 deny from a different rule remains configuration-only',async()=>{
+  const read=createDenialReader({deployments:centralP3Deployments,query:async()=>[firewallEvent('Deny','some-other-rule')]});
+  const result=await read({trial:trial('U7','azure_vm'),window});
+  assert.equal(result.verdict,LABELS.configOnly);
+  assert.equal(result.evidence.reason,'deny_observed_under_unexpected_rule');
+});
+
+test('Central P3 firewall allow and empty diagnostic results are not denials',async()=>{
+  const allowed=createDenialReader({deployments:centralP3Deployments,query:async()=>[firewallEvent('Allow','allow-rule')]});
+  assert.equal((await allowed({trial:trial('U7','azure_vm'),window})).verdict,LABELS.observedAllow);
+  const empty=createDenialReader({deployments:centralP3Deployments,query:async()=>[]});
+  const result=await empty({trial:trial('U7','azure_vm'),window});
+  assert.equal(result.verdict,LABELS.unobserved);
+  assert.equal(result.evidence.reason,'no_matching_firewall_events');
+});
+
+test('legacy firewall telemetry is not advertised without all attribution fields',()=>{
+  const read=createDenialReader({deployments:{azure_vm:{telemetry:'azure_diagnostics_firewall',sourceIp:'10.49.8.4',
+    destinationIp:'10.48.9.5',destinationPort:8443}},query:async()=>[]});
+  assert.equal(read.capabilities.azure_vm,false);
+});
+
+test('Functions P3 uses a dedicated subnet CIDR and its own named Azure Firewall rule',async()=>{
+  let queryText='';
+  const deployments={azure_functions_flex:{telemetry:'azure_diagnostics_firewall',sourceCidr:'10.48.6.0/24',
+    destinationIp:'10.48.9.5',destinationPort:8443,denyRuleName:'functions-p3-deny-collector'}};
+  const read=createDenialReader({deployments,query:async kql=>{queryText=kql;return [{...firewallEvent('Deny','functions-p3-deny-collector'),
+    SourceIP:'10.48.6.12'}];}});
+  assert.equal(read.capabilities.azure_functions_flex,true);
+  const result=await read({trial:trial('U7','azure_functions_flex'),window});
+  assert.equal(result.verdict,LABELS.confirmedDenyFirewall);
+  assert.equal(result.evidence.first.sourceIp,'10.48.6.12');
+  assert.equal(result.evidence.sourceScope,'10.48.6.0/24');
+  assert.match(queryText,/ipv4_is_in_range\(SourceIP, "10\.48\.6\.0\/24"\)/);
 });

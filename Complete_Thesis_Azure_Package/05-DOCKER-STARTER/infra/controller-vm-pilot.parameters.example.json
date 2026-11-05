@@ -17,6 +17,7 @@
       "value": [
         "login.microsoftonline.com",
         "login.microsoft.com",
+        "graph.microsoft.com",
         "management.azure.com",
         "api.loganalytics.azure.com",
         "thesisexpkv20261103.vault.azure.net",

@@ -1,0 +1,91 @@
+{
+  "_comment": "Live route endpoints and managed identity object IDs as observed on 2026-11-05. P3 VM Central is staged but is not yet validated for measured use. This file contains no credentials and does not establish readiness gates.",
+  "evidenceDirectory": "results/evidence",
+  "auditWindowSeconds": 3600,
+  "deployments": {
+    "azure_vm": {
+      "kind": "http",
+      "agentUrl": "https://10.48.0.4",
+      "resourceUrl": "https://10.48.9.4",
+      "collectorUrl": "https://10.48.9.5:8443",
+      "timeoutMs": 30000
+    },
+    "azure_functions_flex": {
+      "kind": "http",
+      "resourceUrl": "https://10.48.9.4",
+      "collectorUrl": "https://10.48.9.5:8443",
+      "timeoutMs": 30000
+    }
+  },
+  "routes": [
+    {
+      "deployment": "azure_vm",
+      "profile": "P1",
+      "agentUrl": "https://10.48.0.4",
+      "principalObjectId": "37fcb428-951e-48a8-aec2-e9918dedba29",
+      "credentials": {
+        "controller": "THESIS_VM_P1_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY"
+      }
+    },
+    {
+      "deployment": "azure_vm",
+      "profile": "P2",
+      "agentUrl": "https://10.48.7.4",
+      "principalObjectId": "dd6be331-a53b-4c08-8a63-7745e98b3952",
+      "credentials": {
+        "controller": "THESIS_VM_P2_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY"
+      }
+    },
+    {
+      "deployment": "azure_vm",
+      "profile": "P3",
+      "agentUrl": "https://10.49.8.4",
+      "principalObjectId": "d599bd8d-0998-46f5-8dae-c9abd9a9ede7",
+      "credentials": {
+        "controller": "THESIS_VM_P3_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY"
+      }
+    },
+    {
+      "deployment": "azure_functions_flex",
+      "profile": "P1",
+      "agentUrl": "https://thesis-flex-pilot-20261103.azurewebsites.net/api",
+      "principalObjectId": "7a1fd40a-3c8d-4d21-b8ae-a0fb938591d4",
+      "credentials": {
+        "controller": "THESIS_FN_P1_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY",
+        "functionKey": "THESIS_FN_P1_FUNCTION_KEY"
+      }
+    },
+    {
+      "deployment": "azure_functions_flex",
+      "profile": "P2",
+      "agentUrl": "https://thesis-flex-p2-20261105.azurewebsites.net/api",
+      "principalObjectId": "76174085-c59c-4cc8-9409-b019eea36f61",
+      "credentials": {
+        "controller": "THESIS_FN_P2_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY",
+        "functionKey": "THESIS_FN_P2_FUNCTION_KEY"
+      }
+    },
+    {
+      "deployment": "azure_functions_flex",
+      "profile": "P3",
+      "agentUrl": "https://thesis-flex-p3-20261105.azurewebsites.net/api",
+      "principalObjectId": "da87656a-277f-4fff-abdc-88275362fff0",
+      "credentials": {
+        "controller": "THESIS_FN_P3_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY",
+        "functionKey": "THESIS_FN_P3_FUNCTION_KEY"
+      }
+    }
+  ]
+}

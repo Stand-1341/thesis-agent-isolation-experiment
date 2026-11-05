@@ -220,7 +220,8 @@ export function createAciBlobSessionIndependentVerifier({
     const blockers=[];
     const result=(classification,extra={})=>({classification,evidence:{scope:'independent_aci_session_analog_verification',
       runId:trial?.runId??null,scenario:trial?.scenario??null,independent:true,blockers:[...new Set(blockers)],...extra}});
-    if(!trial||!['U6','U8'].includes(trial.scenario)||trial.deployment!=='azure_container_instances'||trial.profile!=='P1'||!RUN.test(trial.runId||''))
+    if(!trial||!['U6','U8'].includes(trial.scenario)||trial.deployment!=='azure_container_instances'||
+      !['P1','P2'].includes(trial.profile)||!RUN.test(trial.runId||''))
       return result('indeterminate',{reason:'scenario_not_supported_or_trial_invalid'});
     const evidence=observations?.evidence?.aciSessionAnalog?.evidence;
     if(!evidence||evidence.scope!=='candidate_aci_cross_group_blob_analogue'||evidence.runId!==trial.runId||

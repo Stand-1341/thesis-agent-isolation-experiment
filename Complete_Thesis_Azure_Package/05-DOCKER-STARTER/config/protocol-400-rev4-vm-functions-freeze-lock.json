@@ -1,0 +1,9 @@
+{
+  "status": "frozen_for_measured_execution",
+  "protocolFile": "config/protocol-400-rev4-vm-functions-draft.json",
+  "protocolSha256": "a6292251ac30816f8b0b61fc68f672ff7c447caa28247b3522c64e0fbfd73ea8",
+  "matrixFile": "03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-EXECUTABLE-NO-ACI-DRAFT-V3.csv",
+  "matrixSha256": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+  "evidence": "docs/400-REV4-READINESS-FREEZE-2026-11-05.md",
+  "scope": "owner-directed VM/Functions; no institutional approval claimed"
+}

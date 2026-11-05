@@ -1,12 +1,14 @@
 /** Route a validated plan to explicitly supplied deployment/profile adapters. */
 import {EXPERIMENT_ROUTES} from './experiment-config.mjs';
 const guid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const INJECTABLE_ROUTE_KEYS=['azure_container_instances:P1','azure_container_instances:P2'];
+const SUPPORTED_ROUTE_KEYS=[...EXPERIMENT_ROUTES,...INJECTABLE_ROUTE_KEYS];
 
 export function createTrialAdapterRouter(routes,{requiredRoutes}={}) {
   if(!routes || typeof routes!=='object' || Array.isArray(routes)) throw new Error('invalid routes');
   const expected=EXPERIMENT_ROUTES;
   const required=requiredRoutes?[...new Set(requiredRoutes)]:expected;
-  if(required.some(key=>!expected.includes(key))) throw new Error('unknown required deployment/profile route');
+  if(required.some(key=>!SUPPORTED_ROUTE_KEYS.includes(key))) throw new Error('unknown required deployment/profile route');
     if(JSON.stringify(Object.keys(routes).sort())!==JSON.stringify([...required].sort()))
     throw new Error(requiredRoutes?'routes must exactly match selected deployment/profile routes':`all ${expected.length} revision-3 deployment/profile routes are required`);
   const identities=new Set();

@@ -7,9 +7,11 @@ import {createHttpPilotAdapter} from './http-pilot-adapter.mjs';
 test('pilot adapter keeps controller and fixture credentials on their intended requests', async()=>{
   const seen=[];
   const server=createServer((req,res)=>{
-    seen.push({path:req.url,admin:req.headers['x-admin-token'],controller:req.headers['x-trial-key'],functionKey:req.headers['x-functions-key']});
+    let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>{
+    seen.push({path:req.url,admin:req.headers['x-admin-token'],controller:req.headers['x-trial-key'],functionKey:req.headers['x-functions-key'],body:body?JSON.parse(body):undefined});
     res.setHeader('content-type','application/json');
     res.end(JSON.stringify(req.url.endsWith('/health')?{ready:true}:req.url==='/resource/admin/reset'?{u5Marker:'SYNTHETIC-test'}:{ok:true}));
+    });
   }).listen(0,'127.0.0.1');
   await once(server,'listening');
   try {
@@ -27,6 +29,9 @@ test('pilot adapter keeps controller and fixture credentials on their intended r
       if (request.path.startsWith('/agent/')) assert.deepEqual([request.admin,request.controller],[undefined,'controller-secret']);
       assert.equal(request.functionKey,request.path.startsWith('/agent/')?'function-secret':undefined);
     }
+    const u5Request=seen.find(value=>value.path==='/agent/run');
+    assert.match(u5Request.body.requestId,/^u5-[0-9a-f]{64}$/);
+    assert.equal(u5Request.body.runId,'test');
     assert.throws(()=>createHttpPilotAdapter({resourceUrl:`${origin}/resource`,collectorUrl:`${origin}/collector`,agentUrl:`${origin}/agent`,
       resourceAdminToken:'a',collectorAdminToken:'b',controllerToken:'c',functionKey:'bad\nkey'}),/invalid function key/);
     assert.throws(()=>createHttpPilotAdapter({resourceUrl:'http://example.com'}));

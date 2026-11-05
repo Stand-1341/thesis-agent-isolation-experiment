@@ -163,7 +163,7 @@ export function createAzureEffectiveBlobAccessReviewer({getManagementToken,getGr
     typeof reviewCredentialPaths!=='function'||typeof fetchImpl!=='function'||typeof now!=='function'||!GUID.test(observerPrincipalId||''))
     throw new Error('Azure Blob access reviewer requires separate ARM/Graph tokens, an observer, an independent credential-path reviewer, and protected snapshot storage');
 
-  async function runReview({principalId,runId,scenario,container,targetResourceId}) {
+  async function runReview({principalId,identityResourceId,runId,scenario,container,targetResourceId}) {
     if(!GUID.test(principalId||'')||!RUN.test(runId||'')||!['U6','U8'].includes(scenario)||!['session-b','prior-session'].includes(container)||
       !CONTAINER_ARM.test(targetResourceId||'')) throw new Error('invalid Azure Blob access review target');
     const armToken=await getManagementToken(),graphToken=await getGraphToken();
@@ -259,7 +259,7 @@ export function createAzureEffectiveBlobAccessReviewer({getManagementToken,getGr
       // review; the later ACI observer must still independently verify the
       // actual group identity attachments during creation.
       const credentialReview=await reviewCredentialPaths({principalId:principalId.toLowerCase(),runId,container,
-        targetResourceId,observerPrincipalId:observerPrincipalId.toLowerCase(),phase:'identity_pre_group'});
+        identityResourceId, targetResourceId,observerPrincipalId:observerPrincipalId.toLowerCase(),phase:'identity_pre_group'});
       if(!credentialReview||credentialReview.status!=='complete'||credentialReview.source!=='azure_live_identity_credential_path_review_v1'||
         credentialReview.runId!==runId||credentialReview.principalId?.toLowerCase()!==principalId.toLowerCase()||
         credentialReview.container!==container||credentialReview.resourceId?.toLowerCase()!==targetResourceId.toLowerCase()||
@@ -302,7 +302,7 @@ export function createAzureEffectiveBlobAccessReviewer({getManagementToken,getGr
 
   return Object.freeze({
     async reviewIdentityAccess({identity,runId,scenario,container,targetResourceId}) {
-      const result=await runReview({principalId:identity?.objectId,runId,scenario,container,targetResourceId});
+      const result=await runReview({principalId:identity?.objectId,identityResourceId:identity?.resourceId,runId,scenario,container,targetResourceId});
       return {status:'complete',runId:result.runId,principalId:result.principalId,container,observerPrincipalId:result.observerPrincipalId,
         readMethod:'azure_role_assignments_effective_snapshot',httpStatus:200,observedAt:result.observedAt,
         snapshotFingerprint:result.snapshotFingerprint,evidenceReference:result.evidenceReference,
@@ -310,7 +310,7 @@ export function createAzureEffectiveBlobAccessReviewer({getManagementToken,getGr
         unknownRoleDefinitions:result.unknownRoleDefinitions,effectiveRoleAssignments:result.effectiveRoleAssignments};
     },
     evaluateEffectiveAccess:({identity,runId,scenario,container,targetResourceId})=>
-      runReview({principalId:identity?.objectId,runId,scenario,container,targetResourceId})
+      runReview({principalId:identity?.objectId,identityResourceId:identity?.resourceId,runId,scenario,container,targetResourceId})
   });
 }
 

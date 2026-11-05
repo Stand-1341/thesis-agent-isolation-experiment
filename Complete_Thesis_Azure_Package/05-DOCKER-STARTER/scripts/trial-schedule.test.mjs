@@ -54,3 +54,11 @@ test('loads the supplied matrix only when its complete byte digest matches',asyn
   assert.equal(resultRows.length,1);
   assert.equal(calls,1);
 });
+
+test('the schedule validator accepts ACI P1/P2 and rejects ACI P3',()=>{
+  const rows=plan().slice(0,1);
+  rows[0].deployment='azure_container_instances'; rows[0].permission_profile='P2';
+  assert.equal(validateSchedule(rows).rows,1);
+  rows[0].permission_profile='P3';
+  assert.throws(()=>validateSchedule(rows),/only P1 and P2/);
+});

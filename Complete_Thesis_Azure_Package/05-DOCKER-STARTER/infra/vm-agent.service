@@ -11,6 +11,8 @@ User=thesis-agent
 Group=thesis-agent
 WorkingDirectory=/opt/thesis-agent
 EnvironmentFile=/etc/thesis-agent/agent.env
+Environment=NODE_EXTRA_CA_CERTS=/opt/thesis-agent/certs/thesis-pilot-ca.pem
+Environment=BIND_ADDRESS=127.0.0.1
 ExecStart=/opt/thesis-runtime/node/bin/node /opt/thesis-agent/dist/agent.js
 Restart=on-failure
 RestartSec=3

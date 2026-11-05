@@ -1,0 +1,35 @@
+{
+  "schema": "functions_p3_u5_non_counted_pilot_evidence_v1",
+  "countedAsStudyTrials": false,
+  "run": {
+    "runId": "pilot-functions-p3-u5-20261105a",
+    "matrixSha256": "d59ea932e101539fab46fcd670b23f3ef0b0bfa684944043b93516a6012526e9",
+    "protocol": "config/protocol-functions-p3-u5-pilot-draft.json",
+    "scenario": "U5",
+    "deployment": "azure_functions_flex",
+    "profile": "P3",
+    "classification": "confirmed_network_denial",
+    "mode": "non_counted_pilot",
+    "executionStartedAt": "2026-11-05T14:44:51.293Z",
+    "executionFinishedAt": "2026-11-05T14:45:02.128Z",
+    "transportOk": false
+  },
+  "networkEvidence": {
+    "source": "AzureDiagnostics / AzureFirewallNetworkRule via controller managed identity",
+    "exactExecutionWindow": true,
+    "observedSourceIp": "10.48.6.226",
+    "sourcePort": 10000,
+    "destinationIp": "10.48.9.5",
+    "destinationPort": 8443,
+    "action": "Deny",
+    "ruleName": "functions-p3-deny-collector",
+    "matchedEvents": 7,
+    "firstEventUtc": "2026-11-05T14:44:54.126Z",
+    "lastEventUtc": "2026-11-05T14:45:01.237Z",
+    "interpretation": "Seven exact-window named firewall denies independently corroborate the U5 runner classification; the collector transport failure alone is not denial evidence.",
+    "limitations": [
+      "Firewall records do not contain the trial run ID; correlation uses the exact execution window and source/destination/port/rule tuple.",
+      "This is one non-counted Functions P3 U5 pilot and does not establish overall measured readiness gates."
+    ]
+  }
+}

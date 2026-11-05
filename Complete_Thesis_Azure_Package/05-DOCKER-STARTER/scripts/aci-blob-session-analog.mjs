@@ -157,7 +157,8 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
         role,trial.runId,container,markerTarget?.resourceId);
       if(createdIdentities.some(item=>item.objectId===value.objectId)||createdIdentities.some(item=>item.clientId===value.clientId))
         throw new Error('ACI session analogue identities must be distinct within a run');
-      createdIdentities.push(value);events.push({stage:'identity_created',role,objectId:value.objectId,resourceId:value.resourceId,at:value.createdAt});
+      createdIdentities.push(value);events.push({stage:'identity_created',role,objectId:value.objectId,resourceId:value.resourceId,
+        assignmentIds:(value.accessReview?.effectiveRoleAssignments||[]).map(item=>item.assignmentId).filter(item=>typeof item==='string'),at:value.createdAt});
       const access=validateEffectiveAccess(await evaluateEffectiveAccess({identity:value,runId:trial.runId,scenario:trial.scenario,
         role,container,targetResourceId:markerTarget.resourceId}),{runId:trial.runId,principalId:value.objectId,
         container,targetResourceId:markerTarget.resourceId});
@@ -169,7 +170,8 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
       if(allGroups.some(item=>item.name===value.name||item.resourceId.toLowerCase()===value.resourceId.toLowerCase()))
         throw new Error('ACI session analogue groups must have distinct names and resource IDs');
       createdGroups.push(value);allGroups.push(value);events.push({stage:'group_ready',phase,name:value.name,
-        resourceId:value.resourceId,identityObjectId:id.objectId,at:value.createdAt});
+        resourceId:value.resourceId,identityObjectId:id.objectId,attachedPrincipalObjectIds:value.attachedPrincipalObjectIds,
+        ...(value.lifecycleEvidence?{lifecycleEvidence:value.lifecycleEvidence}:{}),at:value.createdAt});
       return value;
     };
     const observeRequest=async(request,expected)=>{
@@ -259,8 +261,10 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
           sourceStateAfter.identityObjectId?.toLowerCase()!==sourceIdentity.objectId||
           !Number.isFinite(Date.parse(sourceStateAfter.observedAt))||Date.parse(sourceStateAfter.observedAt)<Date.parse(probe.startedAt))
           throw new Error('U6 source group was not proven active during the probe');
-        observations.u6SourceActiveBefore={name:source.name,state:sourceState.state,observedAt:sourceState.observedAt};
-        observations.u6SourceActiveAfter={name:source.name,state:sourceStateAfter.state,observedAt:sourceStateAfter.observedAt};
+        observations.u6SourceActiveBefore={name:source.name,state:sourceState.state,observedAt:sourceState.observedAt,
+          ...(sourceState.lifecycleEvidence?{lifecycleEvidence:sourceState.lifecycleEvidence}:{})};
+        observations.u6SourceActiveAfter={name:source.name,state:sourceStateAfter.state,observedAt:sourceStateAfter.observedAt,
+          ...(sourceStateAfter.lifecycleEvidence?{lifecycleEvidence:sourceStateAfter.lifecycleEvidence}:{})};
       } else {
         const sourceDeletion=await deleteGroup({group:source,trial,phase:'source'});
         if(sourceDeletion?.deleted!==true||sourceDeletion.name!==source.name||!Number.isFinite(Date.parse(sourceDeletion.absentAt)))
@@ -270,8 +274,10 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
           !Number.isFinite(Date.parse(sourceAfter.observedAt))||Date.parse(sourceAfter.observedAt)<Date.parse(sourceDeletion.absentAt))
           throw new Error('U8 source group absence was not independently observed');
         createdGroups.splice(createdGroups.indexOf(source),1);
-        events.push({stage:'source_group_absent',name:source.name,at:sourceDeletion.absentAt});
-        observations.u8SourceAbsent={name:source.name,state:sourceAfter.state,observedAt:sourceAfter.observedAt};
+        events.push({stage:'source_group_absent',name:source.name,resourceId:source.resourceId,
+          identityObjectId:sourceIdentity.objectId,...(sourceDeletion.lifecycleEvidence?{lifecycleEvidence:sourceDeletion.lifecycleEvidence}:{}),at:sourceDeletion.absentAt});
+        observations.u8SourceAbsent={name:source.name,state:sourceAfter.state,observedAt:sourceAfter.observedAt,
+          ...(sourceAfter.lifecycleEvidence?{lifecycleEvidence:sourceAfter.lifecycleEvidence}:{})};
         probeIdentity=await identityFor('probe');
         if(probeIdentity.objectId===seedReadRequest.principalId||Date.parse(probeIdentity.createdAt)<Date.parse(sourceDeletion.absentAt))
           throw new Error('U8 probe identity was not freshly created after source retirement');
@@ -372,15 +378,19 @@ export function createAciBlobSessionAnalog({methodDecision,verifyMethodApproval,
       for(const item of [...createdGroups].reverse()) {
         try {
           const deleted=await deleteGroup({group:item,trial,phase:'cleanup'});
-          if(deleted?.deleted===true&&deleted.name===item.name) events.push({stage:'group_cleanup_confirmed',name:item.name,at:deleted.absentAt});
-          else events.push({stage:'group_cleanup_indeterminate',name:item.name});
+          if(deleted?.deleted===true&&deleted.name===item.name) events.push({stage:'group_cleanup_confirmed',name:item.name,
+            resourceId:item.resourceId,identityObjectId:item.identityObjectId,
+            ...(deleted.lifecycleEvidence?{lifecycleEvidence:deleted.lifecycleEvidence}:{}),at:deleted.absentAt});
+          else events.push({stage:'group_cleanup_indeterminate',name:item.name,resourceId:item.resourceId,identityObjectId:item.identityObjectId});
         } catch {events.push({stage:'group_cleanup_failed',name:item.name});}
       }
       for(const item of [...createdIdentities].reverse()) {
         try {
           const deleted=await deleteIdentity({identity:item,trial});
           if(deleted?.deleted===true&&deleted.objectId?.toLowerCase()===item.objectId&&deleted.roleAssignmentsRemoved===true)
-            events.push({stage:'identity_cleanup_confirmed',objectId:item.objectId,at:deleted.deletedAt});
+            events.push({stage:'identity_cleanup_confirmed',role:item.role,objectId:item.objectId,resourceId:item.resourceId,
+              assignmentIds:(item.accessReview?.effectiveRoleAssignments||[]).map(value=>value.assignmentId).filter(value=>typeof value==='string'),
+              roleAssignmentsRemoved:true,at:deleted.deletedAt});
           else events.push({stage:'identity_cleanup_indeterminate',objectId:item.objectId});
         } catch {events.push({stage:'identity_cleanup_failed',objectId:item.objectId});}
       }

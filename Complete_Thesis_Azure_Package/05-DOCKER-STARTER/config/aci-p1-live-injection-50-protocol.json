@@ -37,18 +37,18 @@
   "evidenceRetention": {
     "desired": "indefinite",
     "departmentApproved": false,
-    "azureMechanism": "unresolved_pending_department_approval",
-    "options": [
-      "locked time-based immutability up to 146000 days (400 years)",
-      "Azure legal hold until explicitly cleared, only if appropriate for the approved records purpose"
-    ],
+    "ownerApproved": true,
+    "ownerApprovalScope": "aci_p1_live_injection_50_non_counted_synthetic_pilot_only",
+    "ownerApprovalReference": "file:docs/ACI-P1-50-RETENTION-OWNER-DIRECTION.md",
+    "institutionalApprovalStatus": "not_provided; do not describe as institution-approved or treat pilot outputs as thesis results",
+    "azureMechanism": "locked_time_based_worm_146000_days",
+    "minimumRetentionDays": 146000,
     "automaticExpiry": "must_not_be_configured",
     "localEvidenceFallback": false
   },
   "blockers": [
-    "University department-approved retention schedule is not verified; indefinite is the requested preference, not yet the institution-approved schedule",
     "Azure trial-evidence immutability policy is Deleted with a zero-day period",
-    "ACI U1 and U5 live routes and independent audit verifiers have not passed Azure validation",
-    "No trial has run under this protocol"
+    "Independent evidence protection has not been validated against a locked Azure policy",
+    "No GPT-5 mini condition has run under this protocol"
   ]
 }

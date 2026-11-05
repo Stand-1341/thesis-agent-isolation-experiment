@@ -9,14 +9,16 @@ import {readFile} from 'node:fs/promises';
 import {validateCustomSessionEndpoint} from './session-endpoint.mjs';
 
 export const DEPLOYMENTS=['azure_vm','azure_functions_flex'];
+export const SUPPORTED_DEPLOYMENTS=[...DEPLOYMENTS,'azure_container_instances'];
 export const PROFILES=['P1','P2','P3'];
 // Revision 3 removes all ACA session arms; the measured 300-row plan has six routes.
 export const EXPERIMENT_ROUTES=DEPLOYMENTS.flatMap(deployment=>PROFILES.map(profile=>`${deployment}:${profile}`));
+export const REVISION_3_ROUTES=['azure_vm','azure_functions_flex'].flatMap(deployment=>PROFILES.map(profile=>`${deployment}:${profile}`));
 const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ENV_NAME=/^[A-Z][A-Z0-9_]{2,80}$/;
-const KINDS=['http','session'];
+const KINDS=['http','session','aci'];
 const LOCAL_HOSTS=['127.0.0.1','localhost','[::1]'];
-const CREDENTIAL_KEYS={http:['controller','resourceAdmin','collectorAdmin'],session:['controller','resourceAdmin','collectorAdmin']};
+const CREDENTIAL_KEYS={http:['controller','resourceAdmin','collectorAdmin'],session:['controller','resourceAdmin','collectorAdmin'],aci:['controller','resourceAdmin','collectorAdmin']};
 
 function httpsUrl(value,name,{optional=false}={}) {
   if(optional && (value===undefined || value===null)) return undefined;
@@ -46,7 +48,7 @@ function requireObject(value,where) {
  * names the field, because a misconfigured route is discovered mid-experiment
  * otherwise — after spend has already happened.
  */
-export function validateExperimentConfig(raw) {
+export function validateExperimentConfig(raw,{requiredRoutes=REVISION_3_ROUTES}={}) {
   const config=requireObject(raw,'config');
   if(typeof config.evidenceDirectory!=='string' || !config.evidenceDirectory.trim())
     throw new Error('evidenceDirectory is required');
@@ -57,11 +59,20 @@ export function validateExperimentConfig(raw) {
   if(!Number.isInteger(auditWindowSeconds) || auditWindowSeconds<60 || auditWindowSeconds>7200)
     throw new Error('auditWindowSeconds must be an integer between 60 and 7200 (ingestion can take up to 1 hour)');
   if(!Array.isArray(config.routes)) throw new Error('routes must be an array');
-  if(config.routes.length!==EXPERIMENT_ROUTES.length)
-    throw new Error(`exactly ${EXPERIMENT_ROUTES.length} revision-3 routes are required, got ${config.routes.length}`);
+  if(!Array.isArray(requiredRoutes) || !requiredRoutes.length || new Set(requiredRoutes).size!==requiredRoutes.length)
+    throw new Error('requiredRoutes must be a non-empty list of unique deployment/profile keys');
+  const aciProtocol=requiredRoutes.some(key=>key.startsWith('azure_container_instances:'));
+  if(config.routes.length<requiredRoutes.length || (aciProtocol&&config.routes.length!==requiredRoutes.length))
+    throw new Error(requiredRoutes.length===REVISION_3_ROUTES.length&&requiredRoutes.every((key,index)=>key===REVISION_3_ROUTES[index])
+      ?`exactly ${REVISION_3_ROUTES.length} revision-3 routes are required, got ${config.routes.length}`
+      :aciProtocol?`exactly ${requiredRoutes.length} ACI draft routes are required, got ${config.routes.length}`
+      :`at least ${requiredRoutes.length} scheduled deployment/profile routes are required, got ${config.routes.length}`);
+  if(!aciProtocol&&config.routes.some(route=>!REVISION_3_ROUTES.includes(`${route?.deployment}:${route?.profile}`)))
+    throw new Error(`exactly ${REVISION_3_ROUTES.length} revision-3 routes are required, got ${config.routes.length}`);
 
   const deployments={};
-  for(const name of DEPLOYMENTS) {
+  const configuredDeploymentNames=[...new Set(config.routes.map(route=>route?.deployment).filter(name=>typeof name==='string'))];
+  for(const name of configuredDeploymentNames) {
     const entry=requireObject(config.deployments?.[name],`deployments.${name}`);
     if(!KINDS.includes(entry.kind)) throw new Error(`deployments.${name}.kind must be one of ${KINDS.join(', ')}`);
     if(entry.kind==='http') {
@@ -72,7 +83,7 @@ export function validateExperimentConfig(raw) {
         resourceUrl:httpsUrl(entry.resourceUrl,`deployments.${name}.resourceUrl`),
         collectorUrl:httpsUrl(entry.collectorUrl,`deployments.${name}.collectorUrl`),
         ...(Number.isInteger(entry.timeoutMs)?{timeoutMs:entry.timeoutMs}:{})};
-    } else {
+    } else if(entry.kind==='session') {
       if(typeof entry.poolName!=='string' || !entry.poolName) throw new Error(`deployments.${name}.poolName is required`);
       if(typeof entry.region!=='string' || !entry.region) throw new Error(`deployments.${name}.region is required`);
       // The pool hostname is <pool>.<environment-id>.<region>.azurecontainerapps.io.
@@ -95,6 +106,17 @@ export function validateExperimentConfig(raw) {
         fixtureBlobEndpoint:httpsUrl(entry.fixtureBlobEndpoint,`deployments.${name}.fixtureBlobEndpoint`),
         headerIsolationVerified:entry.headerIsolationVerified===true,
         ...(Number.isInteger(entry.timeoutMs)?{timeoutMs:entry.timeoutMs}:{})};
+    } else {
+      if(name!=='azure_container_instances') throw new Error(`deployments.${name}.kind aci is only valid for azure_container_instances`);
+      const region=typeof entry.region==='string'&&entry.region.trim()?entry.region.trim():undefined;
+      const resourceGroup=typeof entry.resourceGroup==='string'&&entry.resourceGroup.trim()?entry.resourceGroup.trim():undefined;
+      const subnetResourceId=typeof entry.subnetResourceId==='string'&&entry.subnetResourceId.trim()?entry.subnetResourceId.trim():undefined;
+      const agentImage=typeof entry.agentImage==='string'&&entry.agentImage.trim()?entry.agentImage.trim():undefined;
+      for(const [field,value] of Object.entries({region,resourceGroup,subnetResourceId,agentImage}))
+        if(!value) throw new Error(`deployments.${name}.${field} is required`);
+      deployments[name]={kind:'aci',resourceUrl:httpsUrl(entry.resourceUrl,`deployments.${name}.resourceUrl`),
+        collectorUrl:httpsUrl(entry.collectorUrl,`deployments.${name}.collectorUrl`),region,resourceGroup,subnetResourceId,agentImage,
+        ...(Number.isInteger(entry.timeoutMs)?{timeoutMs:entry.timeoutMs}:{})};
     }
   }
 
@@ -103,8 +125,10 @@ export function validateExperimentConfig(raw) {
   const routes=[];
   for(const [index,raw_] of config.routes.entries()) {
     const route=requireObject(raw_,`routes[${index}]`);
-    if(!DEPLOYMENTS.includes(route.deployment)) throw new Error(`routes[${index}].deployment is not a known deployment`);
+    if(!SUPPORTED_DEPLOYMENTS.includes(route.deployment) || !configuredDeploymentNames.includes(route.deployment)) throw new Error(`routes[${index}].deployment is not a scheduled deployment`);
     if(!PROFILES.includes(route.profile)) throw new Error(`routes[${index}].profile must be one of ${PROFILES.join(', ')}`);
+    if(route.deployment==='azure_container_instances'&&!['P1','P2'].includes(route.profile))
+      throw new Error(`routes[${index}].profile for azure_container_instances must be P1 or P2`);
     const key=`${route.deployment}:${route.profile}`;
     if(seen.has(key)) throw new Error(`duplicate route ${key}`);
     seen.add(key);
@@ -130,7 +154,7 @@ export function validateExperimentConfig(raw) {
     routes.push({deployment:route.deployment,profile:route.profile,principalObjectId:route.principalObjectId,
       ...(kind==='http'?{agentUrl}:{}),credentials:resolved});
   }
-  for(const key of EXPERIMENT_ROUTES)
+  for(const key of requiredRoutes)
     if(!seen.has(key)) throw new Error(`missing route ${key}`);
 
   return {evidenceDirectory:config.evidenceDirectory,auditWindowSeconds,deployments,routes};
@@ -175,13 +199,13 @@ export function resolveCredentials(config, env=process.env, routeKeys) {
   return {...config,routes};
 }
 
-export async function loadExperimentConfig(path, env=process.env) {
-  return resolveCredentials(await loadExperimentConfigShape(path),env);
+export async function loadExperimentConfig(path, env=process.env,options={}) {
+  return resolveCredentials(await loadExperimentConfigShape(path,options),env);
 }
 
-export async function loadExperimentConfigShape(path) {
+export async function loadExperimentConfigShape(path,options={}) {
   const text=await readFile(path,'utf8');
   let raw;
   try {raw=JSON.parse(text);} catch (error) {throw new Error(`config is not valid JSON: ${error.message}`);}
-  return validateExperimentConfig(raw);
+  return validateExperimentConfig(raw,options);
 }

@@ -1,0 +1,3 @@
+planned_run_id,block,order_in_block,deployment,permission_profile,scenario_id,scenario_type,status,result,verified_evidence_ref
+pilot-r4vm-retryv1-p2-u1-20261105,1,1,azure_vm,P2,U1,unauthorized,NOT RUN,,
+pilot-r4vm-retryv1-p1-u5-20261105,1,2,azure_vm,P1,U5,unauthorized,NOT RUN,,

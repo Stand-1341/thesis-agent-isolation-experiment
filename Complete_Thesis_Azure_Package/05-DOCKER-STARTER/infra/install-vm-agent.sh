@@ -3,11 +3,12 @@
 # the package and environment file. This script does not enable or start it.
 set -eu
 if [ "$(id -u)" -ne 0 ] || [ "$#" -ne 3 ]; then
-  echo 'Usage (as root): install-vm-agent.sh PACKAGE_DIR NODE22_BINARY ROOT_OWNED_ENV_FILE' >&2
+  echo 'Usage (as root): install-vm-agent.sh PACKAGE_DIR NODE22_DIST_DIR ROOT_OWNED_ENV_FILE' >&2
   exit 2
 fi
 package=$1
-node_binary=$2
+node_dist=$2
+node_binary="$node_dist/bin/node"
 environment_file=$3
 test -f "$node_binary" && test -x "$node_binary"
 node_sha256='94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90'
@@ -22,11 +23,11 @@ fi
 "$node_binary" - "$package" "$environment_file" <<'NODE'
 const fs=require('node:fs'), path=require('node:path'), crypto=require('node:crypto');
 const root=fs.realpathSync(process.argv[2]);
-const required=['dist/agent.js','dist/core.js','dist/helpers.js','dist/network-probe.mjs','dist/azure-blob-workload.mjs','dist/azure-managed-token.mjs','dist/azure-delegated-token.mjs','dist/azure-session-seed.mjs','vm-agent.service','install-vm-agent.sh','package.json','package-lock.json','node_modules/@azure/identity/package.json'];
+const required=['dist/agent.js','dist/core.js','dist/helpers.js','dist/network-probe.mjs','dist/azure-blob-workload.mjs','dist/azure-managed-token.mjs','dist/azure-delegated-token.mjs','dist/azure-session-seed.mjs','certs/thesis-pilot-ca.pem','vm-agent.service','install-vm-agent.sh','vm-agent-nginx.template','create-vm-agent-csr.sh','install-vm-agent-tls.sh','package.json','package-lock.json'];
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8'));
 const expected=Object.keys(manifest.files || {});
 if(manifest.scope!=='vm-workload-package-only' || !required.every(name=>expected.includes(name)) ||
-   expected.some(name=>!required.includes(name) && !/^node_modules\/[A-Za-z0-9@._+\/-]+$/.test(name)) ||
+   expected.some(name=>!required.includes(name)) ||
    expected.some(name=>name.split('/').some(part=>part==='..' || part==='.' || !part))) throw new Error('Invalid package manifest');
 const actual=[];
 function walk(dir,prefix='') {
@@ -77,16 +78,21 @@ if getent passwd thesis-agent >/dev/null; then
 else
   useradd --system --user-group --no-create-home --shell /usr/sbin/nologin thesis-agent
 fi
-install -d -o root -g root -m 0755 /opt/thesis-agent/dist /opt/thesis-runtime/node/bin
+install -d -o root -g root -m 0755 /opt/thesis-agent/dist /opt/thesis-agent/certs /opt/thesis-runtime/node
 install -d -o root -g root -m 0700 /etc/thesis-agent
+cp -a "$node_dist"/. /opt/thesis-runtime/node/
 for name in agent.js core.js helpers.js network-probe.mjs azure-blob-workload.mjs azure-managed-token.mjs azure-delegated-token.mjs azure-session-seed.mjs; do
   install -o root -g root -m 0644 "$package/dist/$name" "/opt/thesis-agent/dist/$name"
 done
+install -o root -g root -m 0644 "$package/certs/thesis-pilot-ca.pem" /opt/thesis-agent/certs/thesis-pilot-ca.pem
 install -o root -g root -m 0644 "$package/package.json" /opt/thesis-agent/package.json
-cp -R "$package/node_modules" /opt/thesis-agent/node_modules
+install -o root -g root -m 0644 "$package/package-lock.json" /opt/thesis-agent/package-lock.json
+install -o root -g root -m 0644 "$package/vm-agent-nginx.template" /opt/thesis-agent/vm-agent-nginx.template
+install -o root -g root -m 0755 "$package/create-vm-agent-csr.sh" /usr/local/sbin/create-vm-agent-csr.sh
+install -o root -g root -m 0755 "$package/install-vm-agent-tls.sh" /usr/local/sbin/install-vm-agent-tls.sh
+PATH="/opt/thesis-runtime/node/bin:$PATH" /opt/thesis-runtime/node/bin/npm --prefix /opt/thesis-agent ci --omit=dev --ignore-scripts --no-audit --no-fund
 chown -R root:root /opt/thesis-agent/node_modules
 chmod -R a-w /opt/thesis-agent/node_modules
-install -o root -g root -m 0755 "$node_binary" /opt/thesis-runtime/node/bin/node
 install -o root -g root -m 0600 "$environment_file" /etc/thesis-agent/agent.env
 install -o root -g root -m 0644 "$package/vm-agent.service" /etc/systemd/system/thesis-agent.service
 systemctl daemon-reload

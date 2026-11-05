@@ -79,7 +79,7 @@ export function createAzureVersionedProtectedEvidenceAdapter({containerUrl,conta
     if(url.protocol!=='https:'||url.origin!==base.url.origin||!url.pathname.startsWith(`${base.url.pathname}/proofs/`)||
       url.hash||url.username||url.password||[...url.searchParams.keys()].some(key=>key!=='versionid')||
       url.searchParams.getAll('versionid').length!==1||url.searchParams.get('versionid').length>100||
-      !/^[A-Za-z0-9_-]{1,150}-(?:U6|U8)-(?:marker|rbac|audit|lifecycle)-[a-f0-9-]{36}\.json$/i.test(url.pathname.split('/').at(-1))||
+      !/^[A-Za-z0-9_-]{1,150}-(?:U6|U8)-(?:marker|rbac|audit|lifecycle|credential)-[a-f0-9-]{36}\.json$/i.test(url.pathname.split('/').at(-1))||
       !url.searchParams.get('versionid')) throw new Error('protected evidence reference is outside the versioned proof namespace');
     return url;
   }
@@ -87,6 +87,7 @@ export function createAzureVersionedProtectedEvidenceAdapter({containerUrl,conta
       const artifact=snapshot?.schema==='azure_blob_marker_content_proof_v1'?'marker':
         snapshot?.schema==='azure-effective-blob-access-review-v1'?'rbac':
         snapshot?.schema==='azure_storage_blob_audit_snapshot_v1'?'audit':
+      snapshot?.schema==='azure_identity_credential_path_review_v1'?'credential':
         snapshot?.schema==='azure_aci_arm_activity_snapshot_v1'?'lifecycle':undefined;
       if(!snapshot||!artifact||!['U6','U8'].includes(snapshot.scenario)||
         observerPrincipalId?.toLowerCase()!==readerPrincipalId.toLowerCase())

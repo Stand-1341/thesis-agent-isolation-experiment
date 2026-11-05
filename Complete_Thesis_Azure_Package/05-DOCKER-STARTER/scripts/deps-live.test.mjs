@@ -1,8 +1,25 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
-import createLiveDeps from './deps-live.mjs';
+import createLiveDeps,{principalForConfiguredTrial} from './deps-live.mjs';
 import {loadExperimentConfigShape,resolveCredentials} from './experiment-config.mjs';
+
+test('Blob verifier principal resolution accepts scheduled profile field and rejects conflicting labels',async()=>{
+  const config=await loadExperimentConfigShape(fileURLToPath(new URL('../config/experiment.azure-live.json',import.meta.url)));
+  const expected=config.routes.find(route=>route.deployment==='azure_functions_flex'&&route.profile==='P1').principalObjectId;
+  assert.equal(principalForConfiguredTrial(config,{
+    deployment:'azure_functions_flex',permission_profile:'P1',scenario:'U2'
+  }),expected);
+  assert.equal(principalForConfiguredTrial(config,{
+    deployment:'azure_functions_flex',profile:'P1',permission_profile:'P1',scenario:'U2'
+  }),expected);
+  assert.throws(()=>principalForConfiguredTrial(config,{
+    deployment:'azure_functions_flex',profile:'P3',permission_profile:'P1',scenario:'U2'
+  }),/profile fields disagree/);
+  assert.throws(()=>principalForConfiguredTrial(config,{
+    deployment:'azure_functions_flex',scenario:'U2'
+  }),/deployment\/profile is missing/);
+});
 
 test('live dependencies do not require an unused subscription ID environment variable',async()=>{
   const config=await loadExperimentConfigShape(fileURLToPath(new URL('../config/experiment.example.json',import.meta.url)));
@@ -80,4 +97,32 @@ test('live verifiers select endpoint and verifier secret from the trial deployme
       {url:'https://collector-functions.example/admin/evidence?runId=run-functions-p1',token:'collector-verifier-secret'}
     ]);
   } finally {globalThis.fetch=originalFetch;}
+});
+
+test('VM/Functions-only Rev4 measured dependencies do not require the retired session-header assertion',async()=>{
+  const path=fileURLToPath(new URL('../config/experiment.azure-live.json',import.meta.url));
+  const shape=await loadExperimentConfigShape(path);
+  const env={THESIS_LOG_ANALYTICS_WORKSPACE_ID:'00000000-0000-4000-8000-000000000001',
+    THESIS_FIXTURE_BLOB_ENDPOINT:'https://fixture.blob.core.windows.net',
+    THESIS_BLOB_RESOURCE_ID:'/subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture/blobServices/default',
+    THESIS_DENIAL_DESTINATION_IP:'10.48.9.5',THESIS_VM_P3_DENIAL_TELEMETRY:'azure_diagnostics_firewall',
+    THESIS_VM_P3_FIREWALL_SOURCE_IP:'10.49.8.4',THESIS_VM_P3_FIREWALL_DESTINATION_PORT:'8443',
+    THESIS_VM_P3_FIREWALL_DENY_RULE:'deny-centralus-p3-collector',
+    THESIS_FLEX_P3_DENIAL_TELEMETRY:'azure_diagnostics_firewall',THESIS_FLEX_P3_FIREWALL_SOURCE_CIDR:'10.48.6.0/24',
+    THESIS_FLEX_P3_FIREWALL_DESTINATION_PORT:'8443',THESIS_FLEX_P3_FIREWALL_DENY_RULE:'functions-p3-deny-collector',
+    THESIS_AZURE_VM_RESOURCE_VERIFIER_KEY:'resource-verifier-secret',
+    THESIS_AZURE_VM_COLLECTOR_VERIFIER_KEY:'collector-verifier-secret',
+    THESIS_AZURE_FUNCTIONS_FLEX_RESOURCE_VERIFIER_KEY:'functions-resource-verifier-secret',
+    THESIS_AZURE_FUNCTIONS_FLEX_COLLECTOR_VERIFIER_KEY:'functions-collector-verifier-secret',
+    THESIS_COLLECTOR_INDEPENDENTLY_VALIDATED:'true',THESIS_RESOURCE_INDEPENDENTLY_VALIDATED:'true',
+    THESIS_CLOCK_SYNC_VALIDATED:'true',THESIS_AUDIT_PIPELINE_VALIDATED:'true',
+    THESIS_AUTHORIZATION_VALIDATED:'true',THESIS_DENIAL_STATUS_TEXT_VALIDATED:'true'};
+  for(const route of shape.routes) for(const name of Object.values(route.credentials))
+    env[name]=`measured-route-secret-${name}-0123456789abcdef`;
+  const routes=new Set(shape.routes.map(route=>`${route.deployment}:${route.profile}`));
+  const config=resolveCredentials(shape,env,routes);
+  const deps=createLiveDeps({config,env,mode:'measured',routeKeys:routes});
+  assert.equal(typeof deps.httpFactory,'function');
+  assert.equal(deps.sessionFactory,undefined);
+  assert.equal(env.THESIS_SESSION_HEADER_ISOLATION_VERIFIED,undefined);
 });

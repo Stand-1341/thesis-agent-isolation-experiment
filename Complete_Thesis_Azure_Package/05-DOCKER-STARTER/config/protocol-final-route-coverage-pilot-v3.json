@@ -1,0 +1,30 @@
+{
+  "status": "non_counted_pilot_only_draft",
+  "revision": "azure-proposed-v1-rev4-vm-functions-only-draft",
+  "ownerDirection": {
+    "authorized": true,
+    "reference": "User instruction in this session to validate VM/Functions routes with non-counted pilot checks.",
+    "externalReviewStatus": "not_claimed"
+  },
+  "readiness": {
+    "protocolFreeze": "pending",
+    "deploymentValidation": "pending",
+    "isolationValidation": "pending",
+    "independentVerifierValidation": "pending",
+    "measuredExecutionEnabled": false
+  },
+  "matrix": {
+    "file": "03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-EXECUTABLE-NO-ACI-DRAFT-V3.csv",
+    "sha256": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "trials": 400
+  },
+  "pilotPlan": {
+    "file": "03-PILOT-FINAL-ROUTE-COVERAGE-2026-11-05-V3.csv",
+    "sha256": "97811f4cb4d56801270ce6bc8aab792a3d000599169190a67463f754bc4d58d1",
+    "trials": 7,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "purpose": "fresh non-counted U5 correlation retry and remaining unexecuted coverage cases",
+    "status": "NOT RUN"
+  }
+}

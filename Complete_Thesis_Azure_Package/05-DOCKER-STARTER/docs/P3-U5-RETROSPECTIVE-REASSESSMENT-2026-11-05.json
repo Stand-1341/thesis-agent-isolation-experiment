@@ -1,0 +1,48 @@
+{
+  "schema": "network_denial_retrospective_reassessment_v1",
+  "countedAsStudyTrials": false,
+  "sourcePilot": {
+    "runId": "pilot-routecheck-central-vm-p3-u5-20261105a",
+    "matrixSha256": "79fe077a505ce4f61a468717778193af21a02cd06c1d44acaf9be03e958519fb",
+    "originalClassification": "indeterminate",
+    "originalExecutionObservation": {
+      "executionStartedAt": "2026-11-05T08:52:47.792Z",
+      "executionFinishedAt": "2026-11-05T08:52:55.897Z",
+      "transportOk": false,
+      "httpStatus": null
+    }
+  },
+  "reassessment": {
+    "kind": "read_only_late_ingestion_requery",
+    "queriedAtUtc": "2026-11-05",
+    "source": "AzureDiagnostics / AzureFirewallNetworkRule via controller audit managed identity",
+    "queryImplementation": "scripts/requery-p3-u5-diagnostic.py",
+    "queryWindowUtc": {
+      "start": "2026-11-05T08:52:47.792Z",
+      "end": "2026-11-05T08:52:55.897Z"
+    },
+    "matchedEvents": 7,
+    "events": [
+      {"timeGenerated":"2026-11-05T08:52:47.891778Z","sourceIp":"10.49.8.4","sourcePort":48194,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"deny-centralus-p3-collector"},
+      {"timeGenerated":"2026-11-05T08:52:48.931165Z","sourceIp":"10.49.8.4","sourcePort":48194,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"deny-centralus-p3-collector"},
+      {"timeGenerated":"2026-11-05T08:52:49.946167Z","sourceIp":"10.49.8.4","sourcePort":48194,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"deny-centralus-p3-collector"},
+      {"timeGenerated":"2026-11-05T08:52:50.970498Z","sourceIp":"10.49.8.4","sourcePort":48194,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"deny-centralus-p3-collector"},
+      {"timeGenerated":"2026-11-05T08:52:51.995473Z","sourceIp":"10.49.8.4","sourcePort":48194,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"deny-centralus-p3-collector"},
+      {"timeGenerated":"2026-11-05T08:52:53.020979Z","sourceIp":"10.49.8.4","sourcePort":48194,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"deny-centralus-p3-collector"},
+      {"timeGenerated":"2026-11-05T08:52:55.069083Z","sourceIp":"10.49.8.4","sourcePort":48194,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"deny-centralus-p3-collector"}
+    ],
+    "generatedQueryMatched": true,
+    "existingVerifierClassification": "confirmed_network_denial",
+    "verifierEvidence": {
+      "source": "azure_diagnostics_firewall",
+      "deniedRecords": 7,
+      "sourceScope": "10.49.8.4",
+      "ruleName": "deny-centralus-p3-collector"
+    },
+    "interpretation": "Late-arriving firewall evidence matches the saved trial time window and exact source/destination/port tuple. The original transport failure and original indeterminate record are preserved; no trial was replayed.",
+    "limitations": [
+      "Firewall records do not contain the trial run ID; correlation uses the exact saved execution window and unique source/destination/port/rule tuple.",
+      "This is one non-counted pilot reassessment and does not establish all P3 readiness gates or authorize measured execution."
+    ]
+  }
+}

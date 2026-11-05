@@ -47,6 +47,6 @@ test('ACR pull identity gets metadata-only Reader at the registry scope',()=>{
 
 test('example egress list names current Entra, ARM, Log Analytics, and diagnostic Function FQDNs explicitly',async()=>{
   const params=JSON.parse(await readFile(new URL('../infra/controller-vm-pilot.parameters.example.json',import.meta.url),'utf8')).parameters;
-  for(const fqdn of ['login.microsoftonline.com','management.azure.com','api.loganalytics.azure.com','thesisacr74a95224.azurecr.io','thesisacr74a95224.eastus.data.azurecr.io','thesisfixture20261103.blob.core.windows.net','thesispilotblob20261102.blob.core.windows.net','thesis-flex-pilot-20261103.azurewebsites.net'])
+  for(const fqdn of ['login.microsoftonline.com','login.microsoft.com','graph.microsoft.com','management.azure.com','api.loganalytics.azure.com','thesisacr74a95224.azurecr.io','thesisacr74a95224.eastus.data.azurecr.io','thesisfixture20261103.blob.core.windows.net','thesispilotblob20261102.blob.core.windows.net','thesis-flex-pilot-20261103.azurewebsites.net'])
     assert.ok(params.allowedApplicationFqdns.value.includes(fqdn),`missing ${fqdn}`);
 });

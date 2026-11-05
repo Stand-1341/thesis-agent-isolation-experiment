@@ -128,7 +128,7 @@ test('measured runs fail closed without a locked Azure evidence store',()=>{
   const {deps}=scaffold(PASSING_DEPS.replace('  evidenceStore:{claim:async()=>{},save:async()=>{}},',''));
   const out=run(['--config',CONFIG,'--deps',deps,'--deployment','azure_vm','--limit','1','--gates',GATES,'--json']);
   assert.equal(out.code,3);
-  assert.match(out.stderr,/evidence store error: institution-approved evidence retention is not asserted/);
+  assert.match(out.stderr,/evidence store error: institution-approved evidence retention or an applicable explicit owner-directed retention basis is required/);
   assert.equal(out.summary,null,'no trial summary may be emitted when evidence is unprotected');
 });
 

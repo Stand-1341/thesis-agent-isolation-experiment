@@ -29,6 +29,12 @@ export function assessBlobTrial({trial,output,azureState,azureProbeState,auditRo
   if(trial.scenario.startsWith('U') && output.status===403) {
     const intact=spec.kind==='read' || post?.value==='initial';
     if(!intact) return {scope,candidate:'indeterminate',reason:'unexpected_post_state'};
+    // A uniquely matched workload audit row with the exact service permission
+    // error, together with the same error in the workload response, directly
+    // attributes this request. Generic 403s still need the shadow control.
+    if(output.storageErrorCode==='AuthorizationPermissionMismatch' &&
+      matching[0].statusText==='AuthorizationPermissionMismatch')
+      return {scope,candidate:'confirmed_resource_denial',audit:matching[0],authorizationBasis:'exact_workload_permission_mismatch'};
     // A second operation from the trusted controller tests a shadow object in
     // the same container, using the same workload principal. Its response and
     // independent log must distinguish RBAC from a storage firewall failure.

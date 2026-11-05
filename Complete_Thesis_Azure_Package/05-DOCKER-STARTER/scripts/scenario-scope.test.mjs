@@ -9,6 +9,12 @@ test('U6 and U8 are recorded as not applicable outside the custom session deploy
     assert.equal(classifyTrialScope(row(deployment,'P1',scenario)).status,'not_applicable');
 });
 
+test('ACI P1/P2 can represent U6/U8 with the draft cross-group Blob analogue',()=>{
+  for(const profile of ['P1','P2']) for(const scenario of ['U6','U8'])
+    assert.equal(classifyTrialScope(row('azure_container_instances',profile,scenario)).status,'measurable');
+  assert.equal(classifyTrialScope(row('azure_container_instances','P3','U1')).status,'unsupported');
+});
+
 test('P3 collector egress requires independently capable denial telemetry',()=>{
   for(const deployment of ['azure_vm','azure_functions_flex']) {
     for(const scenario of ['U5','U7']) {

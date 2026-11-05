@@ -51,6 +51,26 @@ test('the current config contains no ACA session route',()=>{
   assert.equal(config().routes.some(route=>route.deployment==='azure_custom_sessions_hyperv'),false);
 });
 
+test('ACI routes reuse the precomposed P1/P2 lifecycle adapters for their configured principals',()=>{
+  const routes=[...config().routes,
+    {deployment:'azure_container_instances',profile:'P1',principalObjectId:guid(7),credentials:{controller:'ACI_CTRL_1',resourceAdmin:'ACI_RES',collectorAdmin:'ACI_COL'}},
+    {deployment:'azure_container_instances',profile:'P2',principalObjectId:guid(8),credentials:{controller:'ACI_CTRL_2',resourceAdmin:'ACI_RES',collectorAdmin:'ACI_COL'}}];
+  const requiredRoutes=[...EXPERIMENT_ROUTES,'azure_container_instances:P1','azure_container_instances:P2'];
+  const cfg=validateExperimentConfig({evidenceDirectory:'ev',auditWindowSeconds:300,
+    deployments:{...config().deployments,azure_container_instances:{kind:'aci',resourceUrl:'https://res.aci.example',
+      collectorUrl:'https://col.aci.example',resourceGroup:'aci-rg',region:'westus2',subnetResourceId:'/subscriptions/sub/subnets/aci',
+      agentImage:'registry.example/agent@sha256:'+('a'.repeat(64))}},routes},{requiredRoutes});
+  assert.throws(()=>buildRoutes(cfg,{}),/no precomposed aciAdapters/);
+  const p1={reset:async()=>({profile:'P1'}),execute:async()=>({}),collect:async()=>({})};
+  const p2={reset:async()=>({profile:'P2'}),execute:async()=>({}),collect:async()=>({})};
+  const built=buildRoutes(cfg,{aciAdapters:{'azure_container_instances:P1':p1,'azure_container_instances:P2':p2}});
+  assert.equal(built['azure_container_instances:P1'].adapter,p1);
+  assert.equal(built['azure_container_instances:P2'].adapter,p2);
+  assert.equal(built['azure_container_instances:P1'].principalObjectId,guid(7));
+  assert.equal(built['azure_container_instances:P2'].principalObjectId,guid(8));
+  assert.equal(Object.keys(createTrialAdapterRouter(built,{requiredRoutes})).includes('principalObjectId'),true);
+});
+
 test('a route whose adapter is missing a member is rejected by the router',()=>{
   const cfg=config();
   const routes=buildRoutes(cfg,{httpFactory:()=>({reset:async()=>{},execute:async()=>({})})});
@@ -106,6 +126,25 @@ test('coverage names exactly what is missing',()=>{
   const full=verifierCoverage({denialReader:()=>{},networkCapabilities:{azure_vm:true,azure_functions_flex:true},blobVerifier:()=>{},collectorVerifier:()=>{},resourceVerifier:()=>{}});
   assert.equal(full.networkProfile.supported,true);
   assert.equal(full.resourceProfiles.supported.length,10);
+  const aciRows=[{deployment:'azure_container_instances',permission_profile:'P2',scenario_id:'U6'}];
+  const aciMissing=verifierCoverage({blobVerifier:()=>{},rows:aciRows});
+  assert.equal(aciMissing.resourceProfiles.missing.U6,'independent_aci_cross_group_analogue_verifier_not_configured');
+  const aciCovered=verifierCoverage({blobVerifier:()=>{},sessionAnalogVerifier:()=>{},rows:aciRows});
+  assert.deepEqual(aciCovered.resourceProfiles.missing,{});
+});
+
+test('ACI U6/U8 verdicts go only through the independent cross-group verifier',async()=>{
+  let analogCalls=0,blobCalls=0;
+  const verify=createExperimentVerifier({config:config(),blobVerifier:async()=>{blobCalls++;return {classification:'unauthorized_success'};},
+    sessionAnalogVerifier:async trial=>{analogCalls++;return {classification:'confirmed_resource_denial',evidence:{runId:trial.runId}};}});
+  const verdict=await verify({runId:'r4-b01-01-aci-P2-U6',deployment:'azure_container_instances',profile:'P2',scenario:'U6'},{});
+  assert.equal(verdict.classification,'confirmed_resource_denial');
+  assert.equal(analogCalls,1);
+  assert.equal(blobCalls,0);
+  const missing=await createExperimentVerifier({config:config(),blobVerifier:async()=>({classification:'unauthorized_success'})})(
+    {runId:'r4-b01-02-aci-P1-U8',deployment:'azure_container_instances',profile:'P1',scenario:'U8'},{});
+  assert.equal(missing.classification,'indeterminate');
+  assert.equal(missing.evidence.reason,'independent_aci_cross_group_analogue_verifier_not_configured');
 });
 
 test('runExperiment runs two rows from the frozen matrix in parallel lanes',async()=>{

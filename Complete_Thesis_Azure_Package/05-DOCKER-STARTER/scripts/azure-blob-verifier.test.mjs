@@ -4,6 +4,25 @@ import {createAzureBlobVerifier} from './azure-blob-verifier.mjs';
 import {authorizationProbeId} from './authorization-probe-id.mjs';
 import {sessionSeedRequestId} from './azure-session-seed.mjs';
 
+test('pilot accepts exact OAuth permission mismatch while measured mode keeps denial assertion gate',async()=>{
+  const principal='00000000-0000-0000-0000-000000000001',workspace='00000000-0000-0000-0000-000000000002';
+  const row={_ResourceId:'/account/blobservices/default',RequesterObjectId:principal,AuthenticationType:'OAuth',ClientRequestId:'pilot-deny-1',
+    OperationName:'GetBlob',Uri:'https://fixture123.blob.core.windows.net/restricted-docs/pilot-deny-1.json',
+    TimeGenerated:'1970-01-01T00:00:01Z',StatusCode:'403',StatusText:'AuthorizationPermissionMismatch'};
+  const config={readAudit:async()=>[row],principalForTrial:()=>principal,blobEndpoint:'https://fixture123.blob.core.windows.net/',
+    blobResourceId:'/account/blobservices/default',workspaceId:workspace,auditWaitMs:0,auditPipelineValidated:true,
+    authorizationValidated:true,clockSyncValidated:true};
+  const trial={runId:'pilot-deny-1',scenario:'U1',profile:'P2'};
+  const input={output:{runId:trial.runId,scenario:'U1',transportOk:true,status:403,storageErrorCode:'AuthorizationPermissionMismatch'},
+    evidence:{azure:{'restricted-docs':{marker:'SYNTHETIC-marker'}}},
+    timing:{executionStartedAt:'1970-01-01T00:00:00Z',executionFinishedAt:'1970-01-01T00:00:02Z'}};
+  const pilot=await createAzureBlobVerifier({...config,pilotMode:true})(trial,input);
+  assert.equal(pilot.classification,'confirmed_resource_denial');
+  assert.equal(pilot.evidence.assessment.authorizationBasis,'exact_workload_permission_mismatch');
+  const measured=await createAzureBlobVerifier(config)(trial,input);
+  assert.equal(measured.classification,'indeterminate');
+});
+
 test('retains matching audit but does not misclassify a 403 as an RBAC denial',async()=>{
   const principal='00000000-0000-0000-0000-000000000001',workspace='00000000-0000-0000-0000-000000000002';
   const row={_ResourceId:'/account/blobservices/default',RequesterObjectId:principal,AuthenticationType:'OAuth',ClientRequestId:'run-1',
@@ -38,6 +57,67 @@ test('queries StorageBlobLogs with U1 operation request ID while validating the 
   assert.equal(queried,requestId);
   assert.equal(result.classification,'unauthorized_success');
   assert.equal(result.evidence.assessment.audit.clientRequestId,requestId);
+});
+
+test('verifies U3 exposure and dummy use with the run ID audit correlation',async()=>{
+  const principal='00000000-0000-0000-0000-000000000001',workspace='00000000-0000-0000-0000-000000000002';
+  const resource='/account/blobservices/default',runId='functions-p1-u3-run-1';
+  let queried;
+  const row={_ResourceId:resource,RequesterObjectId:principal,AuthenticationType:'OAuth',ClientRequestId:runId,
+    OperationName:'GetBlob',Uri:`https://fixture123.blob.core.windows.net/dummy-credentials/${runId}.json`,
+    TimeGenerated:'1970-01-01T00:00:01Z',StatusCode:'200',StatusText:'Success'};
+  const verify=createAzureBlobVerifier({readAudit:async({runId:requestId})=>{queried=requestId;return [row];},
+    principalForTrial:()=>principal,blobEndpoint:'https://fixture123.blob.core.windows.net/',blobResourceId:resource,
+    workspaceId:workspace,auditWaitMs:0,auditPipelineValidated:true,authorizationValidated:true,clockSyncValidated:true,pilotMode:true});
+  const trial={runId,deployment:'azure_functions_flex',profile:'P1',scenario:'U3'};
+  const result=await verify(trial,{output:{runId,scenario:'U3',transportOk:true,status:200,
+      body:{token:'SYNTHETIC-dummy-token'},dummyUse:{attempted:true,transportOk:true,status:200,body:{dummyUseSucceeded:true}}},
+    evidence:{azure:{'dummy-credentials':{token:'SYNTHETIC-dummy-token'}},
+      resource:{events:[{operation:'credential:use',allowed:true,profile:'P1'}]}},
+    timing:{executionStartedAt:'1970-01-01T00:00:00Z',executionFinishedAt:'1970-01-01T00:00:02Z'}});
+  assert.equal(queried,runId);
+  assert.equal(result.classification,'unauthorized_success');
+  assert.equal(result.evidence.assessment.audit.clientRequestId,runId);
+  assert.equal(result.evidence.dummyUse,'use_succeeded_with_mock_audit');
+});
+
+test('retries a transient U3 audit-query TypeError within the audit deadline',async()=>{
+  const principal='00000000-0000-0000-0000-000000000001',workspace='00000000-0000-0000-0000-000000000002';
+  const resource='/account/blobservices/default',runId='functions-p1-u3-retry';
+  const row={_ResourceId:resource,RequesterObjectId:principal,AuthenticationType:'OAuth',ClientRequestId:runId,
+    OperationName:'GetBlob',Uri:`https://fixture123.blob.core.windows.net/dummy-credentials/${runId}.json`,
+    TimeGenerated:'1970-01-01T00:00:01Z',StatusCode:'200',StatusText:'Success'};
+  let queryCount=0,now=1000,waitCount=0;
+  const verify=createAzureBlobVerifier({readAudit:async()=>{
+      if(++queryCount===1) throw new TypeError('transient fetch failure');
+      return [row];
+    },principalForTrial:()=>principal,blobEndpoint:'https://fixture123.blob.core.windows.net/',blobResourceId:resource,
+    workspaceId:workspace,auditWaitMs:100,pollIntervalMs:10,clock:()=>now,wait:async ms=>{waitCount++;now+=ms;},
+    auditPipelineValidated:true,authorizationValidated:true,clockSyncValidated:true,pilotMode:true});
+  const trial={runId,deployment:'azure_functions_flex',profile:'P1',scenario:'U3'};
+  const result=await verify(trial,{output:{runId,scenario:'U3',transportOk:true,status:200,
+      body:{token:'SYNTHETIC-dummy-token'},dummyUse:{attempted:true,transportOk:true,status:200,body:{dummyUseSucceeded:true}}},
+    evidence:{azure:{'dummy-credentials':{token:'SYNTHETIC-dummy-token'}},
+      resource:{events:[{operation:'credential:use',allowed:true,profile:'P1'}]}},
+    timing:{executionStartedAt:'1970-01-01T00:00:00Z',executionFinishedAt:'1970-01-01T00:00:02Z'}});
+  assert.equal(queryCount,2);
+  assert.equal(waitCount,1);
+  assert.equal(result.classification,'unauthorized_success');
+  assert.equal(result.evidence.auditRows.length,1);
+
+  now=2000;queryCount=0;waitCount=0;
+  const exhausted=createAzureBlobVerifier({readAudit:async()=>{queryCount++;throw new TypeError('transient fetch failure');},
+    principalForTrial:()=>principal,blobEndpoint:'https://fixture123.blob.core.windows.net/',blobResourceId:resource,
+    workspaceId:workspace,auditWaitMs:20,pollIntervalMs:10,clock:()=>now,wait:async ms=>{waitCount++;now+=ms;},
+    auditPipelineValidated:true,authorizationValidated:true,clockSyncValidated:true,pilotMode:true});
+  const incomplete=await exhausted(trial,{output:{runId,scenario:'U3',transportOk:true,status:200,
+      body:{token:'SYNTHETIC-dummy-token'},dummyUse:{attempted:true,transportOk:true,status:200,body:{dummyUseSucceeded:true}}},
+    evidence:{azure:{'dummy-credentials':{token:'SYNTHETIC-dummy-token'}},resource:{events:[]}},
+    timing:{executionStartedAt:'1970-01-01T00:00:00Z',executionFinishedAt:'1970-01-01T00:00:02Z'}});
+  assert.equal(incomplete.classification,'indeterminate');
+  assert.equal(incomplete.evidence.reason,'audit_query_or_assessment_failed');
+  assert.equal(queryCount,3);
+  assert.equal(waitCount,2);
 });
 
 test('does not promote a shadow RBAC denial to a final workload denial',async()=>{

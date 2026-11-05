@@ -19,6 +19,7 @@ function dependencies(events=[]) {
     independentMarkerReader:async args=>{events.push(`independent-marker:${typeof args.getToken}`);return {independentlyRead:true};},
     persistMarkerContentProof:async args=>{events.push('marker-proof-persist');return {evidenceReference:'urn:proof',snapshotFingerprint:`sha256:${'a'.repeat(64)}`};},
     observeGroup:async ({group})=>({state:'Running',name:group.name,identityObjectId:id(9),createdAt:'2026-11-04T12:00:00Z'}),
+    observeGroupDeletion:async ({group})=>({state:'Absent',name:group.name,identityObjectId:id(9),observedAt:'2026-11-04T12:00:02Z'}),
     fetchImpl:async()=>{throw new Error('network must not be used by injected local test');},
     groupClientFactory:()=>({
       create:async(name,body)=>{events.push(`group-create:${name}`);assert.deepEqual(body,{localOnly:true});return {name,

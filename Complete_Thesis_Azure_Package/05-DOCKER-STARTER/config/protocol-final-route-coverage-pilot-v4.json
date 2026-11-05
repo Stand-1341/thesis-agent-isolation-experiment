@@ -1,0 +1,30 @@
+{
+  "status": "non_counted_pilot_only_draft",
+  "revision": "azure-proposed-v1-rev4-vm-functions-only-draft",
+  "ownerDirection": {
+    "authorized": true,
+    "reference": "User instruction in this session to validate VM/Functions routes with non-counted pilot checks.",
+    "externalReviewStatus": "not_claimed"
+  },
+  "readiness": {
+    "protocolFreeze": "pending",
+    "deploymentValidation": "pending",
+    "isolationValidation": "pending",
+    "independentVerifierValidation": "pending",
+    "measuredExecutionEnabled": false
+  },
+  "matrix": {
+    "file": "03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-EXECUTABLE-NO-ACI-DRAFT-V3.csv",
+    "sha256": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "trials": 400
+  },
+  "pilotPlan": {
+    "file": "03-PILOT-FINAL-ROUTE-COVERAGE-2026-11-05-V4.csv",
+    "sha256": "da7cbe1bc000c703831c2021e6f6202d0616d3b962a8ccd214d332ec94f63535",
+    "trials": 2,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "purpose": "fresh non-counted VM P3 U5/U7 independently attributed network-denial coverage",
+    "status": "NOT RUN"
+  }
+}

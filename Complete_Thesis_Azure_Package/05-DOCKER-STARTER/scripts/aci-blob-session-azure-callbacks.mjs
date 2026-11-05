@@ -44,7 +44,7 @@ export function createAciBlobSessionAzureCallbacks({
   subscriptionId,resourceGroup,workspaceId,managementIdentityClientId,storageIdentityClientId,auditIdentityClientId,
   getManagementToken,createCredential,groupBodyForIdentity,profileForRun,identityProvider,effectiveAccessEvaluator,blobOperations,
   agentSessionCallbacks,independentMarkerReader,persistMarkerContentProof,
-  observeGroup,fetchImpl=fetch,groupClientFactory=createAciContainerGroupClient,
+  observeGroup,observeGroupDeletion,fetchImpl=fetch,groupClientFactory=createAciContainerGroupClient,
   storageTokenProvider=createManagedStorageTokenProvider,logsTokenProvider=createManagedLogsTokenProvider,
   auditReaderFactory=createStorageAuditReader,groupBodyBuilder=buildAciContainerGroupBody,now=()=>Date.now()
 }={}) {
@@ -86,7 +86,15 @@ export function createAciBlobSessionAzureCallbacks({
     attemptRead:args=>agentSessionCallbacks.attemptRead(args),
     readMarker:args=>independentMarkerReader({...args,getToken:getVerifierBlobToken}),
     persistMarkerContentProof:args=>persistMarkerContentProof(args),
-    observeGroup:args=>observeGroup({...args,getManagementToken:managementToken,fetchImpl}),
+    observeGroup:args=>{
+      const observationArgs={...args,runId:args.runId??args.trial?.runId,scenario:args.scenario??args.trial?.scenario,
+        identity:args.identity??{objectId:args.group?.identityObjectId},getManagementToken:managementToken,fetchImpl};
+      if(args.after!==undefined) {
+        if(typeof observeGroupDeletion!=='function') throw new Error('independent ACI group-deletion observer is not configured');
+        return observeGroupDeletion({...observationArgs,identity:{objectId:args.group?.identityObjectId},timeoutMs:30000});
+      }
+      return observeGroup(observationArgs);
+    },
     async createGroup({runId,scenario,phase,container,identity}) {
       if(!/^[A-Za-z0-9_-]{1,130}$/.test(runId||'')||!['U6','U8'].includes(scenario)||
         !['source','probe'].includes(phase)||!identity?.resourceId||!identity?.clientId)
@@ -103,11 +111,19 @@ export function createAciBlobSessionAzureCallbacks({
       const observed=await observeGroup({group:candidate,runId,scenario,phase,identity,getManagementToken:managementToken,fetchImpl});
       if(observed?.state!=='Running'||observed.name!==name||observed.identityObjectId?.toLowerCase()!==identity.objectId.toLowerCase()||
         !Number.isFinite(Date.parse(observed.createdAt))) throw new Error('ACI group creation lacks independent live observation');
-      return {...candidate,createdAt:observed.createdAt};
+      return {...candidate,createdAt:observed.createdAt,attachedPrincipalObjectIds:observed.attachedPrincipalObjectIds,
+        ...(observed.lifecycleEvidence?{lifecycleEvidence:observed.lifecycleEvidence}:{})};
     },
-    async deleteGroup({group}) {
+    async deleteGroup({group,trial,phase}) {
       const result=await groupClient.delete(group?.name);
-      return {...result,absentAt:result.deleted===true?new Date(now()).toISOString():undefined};
+      if(result?.deleted!==true||!group||typeof observeGroupDeletion!=='function')
+        throw new Error('ACI group deletion lacks an independent read-only observer');
+      const observed=await observeGroupDeletion({group,runId:trial?.runId,scenario:trial?.scenario,phase,
+        identity:{objectId:group.identityObjectId},getManagementToken:managementToken,fetchImpl,timeoutMs:30000});
+      if(!['Absent','NotFound'].includes(observed?.state)||observed.name!==group.name||
+        observed.identityObjectId?.toLowerCase()!==group.identityObjectId?.toLowerCase()||!Number.isFinite(Date.parse(observed.observedAt)))
+        throw new Error('ACI group deletion lacks independent absence confirmation');
+      return {...result,absentAt:observed.observedAt,...(observed.lifecycleEvidence?{lifecycleEvidence:observed.lifecycleEvidence}:{})};
     },
     async readAudit({runId,requestId,from,to}) {
       if(typeof requestId!=='string'||requestId.length<12||requestId.length>100||/[\r\n]/.test(requestId))

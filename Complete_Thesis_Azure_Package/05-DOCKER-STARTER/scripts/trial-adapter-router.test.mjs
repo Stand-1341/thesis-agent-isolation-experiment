@@ -20,3 +20,12 @@ test('requires the six revision-3 principals and dispatches to the intended rout
   routes['azure_functions_flex:P2']={principalObjectId:'changed',adapter:{}};
   assert.equal(await router.reset(trial),'azure_functions_flex:P2');
 });
+
+test('an explicitly selected ACI P1/P2 route is accepted, while ACI P3 is rejected',()=>{
+  const route={principalObjectId:'00000000-0000-0000-0000-000000000007',
+    adapter:{reset:async()=>{},execute:async()=>({}),collect:async()=>({})}};
+  assert.doesNotThrow(()=>createTrialAdapterRouter({'azure_container_instances:P1':route},
+    {requiredRoutes:['azure_container_instances:P1']}));
+  assert.throws(()=>createTrialAdapterRouter({'azure_container_instances:P3':route},
+    {requiredRoutes:['azure_container_instances:P3']}),/unknown required/);
+});

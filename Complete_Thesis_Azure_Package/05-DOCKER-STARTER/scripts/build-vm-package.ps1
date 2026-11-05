@@ -14,19 +14,18 @@ try {
     foreach ($name in $distNames) {
         Copy-Item -LiteralPath (Join-Path $projectRoot "dist\$name") -Destination (Join-Path $destination 'dist')
     }
+    New-Item -ItemType Directory -Path (Join-Path $destination 'certs') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'certs\thesis-pilot-ca.pem') -Destination (Join-Path $destination 'certs\thesis-pilot-ca.pem')
     Copy-Item -LiteralPath (Join-Path $projectRoot 'infra\vm-agent.service') -Destination $destination
     Copy-Item -LiteralPath (Join-Path $projectRoot 'infra\install-vm-agent.sh') -Destination $destination
+    foreach ($name in @('vm-agent-nginx.template','create-vm-agent-csr.sh','install-vm-agent-tls.sh')) {
+        Copy-Item -LiteralPath (Join-Path $projectRoot "infra\$name") -Destination $destination
+    }
     Copy-Item -LiteralPath (Join-Path $projectRoot 'package.json') -Destination $destination
     Copy-Item -LiteralPath (Join-Path $projectRoot 'package-lock.json') -Destination $destination
-    Push-Location $destination
-    try {
-        npm ci --omit=dev --ignore-scripts --no-audit --no-fund
-        if ($LASTEXITCODE -ne 0) { throw 'Production dependency installation failed.' }
-    } finally { Pop-Location }
     $hashes = [ordered]@{}
-    $relativeFiles = @('dist/agent.js','dist/core.js','dist/helpers.js','dist/network-probe.mjs','dist/azure-blob-workload.mjs','dist/azure-managed-token.mjs','dist/azure-delegated-token.mjs','dist/azure-session-seed.mjs','vm-agent.service','install-vm-agent.sh','package.json','package-lock.json')
-    $dependencyFiles = Get-ChildItem -LiteralPath (Join-Path $destination 'node_modules') -Recurse -File -Force | ForEach-Object { [System.IO.Path]::GetRelativePath($destination,$_.FullName).Replace('\','/') }
-    foreach ($relative in ($relativeFiles + $dependencyFiles)) {
+    $relativeFiles = @('dist/agent.js','dist/core.js','dist/helpers.js','dist/network-probe.mjs','dist/azure-blob-workload.mjs','dist/azure-managed-token.mjs','dist/azure-delegated-token.mjs','dist/azure-session-seed.mjs','certs/thesis-pilot-ca.pem','vm-agent.service','install-vm-agent.sh','vm-agent-nginx.template','create-vm-agent-csr.sh','install-vm-agent-tls.sh','package.json','package-lock.json')
+    foreach ($relative in $relativeFiles) {
         $hashes[$relative] = (Get-FileHash -LiteralPath (Join-Path $destination $relative) -Algorithm SHA256).Hash.ToLowerInvariant()
     }
     $manifest = [ordered]@{ scope='vm-workload-package-only'; files=$hashes; note='No credentials, Node runtime, configuration, deployment or Azure policy included.' }

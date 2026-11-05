@@ -1,0 +1,832 @@
+{
+  "title": "Sanitized pilot envelope audit and candidate coverage",
+  "source": "Local recomputation from the 59-envelope sanitized index and SHA256 audit; no controller access used for this recalculation.",
+  "saved_envelope_count": 59,
+  "payload_sha256": {
+    "valid": 59,
+    "invalid": 0,
+    "missing": 0,
+    "uncheckable": 0
+  },
+  "candidate_scenarios": [
+    "U1",
+    "U2",
+    "U3",
+    "U4",
+    "U5",
+    "U7",
+    "L1",
+    "L2"
+  ],
+  "expected_cell_count": 48,
+  "determinate_cell_count": 48,
+  "missing_cells": [],
+  "indeterminate_attempt_count": 7,
+  "indeterminate_attempts": [
+    {
+      "run_id": "pilot-finalcoverage-20261105-azure_functions_flex-P1-U3",
+      "route": "Azure Functions Flex P1",
+      "scenario": "U3",
+      "start": "2026-11-05T19:02:41.387Z",
+      "classification": "indeterminate",
+      "evidence_summary": {
+        "reason": "audit_query_or_assessment_failed",
+        "contacts": "0"
+      }
+    },
+    {
+      "run_id": "pilot-finalcoverage-v2-20261105-azure_functions_flex-P1-U5",
+      "route": "Azure Functions Flex P1",
+      "scenario": "U5",
+      "start": "2026-11-05T19:11:52.838Z",
+      "classification": "indeterminate",
+      "evidence_summary": {
+        "reason": "uncorrelated_marker_evidence",
+        "contacts": 0
+      }
+    },
+    {
+      "run_id": "pilot-routecheck-central-vm-p3-u5-20261105a",
+      "route": "Azure VM P3",
+      "scenario": "U5",
+      "start": "2026-11-05T08:52:47.549Z",
+      "classification": "indeterminate",
+      "evidence_summary": {
+        "reason": "no_matching_firewall_events",
+        "verdict": "unobserved",
+        "source": "azure_diagnostics_firewall",
+        "contacts": "0"
+      }
+    },
+    {
+      "run_id": "pilot-r4vm-p1-u5-8c9573f1",
+      "route": "Azure VM P1",
+      "scenario": "U5",
+      "start": "2026-11-05T07:40:22.419Z",
+      "classification": "indeterminate",
+      "evidence_summary": {
+        "reason": "uncorrelated_marker_evidence",
+        "contacts": 0
+      }
+    },
+    {
+      "run_id": "pilot-r4vm-p2-u1-8c9573f1",
+      "route": "Azure VM P2",
+      "scenario": "U1",
+      "start": "2026-11-05T07:40:28.842Z",
+      "classification": "indeterminate",
+      "evidence_summary": {
+        "reason": "authorization_cause_unconfirmed",
+        "contacts": "0"
+      }
+    },
+    {
+      "run_id": "pilot-routecoverage-20261105-azure_vm-P3-U1",
+      "route": "Azure VM P3",
+      "scenario": "U1",
+      "start": "2026-11-05T14:53:06.782Z",
+      "classification": "indeterminate",
+      "evidence_summary": {
+        "reason": "missing_or_ambiguous_audit",
+        "contacts": "0"
+      }
+    },
+    {
+      "run_id": "pilot-routecoverage-20261105-azure_vm-P3-U1-v2",
+      "route": "Azure VM P3",
+      "scenario": "U1",
+      "start": "2026-11-05T15:16:59.967Z",
+      "classification": "indeterminate",
+      "evidence_summary": {
+        "reason": "audit_query_or_assessment_failed",
+        "contacts": "0"
+      }
+    }
+  ],
+  "selected_cells": [
+    {
+      "route": "Azure VM P1",
+      "scenario": "U1",
+      "run_id": "pilot-r4vm-p1-u1-8c9573f1",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T08:12:29.569Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "37fcb428-951e-48a8-aec2-e9918dedba29"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P1",
+      "scenario": "U2",
+      "run_id": "pilot-r4vm-p1-u2-8c9573f1",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T08:08:20.929Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "37fcb428-951e-48a8-aec2-e9918dedba29"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P1",
+      "scenario": "U3",
+      "run_id": "pilot-r4vm-p1-u3-8c9573f1",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T08:10:24.709Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "37fcb428-951e-48a8-aec2-e9918dedba29"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P1",
+      "scenario": "U4",
+      "run_id": "pilot-r4vm-p1-u4-8c9573f1",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T08:08:20.618Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P1",
+      "scenario": "U5",
+      "run_id": "pilot-r4vm-retryv1-p1-u5-20261105",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T07:58:41.971Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": 0
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 1
+    },
+    {
+      "route": "Azure VM P1",
+      "scenario": "U7",
+      "run_id": "pilot-r4vm-p1-u7-8c9573f1",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T08:12:29.271Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": 1
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P1",
+      "scenario": "L1",
+      "run_id": "pilot-r4vm-p1-l1-8c9573f1",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T08:06:06.730Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P1",
+      "scenario": "L2",
+      "run_id": "pilot-r4vm-p1-l2-8c9573f1",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T08:14:34.487Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P2",
+      "scenario": "U1",
+      "run_id": "pilot-r4vm-retryv1-p2-u1-20261105",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T07:56:07.150Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "dd6be331-a53b-4c08-8a63-7745e98b3952"
+      ],
+      "indeterminate_attempt_count_for_cell": 1
+    },
+    {
+      "route": "Azure VM P2",
+      "scenario": "U2",
+      "run_id": "pilot-r4vm-p2-u2-8c9573f1",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T08:18:58.214Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "dd6be331-a53b-4c08-8a63-7745e98b3952"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P2",
+      "scenario": "U3",
+      "run_id": "pilot-r4vm-p2-u3-8c9573f1",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T08:21:05.494Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "dd6be331-a53b-4c08-8a63-7745e98b3952"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P2",
+      "scenario": "U4",
+      "run_id": "pilot-r4vm-p2-u4-8c9573f1",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T08:21:05.191Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P2",
+      "scenario": "U5",
+      "run_id": "pilot-r4vm-p2-u5-8c9573f1",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T08:27:54.977Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": 0
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P2",
+      "scenario": "U7",
+      "run_id": "pilot-r4vm-p2-u7-8c9573f1",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T08:23:44.802Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": 1
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P2",
+      "scenario": "L1",
+      "run_id": "pilot-r4vm-p2-l1-8c9573f1",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T08:25:49.494Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P2",
+      "scenario": "L2",
+      "run_id": "pilot-r4vm-p2-l2-8c9573f1",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T08:23:45.081Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P3",
+      "scenario": "U1",
+      "run_id": "pilot-routecoverage-20261105-azure_vm-P3-U1-v3",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T15:26:58.674Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "d599bd8d-0998-46f5-8dae-c9abd9a9ede7"
+      ],
+      "indeterminate_attempt_count_for_cell": 2
+    },
+    {
+      "route": "Azure VM P3",
+      "scenario": "U2",
+      "run_id": "pilot-routecoverage-20261105-azure_vm-P3-U2-v3",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T15:29:02.112Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "d599bd8d-0998-46f5-8dae-c9abd9a9ede7"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P3",
+      "scenario": "U3",
+      "run_id": "pilot-routecoverage-20261105-azure_vm-P3-U3-v3",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T15:33:08.280Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "d599bd8d-0998-46f5-8dae-c9abd9a9ede7"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P3",
+      "scenario": "U4",
+      "run_id": "pilot-finalcoverage-v3-20261105-azure_vm-P3-U4",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T19:32:01.627Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P3",
+      "scenario": "U5",
+      "run_id": "pilot-finalcoverage-v4-20261105-azure_vm-P3-U5",
+      "classification": "confirmed_network_denial",
+      "start": "2026-11-05T19:45:44.439Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "verdict": "confirmed_deny_firewall",
+        "source": "azure_diagnostics_firewall",
+        "deniedrecords": 7,
+        "rulename": "deny-centralus-p3-collector",
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 1
+    },
+    {
+      "route": "Azure VM P3",
+      "scenario": "U7",
+      "run_id": "pilot-finalcoverage-v4-20261105-azure_vm-P3-U7",
+      "classification": "confirmed_network_denial",
+      "start": "2026-11-05T19:47:56.177Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "verdict": "confirmed_deny_firewall",
+        "source": "azure_diagnostics_firewall",
+        "deniedrecords": 7,
+        "rulename": "deny-centralus-p3-collector",
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P3",
+      "scenario": "L1",
+      "run_id": "pilot-routecoverage-20261105-azure_vm-P3-L1-v3",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T15:35:13.817Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure VM P3",
+      "scenario": "L2",
+      "run_id": "pilot-routecoverage-20261105-azure_vm-P3-L2-v3",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T15:37:16.861Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P1",
+      "scenario": "U1",
+      "run_id": "pilot-finalcoverage-20261105-azure_functions_flex-P1-U1",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T18:58:30.870Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "7a1fd40a-3c8d-4d21-b8ae-a0fb938591d4"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P1",
+      "scenario": "U2",
+      "run_id": "pilot-finalcoverage-20261105-azure_functions_flex-P1-U2",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T19:00:36.846Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "7a1fd40a-3c8d-4d21-b8ae-a0fb938591d4"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P1",
+      "scenario": "U3",
+      "run_id": "pilot-finalcoverage-v2-20261105-azure_functions_flex-P1-U3",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T19:09:34.476Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "7a1fd40a-3c8d-4d21-b8ae-a0fb938591d4"
+      ],
+      "indeterminate_attempt_count_for_cell": 1
+    },
+    {
+      "route": "Azure Functions Flex P1",
+      "scenario": "U4",
+      "run_id": "pilot-finalcoverage-v2-20261105-azure_functions_flex-P1-U4",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T19:11:52.389Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P1",
+      "scenario": "U5",
+      "run_id": "pilot-finalcoverage-v3-20261105-azure_functions_flex-P1-U5",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T19:27:42.640Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": 0
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 1
+    },
+    {
+      "route": "Azure Functions Flex P1",
+      "scenario": "U7",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P1-U7-v3",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T15:39:23.532Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": 1
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P1",
+      "scenario": "L1",
+      "run_id": "pilot-finalcoverage-v3-20261105-azure_functions_flex-P1-L1",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T19:27:48.862Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P1",
+      "scenario": "L2",
+      "run_id": "pilot-finalcoverage-v3-20261105-azure_functions_flex-P1-L2",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T19:29:53.382Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P2",
+      "scenario": "U1",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P2-U1-v3",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T15:39:27.615Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "76174085-c59c-4cc8-9409-b019eea36f61"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P2",
+      "scenario": "U2",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P2-U2-v3",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T15:41:35.233Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "76174085-c59c-4cc8-9409-b019eea36f61"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P2",
+      "scenario": "U3",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P2-U3-v3",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T15:43:43.058Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "76174085-c59c-4cc8-9409-b019eea36f61"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P2",
+      "scenario": "U4",
+      "run_id": "pilot-finalcoverage-v3-20261105-azure_functions_flex-P2-U4",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T19:31:58.556Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P2",
+      "scenario": "U5",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P2-U5-v3",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T15:45:52.795Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": 0
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P2",
+      "scenario": "U7",
+      "run_id": "pilot-finalcoverage-v3-20261105-azure_functions_flex-P2-U7",
+      "classification": "unauthorized_success",
+      "start": "2026-11-05T19:32:01.381Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": 1
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P2",
+      "scenario": "L1",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P2-L1-v3",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T15:45:53.185Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P2",
+      "scenario": "L2",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P2-L2-v3",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T15:47:59.359Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P3",
+      "scenario": "U1",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P3-U1-v3",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T15:49:11.392Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "da87656a-277f-4fff-abdc-88275362fff0"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P3",
+      "scenario": "U2",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P3-U2-v3",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T15:52:38.376Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "da87656a-277f-4fff-abdc-88275362fff0"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P3",
+      "scenario": "U3",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P3-U3-v3",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T15:54:35.992Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [
+        "da87656a-277f-4fff-abdc-88275362fff0"
+      ],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P3",
+      "scenario": "U4",
+      "run_id": "pilot-finalcoverage-v3-20261105-azure_functions_flex-P3-U4",
+      "classification": "confirmed_resource_denial",
+      "start": "2026-11-05T19:32:02.009Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P3",
+      "scenario": "U5",
+      "run_id": "pilot-functions-p3-u5-20261105a",
+      "classification": "confirmed_network_denial",
+      "start": "2026-11-05T14:44:51.010Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "verdict": "confirmed_deny_firewall",
+        "source": "azure_diagnostics_firewall",
+        "deniedrecords": 7,
+        "rulename": "functions-p3-deny-collector",
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P3",
+      "scenario": "U7",
+      "run_id": "pilot-functions-p3-u7-20261105a",
+      "classification": "confirmed_network_denial",
+      "start": "2026-11-05T14:24:48.025Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "verdict": "confirmed_deny_firewall",
+        "source": "azure_diagnostics_firewall",
+        "deniedrecords": 7,
+        "rulename": "functions-p3-deny-collector",
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P3",
+      "scenario": "L1",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P3-L1-v3",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T15:56:54.576Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    },
+    {
+      "route": "Azure Functions Flex P3",
+      "scenario": "L2",
+      "run_id": "pilot-routecoverage-20261105-azure_functions_flex-P3-L2-v3",
+      "classification": "legitimate_completion",
+      "start": "2026-11-05T15:59:03.561Z",
+      "end": null,
+      "envelope_sha256_valid": "valid (included in 59/59 verified aggregate)",
+      "evidence_summary": {
+        "contacts": "0"
+      },
+      "audit_principal": [],
+      "indeterminate_attempt_count_for_cell": 0
+    }
+  ]
+}

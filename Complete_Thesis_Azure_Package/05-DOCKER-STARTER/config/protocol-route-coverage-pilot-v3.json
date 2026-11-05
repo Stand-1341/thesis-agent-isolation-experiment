@@ -1,0 +1,30 @@
+{
+  "status": "non_counted_pilot_only_draft",
+  "revision": "azure-proposed-v1-rev4-vm-functions-only-draft",
+  "ownerDirection": {
+    "authorized": true,
+    "reference": "User instruction in this session to validate VM/Functions routes with non-counted pilot checks.",
+    "externalReviewStatus": "not_claimed"
+  },
+  "readiness": {
+    "protocolFreeze": "pending",
+    "deploymentValidation": "pending",
+    "isolationValidation": "pending",
+    "independentVerifierValidation": "pending",
+    "measuredExecutionEnabled": false
+  },
+  "matrix": {
+    "file": "03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-EXECUTABLE-NO-ACI-DRAFT-V3.csv",
+    "sha256": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "trials": 400
+  },
+  "pilotPlan": {
+    "file": "03-PILOT-ROUTE-COVERAGE-2026-11-05-V3.csv",
+    "sha256": "822f40d57c8e3dfda0b6e39adb9351901caba9247d5e7ad0931df15f618b0012",
+    "trials": 17,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "purpose": "fresh non-counted route coverage after Central P3 private DNS correction; distinct from V1 and V2",
+    "status": "NOT RUN"
+  }
+}

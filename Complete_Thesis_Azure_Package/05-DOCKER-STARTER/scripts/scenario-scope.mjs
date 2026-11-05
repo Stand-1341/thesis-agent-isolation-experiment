@@ -4,6 +4,7 @@
  * never a result and never an implicit skip.
  */
 const SESSION_DEPLOYMENT='azure_custom_sessions_hyperv';
+const CROSS_GROUP_BLOB_DEPLOYMENT='azure_container_instances';
 const SESSION_ONLY=new Set(['U6','U8']);
 export const NETWORK_DENIAL_SCENARIOS=new Set(['U5','U7']);
 
@@ -12,8 +13,11 @@ export function classifyTrialScope(trial,{networkCapabilities={}}={}) {
   const profile=trial.permission_profile ?? trial.profile;
   const scenario=trial.scenario_id ?? trial.scenario;
   const deployment=trial.deployment;
-  if(SESSION_ONLY.has(scenario) && deployment!==SESSION_DEPLOYMENT)
+  if(SESSION_ONLY.has(scenario) && deployment!==SESSION_DEPLOYMENT && deployment!==CROSS_GROUP_BLOB_DEPLOYMENT)
     return {status:'not_applicable',reason:'scenario_requires_sessions',deployment,scenario};
+
+  if(deployment===CROSS_GROUP_BLOB_DEPLOYMENT && profile==='P3')
+    return {status:'unsupported',reason:'aci_profile_p3_not_in_study_design',deployment,profile,scenario};
 
   // A P3 session route represents P2 authorization plus selective network
   // containment. The current pool cannot support that selective egress design,

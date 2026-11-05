@@ -78,6 +78,14 @@ test('creates source identity with a single container-scoped Blob Data Contribut
   assert.equal(body.properties.roleDefinitionId,`/subscriptions/${sub}/providers/Microsoft.Authorization/roleDefinitions/${ACI_BLOB_DATA_CONTRIBUTOR_ROLE_ID}`);
 });
 
+test('supports exact rev4 run IDs while retaining per-run identity names and scope checks',async()=>{
+  const {provider,identities}=harness();
+  const result=await provider.createIdentity({runId:'r4-b01-01-aci-P2-U6',scenario:'U6',role:'source',container:'session-b',target:{resourceId:target}});
+  assert.equal(result.runId,'r4-b01-01-aci-P2-U6');
+  assert.match(result.resourceId,/userAssignedIdentities\/aci-[a-f0-9]{32}-source$/);
+  assert.equal(identities.size,1);
+});
+
 test('probe identity receives no direct Blob role and refuses an unobserved inherited/group-complete snapshot',async()=>{
   const {provider,assignments}=harness();
   const probe=await provider.createIdentity({runId:'pilot-aci-u8-01',scenario:'U8',role:'probe',container:'prior-session',

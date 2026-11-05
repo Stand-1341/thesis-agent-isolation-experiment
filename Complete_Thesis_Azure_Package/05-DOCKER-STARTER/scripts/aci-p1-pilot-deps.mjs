@@ -37,6 +37,7 @@ import {createHash} from 'node:crypto';
 const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ARM_ID=/^\/subscriptions\/[0-9a-f-]{36}\/resourceGroups\/[A-Za-z0-9._()-]+\/providers\/Microsoft\.(?:ManagedIdentity\/userAssignedIdentities|Network\/virtualNetworks)\//i;
 const ACCEPTED=new Set(['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2']);
+const OWNER_50_SCHEDULE_SHA256='b63e949f035ee278ebc932404d48445e667c096ff679f8ef32e14d41e7de26eb';
 const REQUIRED=[
   'THESIS_ACI_SUBSCRIPTION_ID','THESIS_ACI_TENANT_ID','THESIS_ACI_RESOURCE_GROUP','THESIS_ACI_LOCATION',
   'THESIS_ACI_IMAGE_DIGEST_REFERENCE','THESIS_ACI_REGISTRY_SERVER',
@@ -112,7 +113,7 @@ function tokenFor(credential,scope,label) {
     return result.token;
   };
 }
-function validateConfig(env,{diagnosticOnly=false}={}) {
+function validateConfig(env,{diagnosticOnly=false,ownerApprovedNonCountedPilot=false,retentionOwnerApprovalReference}={}) {
   const missing=[]; const values={};
   for(const name of REQUIRED) values[name]=read(env,name,missing);
   for(const [key,name] of Object.entries(SECRET_NAMES)) values[name]=read(env,name,missing);
@@ -151,8 +152,12 @@ function validateConfig(env,{diagnosticOnly=false}={}) {
     throw new Error('THESIS_BLOB_RESOURCE_ID must be a storage Blob service ARM ID');
   if(new URL(values.THESIS_FIXTURE_BLOB_ENDPOINT).hostname!==`${values.THESIS_BLOB_RESOURCE_ID.split('/')[8]}.blob.core.windows.net`)
     throw new Error('fixture Blob endpoint does not match THESIS_BLOB_RESOURCE_ID');
-  if(values.THESIS_EVIDENCE_RETENTION_APPROVED!=='true'&&!diagnosticOnly)
-    throw new Error('institution-approved evidence retention is not asserted');
+  const ownerRetention=ownerApprovedNonCountedPilot===true&&env.THESIS_EVIDENCE_RETENTION_OWNER_APPROVED==='true'&&
+    env.THESIS_EVIDENCE_RETENTION_OWNER_APPROVAL_SCOPE==='aci_p1_live_injection_50_non_counted_synthetic_pilot_only'&&
+    env.THESIS_EVIDENCE_RETENTION_OWNER_APPROVAL_REFERENCE===retentionOwnerApprovalReference&&
+    retentionOwnerApprovalReference==='file:docs/ACI-P1-50-RETENTION-OWNER-DIRECTION.md';
+  if(values.THESIS_EVIDENCE_RETENTION_APPROVED!=='true'&&!diagnosticOnly&&!ownerRetention)
+    throw new Error('institution-approved evidence retention or the explicit ACI 50 owner-approved retention directive is required');
   if(!/^[1-9]\d*$/.test(values.THESIS_EVIDENCE_RETENTION_DAYS)) throw new Error('THESIS_EVIDENCE_RETENTION_DAYS must be a positive integer');
   const evidenceUrl=safeUrl(values.THESIS_EVIDENCE_BLOB_CONTAINER_URL,'THESIS_EVIDENCE_BLOB_CONTAINER_URL');
   if(!/^\/subscriptions\/[0-9a-f-]{36}\/resourceGroups\/[A-Za-z0-9._()-]+\/providers\/Microsoft\.Storage\/storageAccounts\/[a-z0-9]{3,24}\/blobServices\/default\/containers\/[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/i.test(values.THESIS_EVIDENCE_CONTAINER_RESOURCE_ID))
@@ -184,11 +189,18 @@ async function readVaultSecret({vaultUri,name,getToken,fetchImpl}) {
  * components is a test seam for local wiring tests. Production defaults always
  * use Azure SDK managed identities and existing fail-closed Azure adapters.
  */
-async function createAciP1Dependencies({rows,env=process.env,fetchImpl=fetch,components={},diagnosticOnly=false}={}) {
+async function createAciP1Dependencies({rows,env=process.env,fetchImpl=fetch,components={},diagnosticOnly=false,
+  ownerApprovedNonCountedPilot=false,retentionOwnerApprovalReference,scheduleSha256}={}) {
   if(diagnosticOnly && (!Array.isArray(rows)||rows.length!==1||(rows[0]?.scenario_id??rows[0]?.scenario)!=='U1'||
     rows[0]?.deployment!=='azure_container_instances'||(rows[0]?.permission_profile??rows[0]?.profile)!=='P1'))
     throw new Error('diagnostic-only ACI dependencies accept exactly one P1 U1 row; U5 is executed only as its paired operation');
   validateRows(rows,{...components,allowDefaultComposition:true});
+  const ownerRetentionAllowed=ownerApprovedNonCountedPilot===true&&scheduleSha256===OWNER_50_SCHEDULE_SHA256&&rows.length===50&&
+    rows.every(row=>row?.deployment==='azure_container_instances'&&(row?.permission_profile??row?.profile)==='P1'&&
+      (row?.scenario_id??row?.scenario)==='U1')&&
+    retentionOwnerApprovalReference==='file:docs/ACI-P1-50-RETENTION-OWNER-DIRECTION.md';
+  if(ownerApprovedNonCountedPilot===true&&!ownerRetentionAllowed)
+    throw new Error('owner retention exception is restricted to the exact 50-row non-counted ACI P1 U1 pilot');
   const c={
     identity:makeIdentity,
     storageProvider:createManagedStorageTokenProvider,
@@ -220,7 +232,7 @@ async function createAciP1Dependencies({rows,env=process.env,fetchImpl=fetch,com
     ...components
   };
   const hasLifecycle=rows.some(row=>['U6','U8'].includes(row?.scenario_id??row?.scenario));
-  const cfg=validateConfig(env,{diagnosticOnly});
+  const cfg=validateConfig(env,{diagnosticOnly,ownerApprovedNonCountedPilot:ownerRetentionAllowed,retentionOwnerApprovalReference});
   if(hasLifecycle) {
     let approval=false;
     try {approval=await c.verifyMethodApproval(c.methodDecision);} catch {approval=false;}
@@ -409,7 +421,8 @@ async function createAciP1Dependencies({rows,env=process.env,fetchImpl=fetch,com
   const verifier=c.verifierRouter({blobVerifier,collectorVerifier,resourceVerifier,
     ...(hasLifecycle?{sessionAnalogVerifier}:{})});
   const evidenceStore=diagnosticOnly?undefined:
-    await c.evidenceStore({env:{...env,THESIS_TOKEN_PROVIDER_MODE:'managed_identity'},fetchImpl});
+    await c.evidenceStore({env:{...env,THESIS_TOKEN_PROVIDER_MODE:'managed_identity'},fetchImpl,
+      allowOwnerApprovedNonCountedPilot:ownerRetentionAllowed,ownerApprovalReference:retentionOwnerApprovalReference});
   return {adapter,verifier,evidenceStore,...(diagnosticOnly?{diagnosticOnly:true}:{})};
 }
 

@@ -16,13 +16,17 @@ function readyInputs(){
   return {protocol,readiness:{...blankReadiness,approvals:{status:'approved',methodReference:validRef,approvedByReference:validRef},gates}};
 }
 
-test('owner-approved protocol remains blocked on missing Azure route and retention evidence',()=>{
+test('owner-approved non-counted protocol remains blocked until Azure evidence protection is validated',()=>{
   const inspection=inspectAciLiveInjectionReadiness({bytes,protocol:protocolBase,readiness:blankReadiness});
   assert.equal(inspection.runnable,false);
   assert.equal(protocolBase.status,'approved_for_non_counted_pilot');
   assert.equal(inspection.blockers.some(item=>item.includes('method approval')),false);
-  assert.ok(inspection.blockers.some(item=>item.includes('u1ResourceAuditVerifier')));
-  assert.ok(inspection.blockers.some(item=>item.includes('evidenceRetentionApproval')));
+  assert.equal(inspection.blockers.some(item=>item.includes('u1ResourceAuditVerifier')),false);
+  assert.equal(inspection.blockers.some(item=>item.includes('u5CollectorAuditVerifier')),false);
+  assert.equal(inspection.blockers.some(item=>item.includes('operationCorrelation')),false);
+  assert.equal(inspection.blockers.some(item=>item.includes('credentialsValidated')),false);
+  assert.ok(inspection.blockers.some(item=>item.includes('independentEvidenceProtection')));
+  assert.equal(inspection.blockers.some(item=>item.includes('evidenceRetentionApproval')),false);
   assert.equal(inspection.conditions,50);
   assert.equal(inspection.pairs,25);
 });

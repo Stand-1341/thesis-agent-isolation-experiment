@@ -35,10 +35,14 @@ export function inspectAciLiveInjectionReadiness({bytes,protocol,readiness}) {
     blockers.push('the extension method and fixed 25-pair sample size need an approval record');
   for(const name of REQUIRED_GATES) if(readiness?.gates?.[name]?.passed!==true||!isRef(readiness.gates[name].evidenceReference))
     blockers.push(`readiness gate ${name} lacks passed evidence`);
-  if(protocol.evidenceRetention?.desired!=='indefinite'||protocol.evidenceRetention?.departmentApproved!==true||
-    protocol.evidenceRetention?.azureMechanism!=='locked_time_based_worm_146000_days'||
-    protocol.evidenceRetention?.minimumRetentionDays!==146000)
-    blockers.push('the requested indefinite retention must be department-approved and set to the current runner-supported 146000-day locked Azure WORM policy');
+  const retention=protocol.evidenceRetention??{};
+  const ownerApprovedNonCountedRetention=protocol.countedAsStudyTrials===false&&readiness?.countedAsStudyTrials===false&&
+    retention.ownerApproved===true&&retention.ownerApprovalScope==='aci_p1_live_injection_50_non_counted_synthetic_pilot_only'&&
+    isRef(retention.ownerApprovalReference)&&readiness?.gates?.evidenceRetentionApproval?.passed===true&&
+    readiness.gates.evidenceRetentionApproval.evidenceReference===retention.ownerApprovalReference;
+  if(retention.desired!=='indefinite'||(!retention.departmentApproved&&!ownerApprovedNonCountedRetention)||
+    retention.azureMechanism!=='locked_time_based_worm_146000_days'||retention.minimumRetentionDays!==146000)
+    blockers.push('retention requires institution-approved policy or the explicit owner-approved non-counted synthetic-pilot exception, plus locked 146000-day Azure WORM');
   if(protocol.model?.maximumCostPerConditionUsd!==MAX_CONDITION_SPEND_USD||protocol.model?.maximumModelSpendUsd!==MAX_MODEL_SPEND_USD||
     protocol.model?.retryPolicy!=='none'||protocol.model?.fallback!==false)
     blockers.push('the fixed model and spend policy does not match this runner');
@@ -193,6 +197,8 @@ export async function runAciLiveInjectionPilot({bytes,protocol,readiness,depende
     endpointUrl.username||endpointUrl.password||endpointUrl.search||endpointUrl.hash) throw new Error('Azure GPT-5 mini endpoint must be credential-free HTTPS');
   const rows=parseRows(bytes);
   const deps=await dependencies({mode:'non_counted_live_injection_pilot',countedAsStudyTrials:false,
+    ownerApprovedNonCountedPilot:protocol.evidenceRetention?.ownerApproved===true,
+    retentionOwnerApprovalReference:protocol.evidenceRetention?.ownerApprovalReference,
     rows:rows.map(row=>({...row,scenario_id:'U1'})),scheduleSha256:inspection.scheduleSha256});
   if(!deps?.adapter||typeof deps.adapter.beginInjectionPair!=='function'||typeof deps.verifier!=='function'||!deps.evidenceStore)
     throw new Error('ACI live-injection dependencies require paired ACI session, independent verifier, and protected Azure evidence store');
@@ -272,7 +278,13 @@ export async function main(argv=process.argv.slice(2),{stdout=process.stdout,std
   const getModelToken=async()=>{const result=await credential.getToken('https://cognitiveservices.azure.com/.default');
     if(typeof result?.token!=='string'||!result.token||/[\r\n]/.test(result.token))throw new Error('Azure GPT-5 mini managed identity token unavailable');return result.token;};
   const results=await runAciLiveInjectionPilot({bytes,protocol,readiness,endpoint,getModelToken,
-    dependencies:args=>createAciDependencies({rows:args.rows,env}),now:()=>new Date().toISOString()});
+    dependencies:args=>createAciDependencies({rows:args.rows,env:{...env,
+      THESIS_EVIDENCE_RETENTION_OWNER_APPROVED:String(args.ownerApprovedNonCountedPilot===true),
+      THESIS_EVIDENCE_RETENTION_OWNER_APPROVAL_SCOPE:args.ownerApprovedNonCountedPilot===true
+        ?'aci_p1_live_injection_50_non_counted_synthetic_pilot_only':'',
+      THESIS_EVIDENCE_RETENTION_OWNER_APPROVAL_REFERENCE:args.retentionOwnerApprovalReference??''},
+      ownerApprovedNonCountedPilot:args.ownerApprovedNonCountedPilot===true,
+      retentionOwnerApprovalReference:args.retentionOwnerApprovalReference,scheduleSha256:args.scheduleSha256}),now:()=>new Date().toISOString()});
   stdout.write(`${JSON.stringify({mode:'non_counted_aci_p1_live_injection_pilot',countedAsStudyTrials:false,
     plannedConditions:50,completedConditions:results.length,completedPairs:Math.floor(results.length/2),complete:results.complete,
     haltedAt:results.haltedAt??null,estimatedModelUsd:results.totalEstimatedUsd,scheduleSha256:inspection.scheduleSha256},null,2)}\n`);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {readFile} from 'node:fs/promises';
 import {validateExperimentConfig,resolveCredentials,loadExperimentConfig,EXPERIMENT_ROUTES} from './experiment-config.mjs';
 
 const guid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
@@ -33,6 +34,46 @@ test('the revision-3 six-route configuration validates',()=>{
   const config=validateExperimentConfig(baseConfig());
   assert.equal(config.routes.length,6);
   assert.equal(config.auditWindowSeconds,300);
+});
+
+test('a pilot-retry schedule may select a subset of the six revision-3 config routes',()=>{
+  const config=validateExperimentConfig(baseConfig(),{requiredRoutes:['azure_functions_flex:P1']});
+  assert.equal(config.routes.length,6);
+  assert.equal(config.routes.some(route=>route.deployment==='azure_vm'&&route.profile==='P3'),true);
+});
+
+test('the alternate schedule can validate its eight routes including only ACI P1/P2',()=>{
+  const config=baseConfig();
+  config.deployments.azure_container_instances={kind:'aci',resourceUrl:'https://res.aci.example',
+    collectorUrl:'https://col.aci.example',resourceGroup:'aci-rg',region:'westus2',
+    subnetResourceId:'/subscriptions/sub/resourceGroups/net/providers/Microsoft.Network/virtualNetworks/vnet/subnets/aci',
+    agentImage:'registry.example/agent@sha256:'+('a'.repeat(64))};
+  for(const profile of ['P1','P2']) config.routes.push({deployment:'azure_container_instances',profile,
+    principalObjectId:guid(profile==='P1'?7:8),credentials:{controller:`ACI_CONTROLLER_${profile}`,
+      resourceAdmin:'ACI_RESOURCE_ADMIN',collectorAdmin:'ACI_COLLECTOR_ADMIN'}});
+  const requiredRoutes=[...EXPERIMENT_ROUTES,'azure_container_instances:P1','azure_container_instances:P2'];
+  const validated=validateExperimentConfig(config,{requiredRoutes});
+  assert.equal(validated.routes.length,8);
+  assert.equal(validated.deployments.azure_container_instances.kind,'aci');
+  config.routes.push({deployment:'azure_container_instances',profile:'P3',principalObjectId:guid(9),
+    credentials:{controller:'ACI_CONTROLLER_P3',resourceAdmin:'ACI_RESOURCE_ADMIN',collectorAdmin:'ACI_COLLECTOR_ADMIN'}});
+  assert.throws(()=>validateExperimentConfig(config,{requiredRoutes:[...requiredRoutes,'azure_container_instances:P3']}),/must be P1 or P2/);
+});
+
+test('rev4 selected-subset config binds only VM P1/P2 to live routes and labels ACI as unselected placeholders',async()=>{
+  const raw=JSON.parse(await readFile(new URL('../config/experiment.400-rev4-vm-p1-p2-subset.json',import.meta.url),'utf8'));
+  const protocol=JSON.parse(await readFile(new URL('../config/protocol-400-rev4-aci-draft.json',import.meta.url),'utf8'));
+  const requiredRoutes=[...EXPERIMENT_ROUTES,'azure_container_instances:P1','azure_container_instances:P2'];
+  const config=validateExperimentConfig(raw,{requiredRoutes});
+  assert.equal(protocol.revision,'azure-proposed-v1-rev4-aci-draft');
+  assert.equal(protocol.matrix.sha256,'1d21c879f34d35d965d258cd427d2e2e0c25538ccb4eec0147f3d9169d5481d4');
+  assert.deepEqual(config.routes.filter(route=>route.deployment==='azure_vm'&&['P1','P2'].includes(route.profile))
+    .map(route=>[route.profile,route.agentUrl,route.principalObjectId]),[
+      ['P1','https://10.48.0.4','37fcb428-951e-48a8-aec2-e9918dedba29'],
+      ['P2','https://10.48.7.4','dd6be331-a53b-4c08-8a63-7745e98b3952']
+    ]);
+  assert.match(raw._comment,/only.*VM P1\/P2/i);
+  assert.match(raw._comment,/ACI resources are deployed or started/);
 });
 
 test('a configuration that holds a secret instead of naming one is rejected',()=>{

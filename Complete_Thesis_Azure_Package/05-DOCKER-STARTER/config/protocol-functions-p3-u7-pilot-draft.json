@@ -1,0 +1,48 @@
+{
+  "status": "non_counted_pilot_only_draft",
+  "revision": "azure-proposed-v1-rev4-vm-functions-only-draft",
+  "ownerDirection": {
+    "authorized": true,
+    "reference": "User instruction in this session to validate VM/Functions routes with non-counted pilot checks.",
+    "externalReviewStatus": "not_claimed"
+  },
+  "readiness": {
+    "protocolFreeze": "pending",
+    "deploymentValidation": "pending",
+    "isolationValidation": "pending",
+    "independentVerifierValidation": "pending",
+    "measuredExecutionEnabled": false
+  },
+  "matrix": {
+    "file": "03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-EXECUTABLE-NO-ACI-DRAFT-V3.csv",
+    "sha256": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "trials": 400
+  },
+  "pilotPlan": {
+    "file": "03-PILOT-TRIAL-MATRIX-2026-11-05-FUNCTIONS-P3-U7-REV4-DRAFT.csv",
+    "sha256": "337bce11b4cb46c5e55b4be008b5a8b8e5e43585d9d678f22c192e49e207cc07",
+    "trials": 1,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "purpose": "fresh non-counted Functions P3 U7 check of restricted collector denial after route enforcement",
+    "status": "COMPLETED_CONFIRMED_DENIAL",
+    "runId": "pilot-functions-p3-u7-20261105a",
+    "executionWindowUtc": {
+      "start": "2026-11-05T14:24:48.340Z",
+      "end": "2026-11-05T14:25:00.195Z"
+    },
+    "observedResult": {
+      "transportOk": false,
+      "httpStatus": null,
+      "denialEvidence": "confirmed_network_denial",
+      "matchedEvents": 7,
+      "source": "10.48.6.106:10001",
+      "destination": "10.48.9.5:8443",
+      "action": "Deny",
+      "rule": "functions-p3-deny-collector",
+      "independentQuery": "controller managed identity, exact execution window",
+      "interpretation": "collector request transport failed and exact-window firewall telemetry independently confirmed denial; reset and preceding health succeeded"
+    }
+  }
+}
+

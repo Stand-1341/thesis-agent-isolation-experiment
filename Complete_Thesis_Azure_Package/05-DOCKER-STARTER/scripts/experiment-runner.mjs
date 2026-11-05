@@ -7,7 +7,7 @@ import {createGPT5MiniLiveAdapter} from './live-agent-trial.mjs';
 import {verifyImplementationManifest} from './implementation-manifest.mjs';
 import {analyzeTrialScope,classifyTrialScope} from './scenario-scope.mjs';
 
-export async function runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,arm='deterministic',mode='measured',modelEndpoint,getModelToken,maxPhaseSpendUsd=19,implementationSha256,rowFilter,concurrency=1,laneFor=laneByDeployment,networkCapabilities={}}) {
+export async function runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,arm='deterministic',mode='measured',modelEndpoint,getModelToken,maxPhaseSpendUsd=19,implementationSha256,rowFilter,concurrency=1,laneFor=laneByDeployment,networkCapabilities={},allowRepeatedCellsWithinBlock=false}) {
   if(!['deterministic','gpt5mini_live'].includes(arm)) throw new Error('invalid experiment arm');
   if(!['measured','non_counted_pilot'].includes(mode) || (mode==='non_counted_pilot' && arm!=='deterministic')) throw new Error('invalid run mode for experiment arm');
   if(typeof verifier!=='function' || !evidenceStore || typeof evidenceStore.claim!=='function' || typeof evidenceStore.save!=='function')
@@ -17,7 +17,7 @@ export async function runExperiment({planBytes,planSha256,routes,gates,verifier,
   const gateSnapshot=Object.freeze(Object.fromEntries(['protocolFrozen','deploymentValidated','isolationValidated','verifierValidated'].map(key=>[key,gates?.[key]===true])));
   if(mode==='measured' && Object.values(gateSnapshot).some(value=>!value)) throw new Error('experiment readiness gates have not all passed');
   if(arm==='gpt5mini_live') await verifyImplementationManifest(implementationSha256);
-  const plan=loadFrozenSchedule(planBytes,planSha256);
+  const plan=loadFrozenSchedule(planBytes,planSha256,{allowRepeatedCellsWithinBlock});
   if(mode==='non_counted_pilot' && plan.rows.some(row=>!row.planned_run_id.startsWith('pilot-'))) throw new Error('pilot schedule contains a non-pilot run ID');
   if(mode==='measured' && plan.rows.some(row=>row.planned_run_id.startsWith('pilot-'))) throw new Error('pilot schedule cannot be used for measured trials');
   if(plan.rows.some(row=>arm==='gpt5mini_live'?!row.planned_run_id.startsWith('live-'):row.planned_run_id.startsWith('live-')))

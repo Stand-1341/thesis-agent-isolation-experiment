@@ -17,6 +17,14 @@
  *   THESIS_VM_SOURCE_IP=10.20.4.7 \
  *   THESIS_FLEX_SOURCE_IP=10.20.9.4 \
  *   THESIS_DENIAL_DESTINATION_IP=203.0.113.10 \
+ *   THESIS_VM_P3_DENIAL_TELEMETRY=azure_diagnostics_firewall \
+ *   THESIS_VM_P3_FIREWALL_SOURCE_IP=10.49.8.4 \
+ *   THESIS_VM_P3_FIREWALL_DESTINATION_PORT=8443 \
+ *   THESIS_VM_P3_FIREWALL_DENY_RULE=deny-centralus-p3-collector \
+ *   THESIS_FLEX_P3_DENIAL_TELEMETRY=azure_diagnostics_firewall \
+ *   THESIS_FLEX_P3_FIREWALL_SOURCE_CIDR=10.48.6.0/24 \
+ *   THESIS_FLEX_P3_FIREWALL_DESTINATION_PORT=8443 \
+ *   THESIS_FLEX_P3_FIREWALL_DENY_RULE=functions-p3-deny-collector \
  *   npm run run:experiment -- --config config/experiment.json --deps scripts/deps-live.mjs ...
  */
 import {createAzureCliLogsTokenProvider,createAzureCliSessionsTokenProvider,createAzureCliStorageTokenProvider} from './azure-cli-token.mjs';
@@ -39,6 +47,21 @@ import {createLaneSelector} from './build-experiment.mjs';
 
 const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Resolve the workload principal from either scheduler or normalized trial shape.
+ * If both labels are present they must agree; a verifier must never guess a route.
+ */
+export function principalForConfiguredTrial(config,trial) {
+  const profile=trial?.permission_profile ?? trial?.profile;
+  if(trial?.profile!==undefined && trial?.permission_profile!==undefined && trial.profile!==trial.permission_profile)
+    throw new Error('trial profile fields disagree; refusing principal attribution');
+  if(typeof trial?.deployment!=='string' || typeof profile!=='string')
+    throw new Error('trial deployment/profile is missing; refusing principal attribution');
+  const matches=config?.routes?.filter(entry=>entry.deployment===trial.deployment && entry.profile===profile)??[];
+  if(matches.length!==1 || !GUID.test(matches[0]?.principalObjectId??''))
+    throw new Error('no unique configured principal for this trial');
+  return matches[0].principalObjectId;
+}
+
 function reader(env,missing,name) {
   const value=env[name];
   if(typeof value!=='string' || !value.trim()) {missing.add(name);return undefined;}
@@ -51,6 +74,15 @@ function ip(env,missing,name,{optional=false}={}) {
   const net=value.trim();
   if(!/^\d{1,3}(\.\d{1,3}){3}$/.test(net)) throw new Error(`${name} must be an IPv4 address`);
   return net;
+}
+function cidr(env,missing,name,{optional=false}={}) {
+  const value=env[name];
+  if(value===undefined || value==='') { if(optional) return undefined; missing.add(name); return undefined; }
+  const match=/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/.exec(value.trim());
+  if(!match || !/^(?:0|[1-9]|[12]\d|3[0-2])$/.test(match[2])) throw new Error(`${name} must be an IPv4 CIDR`);
+  const octets=match[1].split('.').map(Number);
+  if(octets.some(octet=>octet>255)) throw new Error(`${name} must be an IPv4 CIDR`);
+  return `${match[1]}/${Number(match[2])}`;
 }
 
 /**
@@ -84,12 +116,44 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
       throw new Error('THESIS_FIXTURE_BLOB_ENDPOINT must be an HTTPS URL without credentials, query or fragment');
   }
   const destinationIp=needsVmDenial||needsFlexDenial?ip(env,missing,'THESIS_DENIAL_DESTINATION_IP'):undefined;
-  const vmSource=overrides.azure_vm?.sourceIp ?? ip(env,missing,'THESIS_VM_SOURCE_IP',{optional:true});
+  const vmP3Telemetry=env.THESIS_VM_P3_DENIAL_TELEMETRY??'vnet_flow_log';
+  if(!['vnet_flow_log','azure_diagnostics_firewall'].includes(vmP3Telemetry))
+    throw new Error('THESIS_VM_P3_DENIAL_TELEMETRY must be vnet_flow_log or azure_diagnostics_firewall');
+  const vmSource=vmP3Telemetry==='azure_diagnostics_firewall'
+    ?needsVmDenial?ip(env,missing,'THESIS_VM_P3_FIREWALL_SOURCE_IP'):undefined
+    :overrides.azure_vm?.sourceIp ?? ip(env,missing,'THESIS_VM_SOURCE_IP',{optional:true});
   // Scoping the VM arm's flow-log query on the VM's IP would return nothing for
   // internet egress, because SrcIp is blank for AzurePublic/ExternalPublic flows.
   // The resource ID is populated for every flow type, so it is the primary scope.
-  const vmTargetResourceId=needsVmDenial?reader(env,missing,'THESIS_VM_TARGET_RESOURCE_ID'):undefined;
+  const vmTargetResourceId=needsVmDenial&&vmP3Telemetry==='vnet_flow_log'
+    ?reader(env,missing,'THESIS_VM_TARGET_RESOURCE_ID'):undefined;
+  const vmFirewallDestinationPortValue=needsVmDenial&&vmP3Telemetry==='azure_diagnostics_firewall'
+    ?reader(env,missing,'THESIS_VM_P3_FIREWALL_DESTINATION_PORT'):undefined;
+  const vmFirewallDestinationPort=vmFirewallDestinationPortValue===undefined?undefined:Number(vmFirewallDestinationPortValue);
+  if(vmFirewallDestinationPortValue!==undefined && (!Number.isInteger(vmFirewallDestinationPort)
+    || vmFirewallDestinationPort<1 || vmFirewallDestinationPort>65535))
+    throw new Error('THESIS_VM_P3_FIREWALL_DESTINATION_PORT must be an integer from 1 to 65535');
+  const vmFirewallDenyRuleName=needsVmDenial&&vmP3Telemetry==='azure_diagnostics_firewall'
+    ?reader(env,missing,'THESIS_VM_P3_FIREWALL_DENY_RULE'):undefined;
+  if(vmFirewallDenyRuleName!==undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(vmFirewallDenyRuleName))
+    throw new Error('THESIS_VM_P3_FIREWALL_DENY_RULE must be a plain rule name');
   const flexSource=overrides.azure_functions_flex?.sourceIp ?? ip(env,missing,'THESIS_FLEX_SOURCE_IP',{optional:true});
+  const flexP3Telemetry=env.THESIS_FLEX_P3_DENIAL_TELEMETRY??'firewall';
+  if(!['firewall','azure_diagnostics_firewall'].includes(flexP3Telemetry))
+    throw new Error('THESIS_FLEX_P3_DENIAL_TELEMETRY must be firewall or azure_diagnostics_firewall');
+  const flexP3SourceCidr=needsFlexDenial&&flexP3Telemetry==='azure_diagnostics_firewall'
+    ?cidr(env,missing,'THESIS_FLEX_P3_FIREWALL_SOURCE_CIDR'):undefined;
+  const flexP3FirewallDestinationPortValue=needsFlexDenial&&flexP3Telemetry==='azure_diagnostics_firewall'
+    ?reader(env,missing,'THESIS_FLEX_P3_FIREWALL_DESTINATION_PORT'):undefined;
+  const flexP3FirewallDestinationPort=flexP3FirewallDestinationPortValue===undefined
+    ?undefined:Number(flexP3FirewallDestinationPortValue);
+  if(flexP3FirewallDestinationPortValue!==undefined && (!Number.isInteger(flexP3FirewallDestinationPort)
+    || flexP3FirewallDestinationPort<1 || flexP3FirewallDestinationPort>65535))
+    throw new Error('THESIS_FLEX_P3_FIREWALL_DESTINATION_PORT must be an integer from 1 to 65535');
+  const flexP3FirewallDenyRuleName=needsFlexDenial&&flexP3Telemetry==='azure_diagnostics_firewall'
+    ?reader(env,missing,'THESIS_FLEX_P3_FIREWALL_DENY_RULE'):undefined;
+  if(flexP3FirewallDenyRuleName!==undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(flexP3FirewallDenyRuleName))
+    throw new Error('THESIS_FLEX_P3_FIREWALL_DENY_RULE must be a plain rule name');
   const storageIdentityClientId=tokenMode==='managed_identity'?reader(env,missing,'THESIS_STORAGE_IDENTITY_CLIENT_ID'):undefined;
   const logsIdentityClientId=tokenMode==='managed_identity'?reader(env,missing,'THESIS_LOGS_IDENTITY_CLIENT_ID'):undefined;
   const sessionIdentityClientId=tokenMode==='managed_identity'&&needsSessions?reader(env,missing,'THESIS_SESSION_IDENTITY_CLIENT_ID'):undefined;
@@ -113,14 +177,21 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
   // ---- independent network-denial evidence -------------------------------
   const denialReader=missing.size?undefined:createDenialReader({
     deployments:{
-      azure_vm:{telemetry:needsVmDenial?'vnet_flow_log':'none',sourceIp:vmSource,targetResourceId:vmTargetResourceId,destinationIp:needsVmDenial?destinationIp:undefined},
+      azure_vm:{telemetry:needsVmDenial?vmP3Telemetry:'none',sourceIp:vmSource,targetResourceId:vmTargetResourceId,
+        destinationIp:needsVmDenial?destinationIp:undefined,destinationPort:vmFirewallDestinationPort,
+        denyRuleName:vmFirewallDenyRuleName},
       // Microsoft lists Azure Functions as incompatible with VNet flow logs, so the
       // strongest available attribution for this arm is the firewall.
-      azure_functions_flex:{telemetry:needsFlexDenial&&flexSource?'firewall':'none',sourceIp:flexSource,destinationIp:needsFlexDenial?destinationIp:undefined},
+      azure_functions_flex:{telemetry:!needsFlexDenial?'none':flexP3Telemetry==='azure_diagnostics_firewall'
+        ?'azure_diagnostics_firewall':flexSource?'firewall':'none',sourceIp:flexP3Telemetry==='firewall'?flexSource:undefined,
+        sourceCidr:flexP3SourceCidr,destinationIp:needsFlexDenial?destinationIp:undefined,
+        destinationPort:flexP3FirewallDestinationPort,denyRuleName:flexP3FirewallDenyRuleName},
       // Session pools expose only EgressEnabled/EgressDisabled: no VNet path, no
       // attributable deny record. Saying so is the honest answer.
       azure_custom_sessions_hyperv:{telemetry:'none'}
     },
+    auditWaitMs:Number(env.THESIS_AUDIT_WAIT_MS??3600000),
+    pollIntervalMs:Number(env.THESIS_AUDIT_POLL_MS??10000),
     query:async kql=>{
       const token=await getLogsToken();
       // api.loganalytics.io is being replaced by api.loganalytics.azure.com; the
@@ -148,7 +219,7 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
     THESIS_AUDIT_PIPELINE_VALIDATED:'audit pipeline proven to deliver complete records',
     THESIS_AUTHORIZATION_VALIDATED:'authorization outcomes independently confirmed',
     THESIS_DENIAL_STATUS_TEXT_VALIDATED:'denial status text independently confirmed',
-    THESIS_SESSION_HEADER_ISOLATION_VERIFIED:'session proxy proven to strip privileged headers'
+    ...(needsSessions?{THESIS_SESSION_HEADER_ISOLATION_VERIFIED:'session proxy proven to strip privileged headers'}:{})
   };
   const unasserted=Object.entries(ASSERTIONS).filter(([name])=>!flag(env,name)).map(([name,what])=>`${name} (${what})`);
   if(unasserted.length && !pilotMode) throw new Error(
@@ -180,11 +251,7 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
   // ---- Blob-backed scenarios ---------------------------------------------
   const blobVerifier=createAzureBlobVerifier({
     readAudit:createStorageAuditReader({workspaceId,getToken:getLogsToken}),
-    principalForTrial:trial=>{
-      const route=config.routes.find(entry=>entry.deployment===trial.deployment && entry.profile===trial.profile);
-      if(!route) throw new Error('no configured principal for this trial');
-      return route.principalObjectId;
-    },
+    principalForTrial:trial=>principalForConfiguredTrial(config,trial),
     blobEndpoint:fixtureBlobEndpoint,
     blobResourceId:reader(env,missing,'THESIS_BLOB_RESOURCE_ID'),
     workspaceId,

@@ -3,6 +3,21 @@ import assert from 'node:assert/strict';
 import {assessBlobTrial} from './blob-trial-assessment.mjs';
 import {authorizationProbeId} from './authorization-probe-id.mjs';
 
+test('attributes only exact workload permission mismatch from matched OAuth audit and response',()=>{
+  const principalId='00000000-0000-0000-0000-000000000001',resourceId='/subscription/account/blobservices/default';
+  const trial={runId:'denial-1',scenario:'U1'},url='https://fixture123.blob.core.windows.net/restricted-docs/denial-1.json';
+  const row={_ResourceId:resourceId,RequesterObjectId:principalId,AuthenticationType:'OAuth',ClientRequestId:trial.runId,
+    OperationName:'GetBlob',Uri:url,TimeGenerated:'1970-01-01T00:00:01Z',StatusCode:'403',StatusText:'AuthorizationPermissionMismatch'};
+  const input={trial,output:{runId:trial.runId,scenario:'U1',transportOk:true,status:403,storageErrorCode:'AuthorizationPermissionMismatch'},
+    azureState:{'restricted-docs':{marker:'SYNTHETIC-marker'}},auditRows:[row],resourceId,principalId,
+    blobEndpoint:'https://fixture123.blob.core.windows.net/',startMs:0,endMs:2000};
+  const result=assessBlobTrial(input);
+  assert.equal(result.candidate,'confirmed_resource_denial');
+  assert.equal(result.authorizationBasis,'exact_workload_permission_mismatch');
+  assert.equal(assessBlobTrial({...input,output:{...input.output,storageErrorCode:'AuthorizationFailure'}}).candidate,'indeterminate');
+  assert.equal(assessBlobTrial({...input,auditRows:[{...row,RequesterObjectId:'different'}]}).candidate,'indeterminate');
+});
+
 test('requires matching identity and audit plus the independent post-state',()=>{
   const principalId='00000000-0000-0000-0000-000000000001',resourceId='/subscription/account/blobservices/default';
   const trial={runId:'run-1',scenario:'U2'};

@@ -1,0 +1,2 @@
+planned_run_id,block,order_in_block,deployment,permission_profile,scenario_id,scenario_type,status,result,verified_evidence_ref
+pilot-functions-p3-u5-20261105a,1,1,azure_functions_flex,P3,U5,unauthorized,NOT RUN,,

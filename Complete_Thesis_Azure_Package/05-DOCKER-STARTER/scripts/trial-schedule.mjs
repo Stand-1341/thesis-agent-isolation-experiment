@@ -1,6 +1,6 @@
 /** Validate a structured supplied schedule before handing any row to a runner. */
 import {createHash} from 'node:crypto';
-const deployments=['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv'];
+const deployments=['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv','azure_container_instances'];
 const profiles=['P1','P2','P3'];
 const scenarios=['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2'];
 
@@ -12,7 +12,7 @@ export function verifyPlanDigest(bytes, expectedSha256) {
 }
 
 /** Parse only the simple unquoted matrix format after verifying the exact bytes. */
-export function loadFrozenSchedule(bytes, expectedSha256) {
+export function loadFrozenSchedule(bytes, expectedSha256, {allowRepeatedCellsWithinBlock=false}={}) {
   const sha256=verifyPlanDigest(bytes,expectedSha256);
   let text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
   if(text.charCodeAt(0)===0xfeff) text=text.slice(1);
@@ -26,7 +26,7 @@ export function loadFrozenSchedule(bytes, expectedSha256) {
     if(values.length!==header.length || values.some(value=>value.includes('\r'))) throw new Error('invalid matrix row');
     return Object.fromEntries(header.map((key,index)=>[key,values[index]]));
   });
-  validateSchedule(rows);
+  validateSchedule(rows,{allowRepeatedCellsWithinBlock});
   return {sha256,rows};
 }
 
@@ -44,10 +44,12 @@ export async function runFrozenSchedule(bytes,expectedSha256,runOne) {
  * shape is coherent so a truncated or reordered file cannot pass as a complete one.
  *
  * Block sizes must be equal, block numbers contiguous from 1, order_in_block unique
- * and ascending within a block (gaps are expected: withdrawn cells leave holes), and
- * every (block, deployment, profile, scenario) cell may appear once.
+ * and ascending within a block (gaps are expected: withdrawn cells leave holes).
+ * Repeated deployment/profile/scenario cells inside a block are rejected by default;
+ * a separately declared protocol may opt in when its plan intentionally schedules
+ * multiple repetitions of the same cell within a block.
  */
-export function validateSchedule(rows) {
+export function validateSchedule(rows,{allowRepeatedCellsWithinBlock=false}={}) {
   if (!Array.isArray(rows) || rows.length === 0) throw new Error('schedule must contain rows');
   const ids = new Set();
   const cells = new Set();
@@ -64,10 +66,12 @@ export function validateSchedule(rows) {
     if (!/^[A-Za-z0-9_-]{1,150}$/.test(row.planned_run_id || '') || ids.has(row.planned_run_id)) throw new Error('invalid or duplicate run ID');
     ids.add(row.planned_run_id);
     if (!deployments.includes(row.deployment) || !profiles.includes(row.permission_profile) || !scenarios.includes(row.scenario_id)) throw new Error('invalid trial cell');
+    if(row.deployment==='azure_container_instances'&&!['P1','P2'].includes(row.permission_profile))
+      throw new Error('azure_container_instances supports only P1 and P2');
     if (row.scenario_type !== (row.scenario_id.startsWith('U') ? 'unauthorized' : 'legitimate')) throw new Error('invalid scenario type');
     if (row.status !== 'NOT RUN' || row.result || row.verified_evidence_ref) throw new Error('schedule is not an untouched plan');
     const key=[block,row.deployment,row.permission_profile,row.scenario_id].join('|');
-    if (cells.has(key)) throw new Error('duplicate trial cell');
+    if (cells.has(key) && !allowRepeatedCellsWithinBlock) throw new Error('duplicate trial cell');
     cells.add(key);
   }
   const blocks = [...perBlock.keys()].sort((a,b)=>a-b);

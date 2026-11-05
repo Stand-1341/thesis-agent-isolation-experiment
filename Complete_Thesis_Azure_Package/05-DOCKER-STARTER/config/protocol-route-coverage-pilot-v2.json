@@ -1,0 +1,30 @@
+{
+  "status": "non_counted_pilot_only_draft",
+  "revision": "azure-proposed-v1-rev4-vm-functions-only-draft",
+  "ownerDirection": {
+    "authorized": true,
+    "reference": "User instruction in this session to validate VM/Functions routes with non-counted pilot checks.",
+    "externalReviewStatus": "not_claimed"
+  },
+  "readiness": {
+    "protocolFreeze": "pending",
+    "deploymentValidation": "pending",
+    "isolationValidation": "pending",
+    "independentVerifierValidation": "pending",
+    "measuredExecutionEnabled": false
+  },
+  "matrix": {
+    "file": "03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-EXECUTABLE-NO-ACI-DRAFT-V3.csv",
+    "sha256": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "trials": 400
+  },
+  "pilotPlan": {
+    "file": "03-PILOT-ROUTE-COVERAGE-2026-11-05-V2.csv",
+    "sha256": "cc1dbd4f0a4efc64c4c59274efc489a041cebb91a26171ebcc994b14ac4a5e57",
+    "trials": 17,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "purpose": "fresh non-counted route coverage after Central P3 Blob identity configuration; all IDs distinct from V1",
+    "status": "NOT RUN"
+  }
+}

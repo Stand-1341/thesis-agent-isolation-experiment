@@ -58,6 +58,7 @@ function rejectCredentialFields(body) {
         throw new Error('credentials and principal IDs are never accepted from session request bodies');
 }
 const port = Number(process.env.PORT || 8080);
+const bindAddress = process.env.BIND_ADDRESS || '0.0.0.0';
 createServer(async (req, res) => {
     // Parsing the request target can throw on a malformed one. It used to happen
     // outside any try, in an async handler, where the rejection is unhandled and
@@ -147,4 +148,4 @@ createServer(async (req, res) => {
     catch (error) {
         return send(res, 400, { error: error instanceof Error ? error.message : String(error) });
     }
-}).listen(port, '0.0.0.0', () => console.log(`agent listening on ${port}`));
+}).listen(port, bindAddress, () => console.log(`agent listening on ${port}`));

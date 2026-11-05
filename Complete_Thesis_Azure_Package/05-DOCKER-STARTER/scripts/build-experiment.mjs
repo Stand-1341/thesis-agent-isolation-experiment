@@ -1,16 +1,14 @@
 /**
- * Compose the active revision-3 deployment/profile routes the runner requires.
+ * Compose the deployment/profile routes selected by a validated schedule.
  *
- * `createTrialAdapterRouter` demands exactly the active revision-3 routes, each with its own
- * workload principal and a reset/execute/collect adapter, and nothing in the
- * package built them — which is why no measured trial could ever start. This
- * module is that missing step and only that step: it does not decide whether the
- * experiment is safe to run, and it does not invent credentials.
+ * The active revision-3 plan still defaults to its six routes. Alternate plans
+ * may select the explicitly supported ACI P1/P2 routes, whose already-composed
+ * lifecycle adapters are supplied by route key. This module does not create
+ * ACI adapters, decide readiness, or invent credentials.
  */
 import {createHttpPilotAdapter} from './http-pilot-adapter.mjs';
 import {createSessionPilotAdapter} from './session-pilot-adapter.mjs';
 import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
-import {EXPERIMENT_ROUTES} from './experiment-config.mjs';
 
 const required=(names,where)=>{
   const missing=names.filter(name=>!where || typeof where[name]!=='function');
@@ -24,10 +22,15 @@ const required=(names,where)=>{
  *                 supplied here rather than defaulted so a missing piece fails
  *                 loudly at start-up instead of midway through the matrix.
  * @param deps.sessionFactory  (route, deployment) => reset/execute/collect/cleanup
+ * @param deps.aciAdapters     map of route key to an already-composed adapter
  */
 export function buildRoutes(config, deps={}, {routeKeys}={}) {
-  if(!config || !Array.isArray(config.routes) || config.routes.length!==EXPERIMENT_ROUTES.length)
-    throw new Error(`config must contain all ${EXPERIMENT_ROUTES.length} revision-3 routes; run validateExperimentConfig first`);
+  if(!config || !Array.isArray(config.routes) || !config.routes.length)
+    throw new Error('config must contain scheduled routes; run validateExperimentConfig first');
+  const configuredKeys=config.routes.map(route=>`${route.deployment}:${route.profile}`);
+  const requiredKeys=routeKeys?[...routeKeys]:configuredKeys;
+  if(requiredKeys.some(key=>!configuredKeys.includes(key)))
+    throw new Error('config is missing required deployment/profile routes; run validateExperimentConfig first');
   const routes={};
   for(const route of config.routes) {
     const key=`${route.deployment}:${route.profile}`;
@@ -45,6 +48,13 @@ export function buildRoutes(config, deps={}, {routeKeys}={}) {
         controllerToken:route.credentials.controller,
         ...(route.credentials.functionKey===undefined?{}:{functionKey:route.credentials.functionKey}),
         ...(deployment.timeoutMs===undefined?{}:{timeoutMs:deployment.timeoutMs})})};
+      continue;
+    }
+    if(deployment.kind==='aci') {
+      const adapter=deps.aciAdapters?.[key];
+      if(!adapter)
+        throw new Error(`route ${key} is an ACI route but no precomposed aciAdapters.${key} was supplied`);
+      routes[key]={principalObjectId:route.principalObjectId,adapter};
       continue;
     }
     // Custom container sessions: the workload is reached through the pool, and the
@@ -97,7 +107,8 @@ export function describeRoutes(config, {routeKeys}={}) {
     const deployment=config.deployments[route.deployment];
     return {route:key,kind:deployment.kind,
       principalObjectId:route.principalObjectId,
-      target:deployment.kind==='http'?(route.agentUrl ?? deployment.agentUrl):`${deployment.poolName} (${deployment.region})`,
+      target:deployment.kind==='http'?(route.agentUrl ?? deployment.agentUrl)
+        :deployment.kind==='aci'?`${deployment.resourceGroup} (${deployment.region})`:`${deployment.poolName} (${deployment.region})`,
       credentialVariables:Object.values(route.credentials).sort()};
   }).filter(Boolean).sort((a,b)=>a.route<b.route?-1:1);
 }

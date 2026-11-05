@@ -21,8 +21,19 @@ test('composes separate managed writer, reader, and policy reader without networ
 });
 
 test('requires institution approval, exact numeric retention, and distinct principals',()=>{
-  assert.throws(()=>validateAciMarkerProofEvidenceConfig({...env(),THESIS_EVIDENCE_RETENTION_APPROVED:'false'}),/not asserted/);
+  assert.throws(()=>validateAciMarkerProofEvidenceConfig({...env(),THESIS_EVIDENCE_RETENTION_APPROVED:'false'}),/institutional retention approval or the exact owner-directed/);
   assert.throws(()=>validateAciMarkerProofEvidenceConfig({...env(),THESIS_EVIDENCE_RETENTION_DAYS:'365.5'}),/positive integer/);
   assert.throws(()=>validateAciMarkerProofEvidenceConfig({...env(),THESIS_ACI_AUDIT_PRINCIPAL_OBJECT_ID:id(3)}),/must be distinct/);
   assert.equal(validateAciMarkerProofEvidenceConfig(env()).minimumRetentionDays,365);
+});
+
+test('supports the exact owner-directed 400-study basis without asserting institutional approval',()=>{
+  const retentionAuthority={basis:'owner_directed',scope:'aci_400_study_evidence_only',
+    reference:'file:docs/ACI-400-OWNER-DIRECTED-RETENTION.md'};
+  const configured={...env(),THESIS_EVIDENCE_RETENTION_APPROVED:'false',THESIS_EVIDENCE_RETENTION_DAYS:'146000'};
+  assert.equal(validateAciMarkerProofEvidenceConfig(configured,retentionAuthority).retentionBasis,'owner_directed');
+  assert.throws(()=>validateAciMarkerProofEvidenceConfig(configured,{...retentionAuthority,scope:'all_study_data'}),/institutional retention approval/);
+  assert.throws(()=>validateAciMarkerProofEvidenceConfig({...configured,THESIS_EVIDENCE_RETENTION_DAYS:'365'},retentionAuthority),/146000-day period/);
+  assert.equal(validateAciMarkerProofEvidenceConfig({...configured,THESIS_EVIDENCE_RETENTION_APPROVED:'true',THESIS_EVIDENCE_RETENTION_DAYS:'365'},retentionAuthority).retentionBasis,
+    'institutional_approval_asserted_by_configuration');
 });

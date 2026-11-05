@@ -1,0 +1,38 @@
+{
+  "_comment": "Fresh non-counted pilot config for only the VM P1/P2 routes. No Functions, P3, or ACI route is configured or selected.",
+  "evidenceDirectory": "results/evidence",
+  "auditWindowSeconds": 3600,
+  "deployments": {
+    "azure_vm": {
+      "kind": "http",
+      "agentUrl": "https://10.48.0.4",
+      "resourceUrl": "https://10.48.9.4",
+      "collectorUrl": "https://10.48.9.5:8443",
+      "timeoutMs": 30000
+    }
+  },
+  "routes": [
+    {
+      "deployment": "azure_vm",
+      "profile": "P1",
+      "agentUrl": "https://10.48.0.4",
+      "principalObjectId": "37fcb428-951e-48a8-aec2-e9918dedba29",
+      "credentials": {
+        "controller": "THESIS_VM_P1_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY"
+      }
+    },
+    {
+      "deployment": "azure_vm",
+      "profile": "P2",
+      "agentUrl": "https://10.48.7.4",
+      "principalObjectId": "dd6be331-a53b-4c08-8a63-7745e98b3952",
+      "credentials": {
+        "controller": "THESIS_VM_P2_CONTROLLER_KEY",
+        "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
+        "collectorAdmin": "THESIS_COLLECTOR_ADMIN_KEY"
+      }
+    }
+  ]
+}

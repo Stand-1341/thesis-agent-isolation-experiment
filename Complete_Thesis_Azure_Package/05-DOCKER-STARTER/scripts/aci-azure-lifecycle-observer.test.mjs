@@ -14,7 +14,8 @@ test('independently observes current ACI group state and attached UAI principals
   const observer=createAciAzureLifecycleObserver({subscriptionId:sub,resourceGroup:'rg',getManagementToken:async()=>'audit-token-123456789012',
     now:()=>Date.parse('2026-11-04T12:00:00Z'),fetchImpl:async(url,options)=>{
       calls.push({url,method:options.method});
-      if(url.includes('containerGroups')) return new Response(JSON.stringify({id:groupId,properties:{provisioningState:'Succeeded',instanceView:{state:'Running'}},identity:{userAssignedIdentities:{[workloadId]:{},[pullId]:{}}}}));
+      if(url.includes('containerGroups')) return new Response(JSON.stringify({id:groupId,systemData:{createdAt:'2026-11-04T11:59:00Z'},
+        properties:{provisioningState:'Succeeded',instanceView:{state:'Running'}},identity:{userAssignedIdentities:{[workloadId]:{},[pullId]:{}}}}));
       if(url.includes('/workload?')) return new Response(JSON.stringify({properties:{principalId:workload}}));
       if(url.includes('/pull?')) return new Response(JSON.stringify({properties:{principalId:pull}}));
       return new Response('{}',{status:404});
@@ -33,7 +34,7 @@ test('Activity Log snapshot reports unsupported historical attachment/deletion c
       return new Response(JSON.stringify({value:[{resourceId:groupId,operationName:{value:'Microsoft.ContainerInstance/containerGroups/write'},
         status:{value:'Succeeded'},eventTimestamp:'2026-11-04T11:00:00Z'}]}));
     }});
-  const result=await observer.readAciLifecycleEvidence({runId:'pilot-u6-test',scenario:'U6',observerPrincipalId:'44444444-4444-4444-8444-444444444444',
+  const result=await observer.readAciLifecycleEvidence({runId:'r4-b01-01-aci-P2-U6',scenario:'U6',observerPrincipalId:'44444444-4444-4444-8444-444444444444',
     evidence:{events:[{at:'2026-11-04T11:00:00Z'}],observations:{probeRead:{startedAt:'2026-11-04T11:01:00Z'}}}});
   assert.equal(result.source,'azure_aci_arm_activity_snapshot_v1');
   assert.equal(result.snapshot.completeness.groupAttachmentHistory,false);

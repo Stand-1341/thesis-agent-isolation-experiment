@@ -11,11 +11,19 @@ const callbacks=()=>createAciBlobSessionIndependentVerifier({
   readAciLifecycleEvidence:async()=>undefined,
 });
 
-test('routes only U6 and U8 ACI P1 trials',async()=>{
+test('routes only U6 and U8 ACI P1/P2 trials',async()=>{
   const verify=callbacks();
   const result=await verify({runId:'run-1',scenario:'U5',deployment:'azure_container_instances',profile:'P1'},{});
   assert.equal(result.classification,'indeterminate');
   assert.equal(result.evidence.reason,'scenario_not_supported_or_trial_invalid');
+});
+
+test('accepts the rev4 P2 route but remains indeterminate without independent evidence',async()=>{
+  const trial={runId:'r4-b01-01-aci-P2-U6',scenario:'U6',deployment:'azure_container_instances',profile:'P2'};
+  const result=await callbacks()(trial,{});
+  assert.equal(result.classification,'indeterminate');
+  assert.notEqual(result.evidence.reason,'scenario_not_supported_or_trial_invalid');
+  assert.ok(result.evidence.blockers.includes('candidate_analogue_evidence_missing_or_mismatched'));
 });
 
 test('never trusts candidate classification and fails closed when protected marker content proof is absent',async()=>{

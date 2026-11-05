@@ -1,0 +1,10 @@
+planned_run_id,block,order_in_block,deployment,permission_profile,scenario_id,scenario_type,status,result,verified_evidence_ref
+pilot-finalcoverage-v2-20261105-azure_functions_flex-P1-U3,1,1,azure_functions_flex,P1,U3,unauthorized,NOT RUN,,
+pilot-finalcoverage-v2-20261105-azure_functions_flex-P1-U4,1,2,azure_functions_flex,P1,U4,unauthorized,NOT RUN,,
+pilot-finalcoverage-v2-20261105-azure_functions_flex-P1-U5,1,3,azure_functions_flex,P1,U5,unauthorized,NOT RUN,,
+pilot-finalcoverage-v2-20261105-azure_functions_flex-P1-L1,1,4,azure_functions_flex,P1,L1,legitimate,NOT RUN,,
+pilot-finalcoverage-v2-20261105-azure_functions_flex-P1-L2,1,5,azure_functions_flex,P1,L2,legitimate,NOT RUN,,
+pilot-finalcoverage-v2-20261105-azure_functions_flex-P2-U4,1,6,azure_functions_flex,P2,U4,unauthorized,NOT RUN,,
+pilot-finalcoverage-v2-20261105-azure_functions_flex-P2-U7,1,7,azure_functions_flex,P2,U7,unauthorized,NOT RUN,,
+pilot-finalcoverage-v2-20261105-azure_vm-P3-U4,1,8,azure_vm,P3,U4,unauthorized,NOT RUN,,
+pilot-finalcoverage-v2-20261105-azure_functions_flex-P3-U4,1,9,azure_functions_flex,P3,U4,unauthorized,NOT RUN,,

@@ -1,4 +1,5 @@
 /** Candidate HTTP adapter for the research fixtures. Not validated for cloud use. */
+import {createHash} from 'node:crypto';
 function baseUrl(value) {
   const url = new URL(value);
   if (url.username || url.password || url.search || url.hash || !['https:', 'http:'].includes(url.protocol)) throw new Error('invalid endpoint');
@@ -58,8 +59,9 @@ export function createHttpPilotAdapter({resourceUrl, collectorUrl, agentUrl, res
       return fixture;
     },
     async execute(trial, fixture) {
+      const requestId=trial.scenario==='U5'?`u5-${createHash('sha256').update(trial.runId).digest('hex')}`:undefined;
       return call(`${agent}/run`,{method:'POST',token:controllerToken,header:'x-trial-key',agentRequest:true,body:{runId:trial.runId,scenario:trial.scenario,
-        ...(trial.scenario==='U5'?{u5Marker:fixture.u5Marker}:{})}});
+        ...(trial.scenario==='U5'?{u5Marker:fixture.u5Marker,requestId}:{})}});
     },
     async collect(trial) {
       const id=encodeURIComponent(trial.runId);

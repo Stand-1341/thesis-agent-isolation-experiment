@@ -47,7 +47,7 @@ function windowFor(observations) {
  *                      are not constructed here because each needs its own
  *                      independent-evidence readers.
  */
-export function createExperimentVerifier({config,denialReader,blobVerifier,collectorVerifier,resourceVerifier}={}) {
+export function createExperimentVerifier({config,denialReader,blobVerifier,collectorVerifier,resourceVerifier,sessionAnalogVerifier}={}) {
   if(!config || !config.deployments) throw new Error('experiment config is required');
   const auditWindowSeconds=config.auditWindowSeconds ?? 3600;
 
@@ -103,6 +103,13 @@ export function createExperimentVerifier({config,denialReader,blobVerifier,colle
       }
     }
 
+    // ACI U6/U8 use an explicit cross-group analogue. They need their own
+    // independent verifier; ordinary Blob verification cannot stand in for it.
+    if(trial.deployment==='azure_container_instances'&&['U6','U8'].includes(trial.scenario))
+      return typeof sessionAnalogVerifier==='function'
+        ?sessionAnalogVerifier(trial,verificationObservations)
+        :indeterminate('independent_aci_cross_group_analogue_verifier_not_configured');
+
     // P1/P2: resource-level outcomes.
     if(BLOB_SCENARIOS.has(trial.scenario) && typeof blobVerifier==='function')
       return blobVerifier(trial,verificationObservations);
@@ -134,7 +141,7 @@ export function denialWindow({start,end}, auditWindowSeconds=3600, skewMs=0) {
  * classify. The CLI refuses to start a measured run with gaps, because the
  * alternative is discovering them 200 trials in — after the spend, with a halt.
  */
-export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifier,denialReader,networkCapabilities={},rows}={}) {
+export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifier,sessionAnalogVerifier,denialReader,networkCapabilities={},rows}={}) {
   const missing={};
   const selected=rows ?? ['azure_vm','azure_functions_flex'].flatMap(deployment=>
     ['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2'].flatMap(scenario=>
@@ -144,7 +151,11 @@ export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifie
     const scenario=row.scenario_id ?? row.scenario;
     const profile=row.permission_profile ?? row.profile;
     const deployment=row.deployment;
-    if((scenario==='U6'||scenario==='U8') && deployment!=='azure_custom_sessions_hyperv') continue;
+    if((scenario==='U6'||scenario==='U8') && !['azure_custom_sessions_hyperv','azure_container_instances'].includes(deployment)) continue;
+    if(deployment==='azure_container_instances'&&(scenario==='U6'||scenario==='U8')&&typeof sessionAnalogVerifier!=='function') {
+      missing[scenario]='independent_aci_cross_group_analogue_verifier_not_configured';
+      continue;
+    }
     let reason=scenario==='U5'||scenario==='U7'
       ?(typeof collectorVerifier==='function'?null:'collector_verifier_not_configured')
       :scenario==='U4'

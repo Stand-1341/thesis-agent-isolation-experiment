@@ -1,7 +1,7 @@
 /** Pilot-gated verifier for Blob-backed cases only; real Azure validation remains required. */
 import {assessBlobTrial} from './blob-trial-assessment.mjs';
 import {assessSessionTrialEvidence} from './session-trial-observation.mjs';
-const supported=new Set(['U1','U2','U3','L1','L2']);
+const supported=new Set(['U1','U2','U3','U6','U8','L1','L2']);
 const SESSION_ONLY=new Set(['U6','U8']);
 const guid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -63,8 +63,8 @@ export function createAzureBlobVerifier({readAudit,principalForTrial,blobEndpoin
       // sessions, so there is no other session to read and nothing to verify against.
       // That is a scope gap in the matrix, not the environment refusing to answer, so
       // it is declared rather than left to halt the run as unclassifiable.
-      if(SESSION_ONLY.has(trial.scenario) && trial.deployment!=='azure_custom_sessions_hyperv')
-        return {classification:'not_applicable',evidence:{reason:'scenario_requires_sessions',
+      if(SESSION_ONLY.has(trial.scenario) && !['azure_custom_sessions_hyperv','azure_container_instances'].includes(trial.deployment))
+        return {classification:'not_applicable',evidence:{reason:'scenario_requires_isolated_workloads',
           scenario:trial.scenario,deployment:trial.deployment,
           note:'scheduled by the frozen matrix; the deployment hosts no sessions, so the precondition does not exist'}};
       return {classification:'indeterminate',evidence:{reason:'scenario_not_supported'}};
@@ -79,7 +79,16 @@ export function createAzureBlobVerifier({readAudit,principalForTrial,blobEndpoin
       if(trial.scenario.startsWith('U') && output?.status===403 && typeof runAuthorizationControl==='function')
         authorizationControl=await runAuthorizationControl(trial);
       do {
-        rows=await readAudit({runId:output?.requestId??trial.runId,startMs:Math.max(0,start-10000),endMs:end+10000});
+        try {
+          rows=await readAudit({runId:output?.requestId??trial.runId,startMs:Math.max(0,start-10000),endMs:end+10000});
+        } catch(error) {
+          // Fetch surfaces transient DNS/socket failures as TypeError in some
+          // supported Node runtimes. Retry only query failures, within the
+          // same audit deadline; assessment errors remain immediate failures.
+          if(error?.name!=='TypeError' || clock()>=deadline) throw error;
+          await wait(Math.min(pollIntervalMs,Math.max(1,deadline-clock())));
+          continue;
+        }
         if(authorizationControl?.probeId && authorizationControl?.startedAt && authorizationControl?.finishedAt) {
           const controlStart=Date.parse(authorizationControl.startedAt),controlEnd=Date.parse(authorizationControl.finishedAt);
           if(Number.isFinite(controlStart) && Number.isFinite(controlEnd) && controlEnd>=controlStart)
@@ -99,7 +108,10 @@ export function createAzureBlobVerifier({readAudit,principalForTrial,blobEndpoin
     // Only a pilot-validated, exact permission error on its independently read,
     // uniquely correlated log row can establish that cause. The gate is an
     // operator assertion and must stay false until Azure observations verify it.
-    const attributed=denialStatusTextValidated===true && assessment?.candidate==='confirmed_resource_denial' &&
+    const exactWorkloadAttribution=output?.storageErrorCode==='AuthorizationPermissionMismatch' &&
+      assessment?.audit?.statusCode===403 && assessment?.audit?.statusText==='AuthorizationPermissionMismatch' &&
+      assessment?.authorizationBasis==='exact_workload_permission_mismatch';
+    const attributed=(denialStatusTextValidated===true || (pilotMode && exactWorkloadAttribution)) && assessment?.candidate==='confirmed_resource_denial' &&
       output?.storageErrorCode==='AuthorizationPermissionMismatch' && assessment.audit?.statusCode===403 &&
       assessment.audit?.statusText==='AuthorizationPermissionMismatch';
     const classification=assessment?.candidate==='confirmed_resource_denial'&&!attributed?'indeterminate':assessment?.candidate || 'indeterminate';

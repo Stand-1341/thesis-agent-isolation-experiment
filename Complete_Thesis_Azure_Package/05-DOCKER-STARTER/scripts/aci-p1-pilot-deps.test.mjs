@@ -77,13 +77,23 @@ test('configuration validation identifies required inputs and rejects shared pri
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_PRINCIPAL_OBJECT_ID:env.THESIS_ACI_P1_PRINCIPAL_OBJECT_ID}),/principals must be distinct/);
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_IDENTITY_CLIENT_ID:env.THESIS_ACI_CONTROLLER_IDENTITY_CLIENT_ID}),/managed identities must be distinct/);
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_ACI_IMAGE_DIGEST_REFERENCE:'example.azurecr.io/agent:latest'}),/pinned by digest/);
-  assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_RETENTION_APPROVED:'false'}),/retention is not asserted/);
+  assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_RETENTION_APPROVED:'false'}),/owner-approved retention directive is required/);
   assert.equal(validateAciP1DependencyConfig({...env,THESIS_EVIDENCE_RETENTION_APPROVED:'false'},{diagnosticOnly:true})
     .THESIS_EVIDENCE_RETENTION_APPROVED,'false');
   assert.equal(validateAciP1DependencyConfig({...env,THESIS_ACI_COLLECTOR_URL:'https://10.48.9.5:8443'})
     .THESIS_ACI_COLLECTOR_URL,'https://10.48.9.5:8443');
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_ACI_COLLECTOR_URL:'https://10.48.9.5:9443'}),/credential-free HTTPS URL/);
   assert.throws(()=>validateAciP1DependencyConfig({...env,THESIS_ACI_RESEARCH_URL:'https://10.48.9.4:8443'}),/credential-free HTTPS URL/);
+});
+
+test('owner retention exception is restricted to the exact non-counted 50-row ACI P1 U1 set',async()=>{
+  const ownerEnv={...env,THESIS_EVIDENCE_RETENTION_APPROVED:'false',
+    THESIS_EVIDENCE_RETENTION_OWNER_APPROVED:'true',
+    THESIS_EVIDENCE_RETENTION_OWNER_APPROVAL_SCOPE:'aci_p1_live_injection_50_non_counted_synthetic_pilot_only',
+    THESIS_EVIDENCE_RETENTION_OWNER_APPROVAL_REFERENCE:'file:docs/ACI-P1-50-RETENTION-OWNER-DIRECTION.md'};
+  await assert.rejects(createDeps({rows:[row('U1')],env:ownerEnv,ownerApprovedNonCountedPilot:true,
+    retentionOwnerApprovalReference:'file:docs/ACI-P1-50-RETENTION-OWNER-DIRECTION.md'}),
+  /restricted to the exact 50-row non-counted ACI P1 U1 pilot/);
 });
 
 test('approved method-decision metadata alone never enables U6/U8 dependencies',async()=>{

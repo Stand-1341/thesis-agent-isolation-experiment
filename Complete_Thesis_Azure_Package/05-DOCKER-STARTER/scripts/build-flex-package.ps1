@@ -12,7 +12,7 @@ try {
     npm run build
     if ($LASTEXITCODE -ne 0) { throw 'TypeScript build failed.' }
     New-Item -ItemType Directory -Path $destination | Out-Null
-    foreach ($name in @('host.json','index.mjs','package.json','package-lock.json')) {
+    foreach ($name in @('host.json','index.mjs','prepare-run-request.mjs','package.json','package-lock.json')) {
         Copy-Item -LiteralPath (Join-Path $projectRoot "functions\$name") -Destination $destination
     }
     Copy-Item -LiteralPath (Join-Path $projectRoot 'dist') -Destination $destination -Recurse

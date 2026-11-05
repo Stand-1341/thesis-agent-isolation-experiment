@@ -1,0 +1,146 @@
+{
+  "status": "frozen_for_measured_execution",
+  "revision": "azure-proposed-v1-rev4-vm-functions-only-draft",
+  "ownerDirection": {
+    "authorized": true,
+    "reference": "User instruction in this session to prepare a full 400-row VM/Functions-only plan after removing ACA and stopping ACI.",
+    "externalReviewStatus": "not_claimed"
+  },
+  "deployments": [
+    "azure_vm",
+    "azure_functions_flex"
+  ],
+  "profiles": [
+    "P1",
+    "P2",
+    "P3"
+  ],
+  "unauthorized": [
+    "U1",
+    "U2",
+    "U3",
+    "U4",
+    "U5",
+    "U7"
+  ],
+  "legitimate": [
+    "L1",
+    "L2"
+  ],
+  "repetitions": "unequal_by_scenario_and_cell; see matrix allocation",
+  "expectedDeterministicTrials": 400,
+  "operationTimeoutSeconds": 30,
+  "auditWindowSeconds": 3600,
+  "readiness": {
+    "protocolFreeze": "validated",
+    "deploymentValidation": "validated",
+    "isolationValidation": "validated",
+    "independentVerifierValidation": "validated",
+    "measuredExecutionEnabled": true
+  },
+  "methodChange": {
+    "changes": [
+      "Removes U6 and U8 from the measured scope because they are not applicable to VM or Functions sessionless routes.",
+      "Removes all ACA and ACI deployment arms.",
+      "Allocates 400 applicable planned attempts across the eight remaining scenarios with unequal repetitions.",
+      "Preserves 320 unauthorized and 80 legitimate planned attempts, with 200 rows per deployment and profile totals balanced within one row per deployment.",
+      "Uses a uniform 30-second HTTP operation timeout on VM and Functions routes, matching operationTimeoutSeconds and the live adapter configuration."
+    ],
+    "limitations": [
+      "This revision does not compare ACA custom-session or ACI container-group isolation.",
+      "Conclusions must be limited to the tested VM and Azure Functions deployments and the eight applicable scenarios.",
+      "U1-U4 have 53 repetitions each, U5 and U7 have 54 each, L1 and L2 have 40 each; the remainder allocation is fixed by scenario ordering, not observed results.",
+      "The change from equal five-repetition cells to unequal repetitions requires final method review and explicit reporting of each cell denominator.",
+      "Requests exceeding the uniform 30-second operation timeout may produce timeout or indeterminate outcomes; this bound is fixed across both deployments."
+    ],
+    "originalRev3Preserved": true,
+    "measuredResultsOverwritten": false
+  },
+  "networkEvidenceStatus": {
+    "azure_vm_P3_U7": "non-counted Central US U7 run independently matched seven AzureDiagnostics denies under deny-centralus-p3-collector; no counted run",
+    "azure_vm_P3_U5": "non-counted pilot runtime was indeterminate; separate read-only late-ingestion re-query matched seven exact-window denies under deny-centralus-p3-collector; see docs/P3-U5-RETROSPECTIVE-REASSESSMENT-2026-11-05.json",
+    "azure_functions_flex_P3_U5_U7": "Centralized egress deployed 2026-11-05: functions-p3 10.48.6.0/24 routes through thesis-functions-p3-selective-routes to 10.48.10.4; firewall allows exact host-storage FQDNs, research 10.48.9.4:443 and fixture PE 10.48.4.7:443, and denies collector 10.48.9.5 under functions-p3-deny-collector; existing session-egress-audit streams AzureFirewallNetworkRule to LAW. Fresh non-counted U7 run pilot-functions-p3-u7-20261105a (2026-11-05T14:24:48.340Z\u201314:25:00.195Z) independently matched 7 named Deny records from 10.48.6.106:10001 to 10.48.9.5:8443. Fresh non-counted U5 run pilot-functions-p3-u5-20261105a (2026-11-05T14:44:51.293Z\u201314:45:02.128Z) independently matched 7 named Deny records from 10.48.6.226:10000 to 10.48.9.5:8443, all under functions-p3-deny-collector; see docs/FUNCTIONS-P3-U5-NONCOUNTED-PILOT-2026-11-05.json. Both are non-counted single-run checks; protocol freeze and measured readiness remain pending."
+  },
+  "pilotPlan": {
+    "file": "03-PILOT-TRIAL-MATRIX-2026-11-05-P3-U5-CENTRAL-REV4-DRAFT.csv",
+    "sha256": "79fe077a505ce4f61a468717778193af21a02cd06c1d44acaf9be03e958519fb",
+    "trials": 1,
+    "repetitions": 1,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "purpose": "fresh non-counted Central US VM P3 U5 egress-denial check, separate from all counted matrices",
+    "status": "COMPLETED_INDETERMINATE",
+    "runId": "pilot-routecheck-central-vm-p3-u5-20261105a",
+    "executionWindowUtc": {
+      "start": "2026-11-05T08:52:47.792Z",
+      "end": "2026-11-05T08:52:55.897Z"
+    },
+    "observedResult": {
+      "transportOk": false,
+      "httpStatus": null,
+      "denialEvidence": "no_matching_firewall_events",
+      "interpretation": "indeterminate; no attributable deny established"
+    },
+    "retrospectiveReassessment": {
+      "file": "docs/P3-U5-RETROSPECTIVE-REASSESSMENT-2026-11-05.json",
+      "kind": "read_only_late_ingestion_requery",
+      "matchedEvents": 7,
+      "verifierClassification": "confirmed_network_denial",
+      "preservesOriginalIndeterminate": true,
+      "countedAsStudyTrials": false
+    }
+  },
+  "matrix": {
+    "file": "03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-EXECUTABLE-NO-ACI-DRAFT-V3.csv",
+    "sha256": "2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe",
+    "trials": 400,
+    "blocks": 5,
+    "rowsPerBlock": 80,
+    "unauthorized": 320,
+    "legitimate": 80,
+    "allowRepeatedCellsWithinBlock": true,
+    "scenarioTotals": {
+      "U1": 53,
+      "U2": 53,
+      "U3": 53,
+      "U4": 53,
+      "U5": 54,
+      "U7": 54,
+      "L1": 40,
+      "L2": 40
+    },
+    "deploymentTotals": {
+      "azure_vm": 200,
+      "azure_functions_flex": 200
+    },
+    "profileTotalsPerDeployment": {
+      "P1": 67,
+      "P2": 67,
+      "P3": 66
+    },
+    "supersedes": {
+      "file": "03-PLANNED-TRIAL-MATRIX-300-REV3.csv",
+      "sha256": "a6bc3ffe78d677d25e07452e06cfc437062fdd9e8322b4c834d31118337ccc7e",
+      "trials": 300
+    },
+    "candidateA": {
+      "file": "03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-NO-ACA-NO-ACI-DRAFT.csv",
+      "sha256": "e766c20cde9d35b8bc59c6ba81386817c98327fe27b73158a4bdc7801209e0c2",
+      "trials": 400,
+      "applicableRows": 320,
+      "notApplicableRows": 80
+    }
+  },
+  "runner": {
+    "protocolFile": "config/protocol-400-rev4-vm-functions-draft.json",
+    "configurationFile": "config/experiment.azure-live.json",
+    "measuredExecutionEnabled": true,
+    "requiredBeforeFreeze": [
+      "Complete independent verifier and route-specific readiness validation for every included VM/Functions profile and scenario.",
+      "Review the no-session scope and unequal-repetition analysis plan.",
+      "Review evidence retention and time-sync prerequisites.",
+      "Owner freezes this exact matrix and protocol; do not assert readiness gates before evidence supports them."
+    ],
+    "readinessEvidence": "docs/400-REV4-READINESS-FREEZE-2026-11-05.md"
+  }
+}

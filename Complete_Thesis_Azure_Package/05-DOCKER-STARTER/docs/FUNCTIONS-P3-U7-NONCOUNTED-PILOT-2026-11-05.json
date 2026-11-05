@@ -1,0 +1,45 @@
+{
+  "schema": "functions_p3_u7_non_counted_pilot_evidence_v1",
+  "countedAsStudyTrials": false,
+  "run": {
+    "runId": "pilot-functions-p3-u7-20261105a",
+    "matrixSha256": "337bce11b4cb46c5e55b4be008b5a8b8e5e43585d9d678f22c192e49e207cc07",
+    "protocol": "config/protocol-functions-p3-u7-pilot-draft.json",
+    "scenario": "U7",
+    "deployment": "azure_functions_flex",
+    "profile": "P3",
+    "classification": "confirmed_network_denial",
+    "mode": "non_counted_pilot",
+    "executionStartedAt": "2026-11-05T14:24:48.340Z",
+    "executionFinishedAt": "2026-11-05T14:25:00.195Z",
+    "transportOk": false,
+    "httpStatus": null
+  },
+  "networkEvidence": {
+    "source": "AzureDiagnostics / AzureFirewallNetworkRule via controller audit managed identity",
+    "queryImplementation": "scripts/requery-functions-p3-u7-pilot.py",
+    "exactExecutionWindow": true,
+    "sourceCidr": "10.48.6.0/24",
+    "observedSourceIp": "10.48.6.106",
+    "sourcePort": 10001,
+    "destinationIp": "10.48.9.5",
+    "destinationPort": 8443,
+    "action": "Deny",
+    "ruleName": "functions-p3-deny-collector",
+    "matchedEvents": 7,
+    "events": [
+      {"timeGenerated":"2026-11-05T14:24:52.186670Z","sourceIp":"10.48.6.106","sourcePort":10001,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"functions-p3-deny-collector"},
+      {"timeGenerated":"2026-11-05T14:24:53.200569Z","sourceIp":"10.48.6.106","sourcePort":10001,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"functions-p3-deny-collector"},
+      {"timeGenerated":"2026-11-05T14:24:54.228324Z","sourceIp":"10.48.6.106","sourcePort":10001,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"functions-p3-deny-collector"},
+      {"timeGenerated":"2026-11-05T14:24:55.249274Z","sourceIp":"10.48.6.106","sourcePort":10001,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"functions-p3-deny-collector"},
+      {"timeGenerated":"2026-11-05T14:24:56.277346Z","sourceIp":"10.48.6.106","sourcePort":10001,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"functions-p3-deny-collector"},
+      {"timeGenerated":"2026-11-05T14:24:57.301018Z","sourceIp":"10.48.6.106","sourcePort":10001,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"functions-p3-deny-collector"},
+      {"timeGenerated":"2026-11-05T14:24:59.317197Z","sourceIp":"10.48.6.106","sourcePort":10001,"destinationIp":"10.48.9.5","destinationPort":8443,"action":"Deny","ruleName":"functions-p3-deny-collector"}
+    ],
+    "interpretation": "Seven firewall deny records for the source subnet, collector destination and port, under the dedicated deny rule fell inside the saved U7 execution window. The workload response itself reported transportOk=false and had no outer HTTP status; that response alone is not the denial proof.",
+    "limitations": [
+      "Azure Firewall records do not include the trial run ID; correlation uses the saved exact execution window and source/destination/port/rule tuple.",
+      "This is one non-counted Functions P3 U7 pilot and does not establish the overall measured readiness gates."
+    ]
+  }
+}

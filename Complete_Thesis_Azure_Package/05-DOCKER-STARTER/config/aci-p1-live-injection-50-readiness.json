@@ -11,13 +11,13 @@
     "protocolFrozen": {"passed": true, "evidenceReference": "file:docs/ACI-P1-LIVE-INJECTION-50-OWNER-APPROVAL.md"},
     "methodApproval": {"passed": true, "evidenceReference": "file:docs/ACI-P1-LIVE-INJECTION-50-OWNER-APPROVAL.md"},
     "aciP1Deployment": {"passed": true, "evidenceReference": "file:docs/ACI-P1-DEPLOYMENT-HEALTH-SMOKE-2026-11-04.md"},
-    "u1ResourceAuditVerifier": {"passed": false, "evidenceReference": ""},
-    "u5CollectorAuditVerifier": {"passed": false, "evidenceReference": ""},
-    "operationCorrelation": {"passed": false, "evidenceReference": ""},
+    "u1ResourceAuditVerifier": {"passed": true, "evidenceReference": "file:docs/ACI-P1-U1-U5-INDEPENDENT-DIAGNOSTIC-2026-11-05.md"},
+    "u5CollectorAuditVerifier": {"passed": true, "evidenceReference": "file:docs/ACI-P1-U1-U5-INDEPENDENT-DIAGNOSTIC-2026-11-05.md"},
+    "operationCorrelation": {"passed": true, "evidenceReference": "file:docs/ACI-P1-U1-U5-INDEPENDENT-DIAGNOSTIC-2026-11-05.md"},
     "independentEvidenceProtection": {"passed": false, "evidenceReference": ""},
-    "evidenceRetentionApproval": {"passed": false, "evidenceReference": ""},
+    "evidenceRetentionApproval": {"passed": true, "evidenceReference": "file:docs/ACI-P1-50-RETENTION-OWNER-DIRECTION.md"},
     "azureGpt5MiniIdentity": {"passed": true, "evidenceReference": "file:docs/ACI-P1-GPT5-MINI-IDENTITY-SMOKE-2026-11-04.md"},
-    "credentialsValidated": {"passed": false, "evidenceReference": ""},
+    "credentialsValidated": {"passed": true, "evidenceReference": "file:docs/ACI-P1-50-CREDENTIAL-VALIDATION-2026-11-05.md"},
     "costLimitConfigured": {
       "passed": true,
       "evidenceReference": "file:docs/ACI-P1-50-COST-CAP-2026-11-04.md"

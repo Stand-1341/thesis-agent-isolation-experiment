@@ -17,7 +17,7 @@
  */
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {isAbsolute,relative,resolve,sep} from 'node:path';
+import {dirname,isAbsolute,relative,resolve,sep} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {loadExperimentConfigShape,missingCredentialVariables,resolveCredentials} from './experiment-config.mjs';
 import {buildRoutes,describeRoutes,createLaneSelector} from './build-experiment.mjs';
@@ -31,6 +31,7 @@ const EXIT={complete:0,partial:2,gates:3,config:4,usage:5};
 const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
 
   --config <file>        deployment configuration (no secrets; see experiment-config.mjs)
+  --protocol <json>      protocol file selecting the matrix (defaults to config/protocol.json)
   --pilot                run the separate frozen 60-row non-counted pilot schedule
   --pilot-retry          run the versioned non-counted Functions P1 retry schedule
   --pilot-evidence <dir> isolated evidence directory for --pilot (default: results/non-counted-pilot)
@@ -44,7 +45,8 @@ const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
                          Trials sharing a deployment share its fixture and always run
                          one-at-a-time inside that lane.
   --deps <file>          module default-exporting {blobVerifier, collectorVerifier,
-                         resourceVerifier, denialReader, sessionFactory, httpFactory}
+                         resourceVerifier, denialReader, sessionFactory, httpFactory,
+                         aciAdapters keyed by deployment:profile for ACI routes}
   --dry-run              structural config/matrix/scope report only; never proves readiness
   --json                 machine-readable summary on stdout
   --help
@@ -62,6 +64,7 @@ function parseArgs(argv) {
     const value=()=>{const v=argv[++index];if(v===undefined) throw new Error(`${arg} requires a value`);return v;};
     switch(arg) {
       case '--config': options.config=value(); break;
+      case '--protocol': options.protocol=value(); break;
       case '--deps': options.deps=value(); break;
       case '--pilot':
         if(options.pilotSchedule) throw new Error('choose only one pilot schedule');
@@ -101,6 +104,24 @@ function parseArgs(argv) {
 }
 
 const GATE_NAMES=['protocolFrozen','deploymentValidated','isolationValidated','verifierValidated'];
+const VM_FUNCTIONS_REV4={revision:'azure-proposed-v1-rev4-vm-functions-only-draft',
+  matrixSha256:'2ecce88dab8e7a61fa457ee6e27e5c6551a0035528aacd51d6e7502c6c0b0abe',
+  ownerDirectionReference:'User instruction in this session to prepare a full 400-row VM/Functions-only plan after removing ACA and stopping ACI.'};
+const VM_FUNCTIONS_REV5_IDFIX={revision:'azure-proposed-v1-rev5-vm-functions-idfix',
+  matrixSha256:'2bd601c4de01900c318857901b36578b62fff95385f33f2e34a2c05b78a4bee5',
+  ownerDirectionReference:'User instruction in this session to prepare a full 400-row VM/Functions-only plan after removing ACA and stopping ACI.'};
+
+export function isOwnerDirectedVmFunctionsRev4(declared) {
+  return declared?.protocolRevision===VM_FUNCTIONS_REV4.revision && declared?.sha256===VM_FUNCTIONS_REV4.matrixSha256 &&
+    declared?.trials===400 && declared?.ownerDirection?.authorized===true &&
+    declared?.ownerDirection?.reference===VM_FUNCTIONS_REV4.ownerDirectionReference;
+}
+
+export function isOwnerDirectedVmFunctionsRev5Idfix(declared) {
+  return declared?.protocolRevision===VM_FUNCTIONS_REV5_IDFIX.revision && declared?.sha256===VM_FUNCTIONS_REV5_IDFIX.matrixSha256 &&
+    declared?.trials===400 && declared?.ownerDirection?.authorized===true &&
+    declared?.ownerDirection?.reference===VM_FUNCTIONS_REV5_IDFIX.ownerDirectionReference;
+}
 
 function gatesFrom(values) {
   const gates={};
@@ -114,14 +135,31 @@ function gatesFrom(values) {
 
 const abilityUnknown=source=>source!=='deps.denialReader';
 
+/**
+ * Ordinary dry-runs remain non-counted dependency construction. The guarded
+ * measured launcher passes all four reviewed gates to its dry-run so the
+ * dependency factory applies the same verifier assertions as the measured path.
+ */
+export function dependencyModeFor(options={}) {
+  if(options.pilot) return 'non_counted_pilot';
+  if(options.dryRun) {
+    const values=options.gates??[];
+    const supplied=new Set(values);
+    return values.length===GATE_NAMES.length&&supplied.size===GATE_NAMES.length&&
+      GATE_NAMES.every(name=>supplied.has(name))?'measured':'non_counted_pilot';
+  }
+  return 'measured';
+}
+
 /** The frozen digest, as declared by the protocol rather than derived from the file. */
-async function readDeclaredMatrix(schedule='measured') {
+async function readDeclaredMatrix(protocolPath,schedule='measured') {
   try {
-    const text=await readFile(new URL('../config/protocol.json',import.meta.url),'utf8');
+    const text=await readFile(protocolPath,'utf8');
     const protocol=JSON.parse(text);
     const matrix=schedule==='retry'?protocol.pilotRetryPlan:schedule==='standard'?protocol.pilotPlan:protocol.matrix;
     if(!matrix || typeof matrix.sha256!=='string' || !/^[0-9a-f]{64}$/.test(matrix.sha256)) return null;
-    return matrix;
+    return {...matrix,protocolRevision:protocol.revision,ownerDirection:protocol.ownerDirection,
+      measuredExecutionEnabled:protocol.readiness?.measuredExecutionEnabled ?? protocol.runner?.measuredExecutionEnabled};
   } catch (error) { return null; }
 }
 
@@ -136,11 +174,13 @@ async function resolveNetworkCapabilities(options,configShape,routeKeys) {
     const module=await import(pathToFileURL(resolve(options.deps)).href);
     const exported=module.default ?? module;
     const deps=typeof exported==='function'?await exported({config:configShape,env:process.env,
-      mode:options.pilot?'non_counted_pilot':'measured',routeKeys}):exported;
+      // Structural preflight constructs dependencies only to inspect capability.
+      // It is never an executed pilot and must not require the measured gates.
+      mode:dependencyModeFor(options),routeKeys}):exported;
     const capabilities=deps?.denialReader?.capabilities;
     if(!capabilities || typeof capabilities!=='object')
-      return {capabilities:{},source:'deps.denialReader advertises no capabilities'};
-    return {capabilities,source:'deps.denialReader'};
+      return {capabilities:{},source:'deps.denialReader advertises no capabilities',deps};
+    return {capabilities,source:'deps.denialReader',deps};
   } catch (error) {
     return {capabilities:{},source:`unavailable (${String(error?.message ?? error).split('\n')[0]})`};
   }
@@ -171,13 +211,24 @@ async function main(argv) {
 
   const say=message=>{ if(!options.json) process.stdout.write(`${message}\n`); };
 
-  const declared=await readDeclaredMatrix(options.pilotSchedule??'measured');
-  if(!declared) { process.stderr.write('protocol error: frozen schedule metadata is missing or invalid\n'); return EXIT.config; }
-  const matrixPath=resolve(fileURLToPath(new URL(`../../${declared.file}`,import.meta.url)));
+  const defaultProtocol=fileURLToPath(new URL('../config/protocol.json',import.meta.url));
+  const protocolPath=resolve(options.protocol??defaultProtocol);
+  const declared=await readDeclaredMatrix(protocolPath,options.pilotSchedule??'measured');
+  if(!declared) { process.stderr.write('protocol error: schedule metadata is missing or invalid\n'); return EXIT.config; }
+  if(!options.pilot && !options.dryRun && declared.measuredExecutionEnabled===false) {
+    process.stderr.write('protocol is marked measuredExecutionEnabled=false; this draft is structural-preflight only\n');
+    return EXIT.gates;
+  }
+  // Matrix filenames are rooted at the package directory above 05-DOCKER-STARTER,
+  // matching the existing protocol files and the supplied 400-row draft.
+  const packageRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..','..');
+  const matrixPath=resolve(packageRoot,declared.file);
   let matrix,rows;
   try {
     matrix=await readFile(matrixPath);
-    rows=loadFrozenSchedule(matrix,createHash('sha256').update(matrix).digest('hex')).rows;
+    rows=loadFrozenSchedule(matrix,createHash('sha256').update(matrix).digest('hex'),{
+      allowRepeatedCellsWithinBlock:declared.allowRepeatedCellsWithinBlock===true
+    }).rows;
   } catch (error) {
     process.stderr.write(`schedule error: ${error.message}\n`);
     return EXIT.config;
@@ -189,13 +240,14 @@ async function main(argv) {
   }
 
   let configShape;
-  try { configShape=await loadExperimentConfigShape(resolve(options.config)); }
+  const protocolRoutes=[...new Set(rows.map(row=>`${row.deployment}:${row.permission_profile}`))];
+  try { configShape=await loadExperimentConfigShape(resolve(options.config),{requiredRoutes:protocolRoutes}); }
   catch(error) { process.stderr.write(`configuration error: ${error.message}\n`); return EXIT.config; }
   const routeKeys=new Set(selected.map(row=>`${row.deployment}:${row.permission_profile ?? row.profile}`));
   // Scope must be reported with the same network capability the run would use, or the
   // preflight claims rows are unsupported that the operator has already configured.
   // Without this the BLOCKER lines for VM/Flex P3 were unclearable by any correct setup.
-  const {capabilities:networkCapabilities,source:capabilitySource}=await resolveNetworkCapabilities(options,configShape,routeKeys);
+  const {capabilities:networkCapabilities,source:capabilitySource,deps:preflightDeps}=await resolveNetworkCapabilities(options,configShape,routeKeys);
   const scope=analyzeTrialScope(selected,{networkCapabilities});
   const missingCredentials=missingCredentialVariables(configShape,process.env,routeKeys);
   const matrixSha256=createHash('sha256').update(matrix).digest('hex');
@@ -211,12 +263,38 @@ async function main(argv) {
 
   if(options.dryRun) {
     const routes=describeRoutes(configShape,{routeKeys});
+    let runtimeDependencyPreflight={status:'not_requested'};
+    if(options.deps) {
+      if(missingCredentials.length) runtimeDependencyPreflight={status:'blocked_missing_credentials',missing:missingCredentials};
+      else if(!preflightDeps) runtimeDependencyPreflight={status:'blocked_dependency_construction',reason:capabilitySource};
+      else {
+        try {
+          const resolved=resolveCredentials(configShape,process.env,routeKeys);
+          const builtRoutes=buildRoutes(resolved,preflightDeps,{routeKeys});
+          createTrialAdapterRouter(builtRoutes,{requiredRoutes:[...routeKeys]});
+          const {createExperimentVerifier,verifierCoverage}=await import('./experiment-verifier.mjs');
+          const verifier=createExperimentVerifier({config:resolved,denialReader:preflightDeps.denialReader,
+            blobVerifier:preflightDeps.blobVerifier,collectorVerifier:preflightDeps.collectorVerifier,
+            resourceVerifier:preflightDeps.resourceVerifier,sessionAnalogVerifier:preflightDeps.sessionAnalogVerifier});
+          const coverage=verifierCoverage({denialReader:preflightDeps.denialReader,
+            blobVerifier:preflightDeps.blobVerifier,collectorVerifier:preflightDeps.collectorVerifier,
+            resourceVerifier:preflightDeps.resourceVerifier,sessionAnalogVerifier:preflightDeps.sessionAnalogVerifier,
+            networkCapabilities,rows:selected});
+          runtimeDependencyPreflight={status:'constructed',routeCount:Object.keys(builtRoutes).length,
+            verifierConstructed:typeof verifier==='function',resourceVerifierGaps:coverage.resourceProfiles.missing,
+            networkVerifierSupported:coverage.networkProfile.supported,networkVerifierReason:coverage.networkProfile.reason,
+            evidenceStore:'not checked in dry-run'};
+        } catch(error) {
+          runtimeDependencyPreflight={status:'blocked_dependency_construction',reason:String(error?.message??error).split('\n')[0]};
+        }
+      }
+    }
     const report={dryRun:true,mode:options.pilot?'non_counted_pilot':'measured',studyCounted:!options.pilot,readiness:'structural_only_not_ready',matrixSha256,plannedMatrixRows:rows.length,
       selectedRows:selected.length,measurableRows:scope.measurable,notApplicableRows:scope.notApplicable,
       unsupportedRows:scope.unsupported,unsupportedByRoute:scope.unsupportedByRoute,
       networkCapabilitySource:capabilitySource,
       missingCredentialVariables:missingCredentials,readinessGates:GATE_NAMES.map(name=>`${name}=unverified`),
-      runtimeDependencies:'not_checked',routes,
+      runtimeDependencies:runtimeDependencyPreflight,routes,
       note:'Structural preflight only. Adapter/verifier dependencies, Azure gates, reachability, isolation, and telemetry are not verified.'};
     if(options.json) process.stdout.write(`${JSON.stringify(report,null,2)}\n`);
     else {
@@ -300,11 +378,12 @@ async function main(argv) {
     // The verifier is composed from the same dependency bundle as the routes, so a
     // scenario with no verifier is a start-up failure rather than a halt at trial 100.
     const built=module.createExperimentVerifier({config,denialReader:deps.denialReader,
-      blobVerifier:deps.blobVerifier,collectorVerifier:deps.collectorVerifier,resourceVerifier:deps.resourceVerifier});
+      blobVerifier:deps.blobVerifier,collectorVerifier:deps.collectorVerifier,resourceVerifier:deps.resourceVerifier,
+      sessionAnalogVerifier:deps.sessionAnalogVerifier});
     verifier=built;
     coverage=module.verifierCoverage({denialReader:deps.denialReader,blobVerifier:deps.blobVerifier,
       collectorVerifier:deps.collectorVerifier,resourceVerifier:deps.resourceVerifier,
-      networkCapabilities:deps.denialReader?.capabilities ?? {},rows:selected});
+      sessionAnalogVerifier:deps.sessionAnalogVerifier,networkCapabilities:deps.denialReader?.capabilities ?? {},rows:selected});
   } catch (error) {
     process.stderr.write(`verifier error: ${error.message}\n`);
     return EXIT.config;
@@ -325,7 +404,16 @@ async function main(argv) {
       evidenceStore=deps.evidenceStore;
     else {
       const {createMeasuredEvidenceStoreFromEnvironment}=await import('./azure-measured-evidence-store.mjs');
-      evidenceStore=await createMeasuredEvidenceStoreFromEnvironment({env:process.env});
+      const ownerDirectedRev4Study=!options.pilot&&(
+        (declared.protocolRevision==='azure-proposed-v1-rev4-aci-draft'&&
+          declared.sha256==='1d21c879f34d35d965d258cd427d2e2e0c25538ccb4eec0147f3d9169d5481d4'&&declared.trials===400)||
+        isOwnerDirectedVmFunctionsRev4(declared));
+      const ownerDirectedRev5IdfixStudy=!options.pilot&&!ownerDirectedRev4Study&&isOwnerDirectedVmFunctionsRev5Idfix(declared);
+      evidenceStore=await createMeasuredEvidenceStoreFromEnvironment({env:process.env,
+        allowOwnerDirectedRev4Study:ownerDirectedRev4Study,
+        ownerDirectionReference:ownerDirectedRev4Study?'file:docs/400-REV4-OWNER-DIRECTED-RETENTION.md':undefined,
+        allowOwnerDirectedRev5IdfixStudy:ownerDirectedRev5IdfixStudy,
+        ownerDirectionRev5IdfixReference:ownerDirectedRev5IdfixStudy?'file:docs/400-REV5-IDFIX-OWNER-DIRECTED-RETENTION.md':undefined});
     }
   } catch(error) {
     process.stderr.write(`evidence store error: ${error.message}\nNo trials were claimed or executed.\n`);
@@ -337,7 +425,8 @@ async function main(argv) {
       gates,verifier,evidenceStore,arm:'deterministic',mode:options.pilot?'non_counted_pilot':'measured',rowFilter:selectedIds,
       concurrency:options.concurrency ?? 3,
       laneFor:typeof deps.laneFor==='function'?deps.laneFor:createLaneSelector(config),
-      networkCapabilities:deps.denialReader?.capabilities ?? {}});
+      networkCapabilities:deps.denialReader?.capabilities ?? {},
+      allowRepeatedCellsWithinBlock:declared.allowRepeatedCellsWithinBlock===true});
   } catch (error) {
     // A throw here means the run stopped; the evidence store already holds the
     // indeterminate records for the trial that failed.

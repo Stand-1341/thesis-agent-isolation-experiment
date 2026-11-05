@@ -8,7 +8,8 @@
  *
  *   - VNet flow logs  -> FlowStatus 'D' (position 8 of flowTuples) with a named
  *     AclRule, for the VM arm.
- *   - Azure Firewall  -> AZFWNetworkRule / AZFWApplicationRule with Action 'Deny'.
+ *   - Azure Firewall  -> AZFWNetworkRule / AZFWApplicationRule with Action 'Deny',
+ *     or legacy AzureDiagnostics/AzureFirewallNetworkRule rows parsed from msg_s.
  *
  * It deliberately does NOT report a denial for:
  *   - Dynamic Sessions, where Microsoft documents no VNet or UDR path for code
@@ -37,8 +38,14 @@ const LABELS={
 };
 
 const ipv4=value=>typeof value==='string' && net.isIP(value)===4;
-function isoAndChecks(from,to) {
-  const start=Date.parse(from), end=Date.parse(to);
+const ipv4Cidr=value=>{
+  if(typeof value!=='string') return false;
+  const [address,prefix,...extra]=value.split('/');
+  return extra.length===0 && ipv4(address) && /^\d{1,2}$/.test(prefix??'') && Number(prefix)<=32;
+};
+function isoAndChecks(window) {
+  const start=typeof window?.start==='number'?window.start:Date.parse(window?.from);
+  const end=typeof window?.end==='number'?window.end:Date.parse(window?.to);
   if(!Number.isFinite(start) || !Number.isFinite(end) || end<start) throw new Error('invalid evidence window');
   // Dates are embedded in the query, so they are rendered from validated numbers
   // rather than interpolated from caller strings.
@@ -109,29 +116,101 @@ export function firewallControlQuery({srcIp,t0,t1}) {
 | summarize attempts=count(), denies=countif(Action == "Deny"), allows=countif(Action == "Allow")`;
 }
 
+/** Legacy Azure Firewall diagnostic-mode network events are in AzureDiagnostics.msg_s. */
+export function azureDiagnosticsFirewallQuery({srcIp,sourceCidr,destinationIp,destinationPort,t0,t1}) {
+  if((srcIp===undefined) === (sourceCidr===undefined)) throw new Error('provide exactly one source IP or CIDR');
+  if(srcIp!==undefined && !ipv4(srcIp)) throw new Error('source must be IPv4');
+  if(sourceCidr!==undefined && !ipv4Cidr(sourceCidr)) throw new Error('sourceCidr must be IPv4 CIDR');
+  if(!ipv4(destinationIp)) throw new Error('destination must be IPv4');
+  if(!Number.isInteger(destinationPort) || destinationPort<1 || destinationPort>65535)
+    throw new Error('destinationPort must be an integer from 1 to 65535');
+  const sourceFilter=srcIp!==undefined?`SourceIP == "${srcIp}"`
+    :`ipv4_is_in_range(SourceIP, "${sourceCidr}")`;
+  return `AzureDiagnostics
+| where TimeGenerated between (datetime(${t0}) .. datetime(${t1}))
+| where Category == "AzureFirewallNetworkRule"
+| extend SourceIP = extract(@"(?i)(?:TCP|UDP) request from ([0-9.]+):([0-9]+) to ", 1, msg_s),
+         SourcePort = toint(extract(@"(?i)(?:TCP|UDP) request from ([0-9.]+):([0-9]+) to ", 2, msg_s)),
+         DestinationIP = extract(@"(?i) to ([0-9.]+):([0-9]+)\\. Action:", 1, msg_s),
+         DestinationPort = toint(extract(@"(?i) to ([0-9.]+):([0-9]+)\\. Action:", 2, msg_s)),
+         Action = extract(@"(?i)Action:\\s*(Allow|Deny)\\.", 1, msg_s),
+         RuleName = extract(@"(?i)Rule:\\s*([A-Za-z0-9_-]+)(?:\\.|$)", 1, msg_s)
+| where ${sourceFilter} and DestinationIP == "${destinationIp}" and DestinationPort == ${destinationPort}
+| where Action in ("Allow", "Deny")
+| project TimeGenerated, Category, ResourceId, SourceIP, SourcePort, DestinationIP,
+          DestinationPort, Action, RuleName
+| take 100`;
+}
+
 /**
- * @param deployments  { [deploymentName]: {telemetry:'vnet_flow_log'|'firewall'|'none', sourceIp, destinationIp?} }
+ * @param deployments  { [deploymentName]: {telemetry:'vnet_flow_log'|'firewall'|'azure_diagnostics_firewall'|'none', sourceIp, destinationIp?} }
  * @param query        async (kql) => rows[]. Injected so the Log Analytics client,
  *                     credential and workspace stay outside this module.
  */
-export function createDenialReader({deployments={},query,clock=Date.now}={}) {
+export function createDenialReader({deployments={},query,clock=Date.now,auditWaitMs=0,pollIntervalMs=10000,
+  wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
   if(typeof query!=='function') throw new Error('a query function is required');
   if(!deployments || typeof deployments!=='object') throw new Error('deployments map is required');
+  if(!Number.isInteger(auditWaitMs)||auditWaitMs<0||auditWaitMs>3600000) throw new Error('auditWaitMs must be an integer from 0 to 3600000');
+  if(!Number.isInteger(pollIntervalMs)||pollIntervalMs<1||pollIntervalMs>120000) throw new Error('pollIntervalMs must be an integer from 1 to 120000');
+  if(typeof wait!=='function') throw new Error('wait must be a function');
+
+  // Re-query the same bounded KQL window while logs may still be arriving.
+  // The evidence window never slides forward, and a timeout remains unobserved.
+  const queryAfterIngestion=async kql=>{
+    const deadline=clock()+auditWaitMs;
+    for(;;) {
+      const rows=await query(kql);
+      if(Array.isArray(rows)&&rows.length) return rows;
+      const remaining=deadline-clock();
+      if(remaining<=0) return Array.isArray(rows)?rows:[];
+      await wait(Math.min(pollIntervalMs,remaining));
+    }
+  };
 
   const readDenials=async function readDenials({trial,window,auditWindowSeconds=3600}) {
     const deployment=deployments[trial?.deployment];
     if(!deployment) return {verdict:LABELS.noTelemetry,evidence:{reason:'deployment_not_configured',deployment:trial?.deployment??null}};
     if(deployment.telemetry==='none')
       return {verdict:LABELS.noTelemetry,evidence:{reason:'no_deny_attributable_telemetry',deployment:trial.deployment}};
-    const {t0,t1}=isoAndChecks(window.from,window.to);
+    const {t0,t1}=isoAndChecks(window);
     const srcIp=deployment.sourceIp;
+    const sourceCidr=deployment.sourceCidr;
     const destinationIp=deployment.destinationIp;
     const targetResourceId=deployment.targetResourceId;
 
     const useFlowLog=deployment.telemetry==='vnet_flow_log';
-    const denyRows=await query(useFlowLog
-      ?vnetFlowDenyQuery({srcIp,targetResourceId,t0,t1,destinationIp})
-      :firewallDenyQuery({srcIp,t0,t1,destinationIp}));
+    const useAzureDiagnostics=deployment.telemetry==='azure_diagnostics_firewall';
+    if(useAzureDiagnostics) {
+      const events=await queryAfterIngestion(azureDiagnosticsFirewallQuery({srcIp,sourceCidr,destinationIp,
+        destinationPort:deployment.destinationPort,t0,t1}));
+      const projected=row=>({timeGenerated:row.TimeGenerated??row.timeGenerated??null,
+        sourceIp:row.SourceIP??row.sourceIp??null,sourcePort:row.SourcePort??row.sourcePort??null,
+        destinationIp:row.DestinationIP??row.destinationIp??null,
+        destinationPort:row.DestinationPort??row.destinationPort??null,
+        action:row.Action??row.action??null,ruleName:row.RuleName??row.ruleName??null,
+        category:row.Category??row.category??'AzureFirewallNetworkRule'});
+      const denied=(Array.isArray(events)?events:[]).filter(row=>
+        String(row.Action??row.action??'').toLowerCase()==='deny');
+      const expectedDeny=denied.find(row=>String(row.RuleName??row.ruleName??'')===deployment.denyRuleName);
+      if(expectedDeny) return {verdict:LABELS.confirmedDenyFirewall,evidence:{
+        source:deployment.telemetry,deniedRecords:denied.filter(row=>String(row.RuleName??row.ruleName??'')===deployment.denyRuleName).length,
+        sourceScope:srcIp??sourceCidr,first:projected(expectedDeny),window:{from:t0,to:t1}}};
+      if(denied.length) return {verdict:LABELS.configOnly,evidence:{
+        reason:'deny_observed_under_unexpected_rule',source:deployment.telemetry,
+        deniedRecords:denied.length,observedRules:[...new Set(denied.map(row=>String(row.RuleName??row.ruleName??'unknown')))],
+        sourceScope:srcIp??sourceCidr,window:{from:t0,to:t1}}};
+      const allowed=(Array.isArray(events)?events:[]).filter(row=>
+        String(row.Action??row.action??'').toLowerCase()==='allow');
+      if(allowed.length) return {verdict:LABELS.observedAllow,evidence:{
+        source:deployment.telemetry,total:allowed.length,sourceScope:srcIp??sourceCidr,
+        first:projected(allowed[0]),window:{from:t0,to:t1}}};
+      return {verdict:LABELS.unobserved,evidence:{reason:'no_matching_firewall_events',
+        source:deployment.telemetry,sourceScope:srcIp??sourceCidr,window:{from:t0,to:t1},auditWindowSeconds}};
+    }
+    const denyQuery=useFlowLog?vnetFlowDenyQuery({srcIp,targetResourceId,t0,t1,destinationIp})
+      :firewallDenyQuery({srcIp,t0,t1,destinationIp});
+    const denyRows=useFlowLog?await query(denyQuery):await queryAfterIngestion(denyQuery);
     if(Array.isArray(denyRows) && denyRows.length)
       return {verdict:useFlowLog?LABELS.confirmedDenyFlowLog:LABELS.confirmedDenyFirewall,
         evidence:{source:deployment.telemetry,deniedRecords:denyRows.length,first:denyRows[0],window:{from:t0,to:t1}}};
@@ -154,7 +233,11 @@ export function createDenialReader({deployments={},query,clock=Date.now}={}) {
   const capabilities=Object.fromEntries(Object.entries(deployments).map(([name,entry])=>{
     const configured=entry?.telemetry==='vnet_flow_log'
       ?typeof entry.targetResourceId==='string' && entry.targetResourceId.length>0 && ipv4(entry.destinationIp)
-      :entry?.telemetry==='firewall' && ipv4(entry.sourceIp) && ipv4(entry.destinationIp);
+      :entry?.telemetry==='firewall'
+        ?ipv4(entry.sourceIp) && ipv4(entry.destinationIp)
+        :entry?.telemetry==='azure_diagnostics_firewall' && (ipv4(entry.sourceIp)||ipv4Cidr(entry.sourceCidr)) && ipv4(entry.destinationIp)
+          && Number.isInteger(entry.destinationPort) && entry.destinationPort>=1 && entry.destinationPort<=65535
+          && typeof entry.denyRuleName==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(entry.denyRuleName);
     return [name,configured===true];
   }));
   Object.defineProperty(readDenials,'capabilities',{value:Object.freeze(capabilities),enumerable:true});

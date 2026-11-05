@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { X509Certificate } from 'node:crypto';
 import { SCENARIOS, runScenario } from './dist/core.js';
 import { probeNetwork } from './dist/network-probe.mjs';
+import { prepareRunRequest } from './prepare-run-request.mjs';
 
 const blobScenarios=new Set(['U1','U2','U3','U6','U8','L1','L2']);
 const authMode=process.env.AZURE_TOKEN_MODE || 'managed';
@@ -69,15 +70,15 @@ app.http('thesisRun', {
       return {status:403,jsonBody:{error:'controller authorization required'}};
     try{
       const data=await request.json();
-      if(!data||typeof data!=='object'||typeof data.runId!=='string'||
-         !/^[a-zA-Z0-9_-]{1,150}$/.test(data.runId)||!SCENARIOS.includes(data.scenario))
+      const scenarioInput=prepareRunRequest(data);
+      if(!scenarioInput||!SCENARIOS.includes(scenarioInput.scenario))
         return {status:400,jsonBody:{error:'invalid run request'}};
       const workloadToken=authMode==='delegated'?data.mockWorkloadToken:process.env.WORKLOAD_TOKEN;
       if(typeof workloadToken!=='string' || !workloadToken || /[\r\n]/.test(workloadToken) ||
         (authMode==='delegated' && (workloadToken.length<32 || workloadToken.length>512))) throw new Error('missing or invalid workload credential');
-      if(blobRunner && blobScenarios.has(data.scenario)) return {status:200,jsonBody:await blobRunner({runId:data.runId,scenario:data.scenario})};
-      if(delegatedFactory && blobScenarios.has(data.scenario)) return {status:200,jsonBody:await delegatedFactory(data)({runId:data.runId,scenario:data.scenario})};
-      const result=await runScenario(data,{
+      if(blobRunner && blobScenarios.has(scenarioInput.scenario)) return {status:200,jsonBody:await blobRunner({runId:scenarioInput.runId,scenario:scenarioInput.scenario})};
+      if(delegatedFactory && blobScenarios.has(scenarioInput.scenario)) return {status:200,jsonBody:await delegatedFactory(scenarioInput)({runId:scenarioInput.runId,scenario:scenarioInput.scenario})};
+      const result=await runScenario(scenarioInput,{
         resourceUrl:process.env.RESEARCH_URL,
         collectorUrl:process.env.COLLECTOR_URL,
         workloadToken

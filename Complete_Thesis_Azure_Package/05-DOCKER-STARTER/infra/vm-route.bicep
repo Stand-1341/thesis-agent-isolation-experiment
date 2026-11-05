@@ -20,9 +20,6 @@ param workloadIdentityName string
 @description('Exact private CIDRs from the controller network, reachable through an existing VPN or private route.')
 @minLength(1)
 param controllerSourcePrefixes array
-@description('Exact operator CIDRs used for SSH administration. Do not include workload/controller ranges unless required.')
-@minLength(1)
-param operatorSourcePrefixes array
 @description('SSH public key only; never pass a private key.')
 param sshPublicKey string
 @minLength(1)
@@ -58,19 +55,6 @@ resource routeNsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: '443'
-        }
-      }
-      {
-        name: 'operator-ssh'
-        properties: {
-          priority: 110
-          direction: 'Inbound'
-          access: 'Allow'
-          protocol: 'Tcp'
-          sourceAddressPrefixes: operatorSourcePrefixes
-          sourcePortRange: '*'
-          destinationAddressPrefix: '*'
-          destinationPortRange: '22'
         }
       }
       {

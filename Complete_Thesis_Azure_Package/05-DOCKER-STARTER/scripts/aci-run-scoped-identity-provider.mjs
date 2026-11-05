@@ -9,6 +9,7 @@ const BLOB_OWNER='b7e6dc6d-f1e8-4753-8033-0f276bb0955b';
 const BLOB_READER='2a2b9908-6ea1-4ae2-8e65-a410df84e7d1';
 const ROLES=new Set(['source','probe','cleanup']);
 const CONTAINERS=new Set(['session-b','prior-session']);
+const RUN=/^[A-Za-z0-9_-]{1,150}$/;
 const ARM_SCOPE=/^\/subscriptions\/([0-9a-f-]{36})\/resourceGroups\/([A-Za-z0-9._()-]+)\/providers\/Microsoft\.Storage\/storageAccounts\/([a-z0-9]{3,24})\/blobServices\/default\/containers\/([a-z0-9-]+)$/i;
 
 function guidFromSeed(seed) {
@@ -102,7 +103,7 @@ export function createAciRunScopedIdentityProvider({subscriptionId,resourceGroup
   const identityUrl=name=>`https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${encodeURIComponent(resourceGroup)}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${encodeURIComponent(name)}?api-version=${identityApiVersion}`;
   const assignmentUrl=(scope,id)=>`https://management.azure.com${scope}/providers/Microsoft.Authorization/roleAssignments/${id}?api-version=${roleAssignmentApiVersion}`;
   const validateRequest=args=>{
-    if(!args||typeof args.runId!=='string'||!/^pilot-[A-Za-z0-9_-]{1,140}$/.test(args.runId)||
+    if(!args||!RUN.test(args.runId||'')||
       !['U6','U8'].includes(args.scenario)||!ROLES.has(args.role)||!CONTAINERS.has(args.container)||
       !args.target||typeof args.target.resourceId!=='string') throw new Error('invalid ACI run-scoped identity request');
     const match=ARM_SCOPE.exec(args.target.resourceId);
