@@ -1,7 +1,8 @@
 /** Route a validated plan to explicitly supplied deployment/profile adapters. */
 import {EXPERIMENT_ROUTES} from './experiment-config.mjs';
 const guid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const INJECTABLE_ROUTE_KEYS=['azure_container_instances:P1','azure_container_instances:P2'];
+const INJECTABLE_ROUTE_KEYS=['azure_container_instances:P1','azure_container_instances:P2',
+  ...['P1','P2','P3'].map(profile=>`azure_custom_sessions_hyperv:${profile}`)];
 const SUPPORTED_ROUTE_KEYS=[...EXPERIMENT_ROUTES,...INJECTABLE_ROUTE_KEYS];
 
 export function createTrialAdapterRouter(routes,{requiredRoutes}={}) {

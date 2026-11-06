@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {createSessionPilotAdapter} from './session-pilot-adapter.mjs';
 const controllerId='00000000-0000-0000-0000-000000000099';
 const encode=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -24,6 +25,7 @@ test('session request requires header-isolation assertion and uses a unique iden
     assert.equal(stored[0].sessionId,sessionId);
     assert.match(observed.options.headers.authorization,/^Bearer /);
     assert.equal(JSON.parse(observed.options.body).u5Marker,'SYNTHETIC-test');
+    assert.equal(JSON.parse(observed.options.body).requestId,`u5-${createHash('sha256').update('run-1').digest('hex')}`);
     await assert.rejects(adapter.execute({runId:'run-1',scenario:'U5'},{u5Marker:'SYNTHETIC-test'}),/already assigned/);
     await assert.rejects(adapter.execute({runId:'../bad',scenario:'U1'},{}),/invalid session/);
     globalThis.fetch=async(url)=>new Response(JSON.stringify({echo:url.searchParams.get('identifier')}),{status:200});

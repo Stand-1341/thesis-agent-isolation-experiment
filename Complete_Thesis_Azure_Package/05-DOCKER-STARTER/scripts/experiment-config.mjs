@@ -9,7 +9,7 @@ import {readFile} from 'node:fs/promises';
 import {validateCustomSessionEndpoint} from './session-endpoint.mjs';
 
 export const DEPLOYMENTS=['azure_vm','azure_functions_flex'];
-export const SUPPORTED_DEPLOYMENTS=[...DEPLOYMENTS,'azure_container_instances'];
+export const SUPPORTED_DEPLOYMENTS=[...DEPLOYMENTS,'azure_container_instances','azure_custom_sessions_hyperv'];
 export const PROFILES=['P1','P2','P3'];
 // Revision 3 removes all ACA session arms; the measured 300-row plan has six routes.
 export const EXPERIMENT_ROUTES=DEPLOYMENTS.flatMap(deployment=>PROFILES.map(profile=>`${deployment}:${profile}`));
@@ -62,12 +62,14 @@ export function validateExperimentConfig(raw,{requiredRoutes=REVISION_3_ROUTES}=
   if(!Array.isArray(requiredRoutes) || !requiredRoutes.length || new Set(requiredRoutes).size!==requiredRoutes.length)
     throw new Error('requiredRoutes must be a non-empty list of unique deployment/profile keys');
   const aciProtocol=requiredRoutes.some(key=>key.startsWith('azure_container_instances:'));
+  const sessionProtocol=requiredRoutes.some(key=>key.startsWith('azure_custom_sessions_hyperv:'));
   if(config.routes.length<requiredRoutes.length || (aciProtocol&&config.routes.length!==requiredRoutes.length))
     throw new Error(requiredRoutes.length===REVISION_3_ROUTES.length&&requiredRoutes.every((key,index)=>key===REVISION_3_ROUTES[index])
       ?`exactly ${REVISION_3_ROUTES.length} revision-3 routes are required, got ${config.routes.length}`
       :aciProtocol?`exactly ${requiredRoutes.length} ACI draft routes are required, got ${config.routes.length}`
       :`at least ${requiredRoutes.length} scheduled deployment/profile routes are required, got ${config.routes.length}`);
-  if(!aciProtocol&&config.routes.some(route=>!REVISION_3_ROUTES.includes(`${route?.deployment}:${route?.profile}`)))
+  if(!aciProtocol&&config.routes.some(route=>!REVISION_3_ROUTES.includes(`${route?.deployment}:${route?.profile}`) &&
+    !(sessionProtocol && requiredRoutes.includes(`${route?.deployment}:${route?.profile}`))))
     throw new Error(`exactly ${REVISION_3_ROUTES.length} revision-3 routes are required, got ${config.routes.length}`);
 
   const deployments={};
@@ -84,24 +86,28 @@ export function validateExperimentConfig(raw,{requiredRoutes=REVISION_3_ROUTES}=
         collectorUrl:httpsUrl(entry.collectorUrl,`deployments.${name}.collectorUrl`),
         ...(Number.isInteger(entry.timeoutMs)?{timeoutMs:entry.timeoutMs}:{})};
     } else if(entry.kind==='session') {
-      if(typeof entry.poolName!=='string' || !entry.poolName) throw new Error(`deployments.${name}.poolName is required`);
-      if(typeof entry.region!=='string' || !entry.region) throw new Error(`deployments.${name}.region is required`);
-      // The pool hostname is <pool>.<environment-id>.<region>.azurecontainerapps.io.
-      // A two-label guess such as <pool>.<region>... is not a real endpoint, and
-      // validating it here means the mistake surfaces at config load, not at trial 1.
-      const managementEndpoint=(()=>{
-        const url=httpsUrl(entry.managementEndpoint,`deployments.${name}.managementEndpoint`);
-        try {return validateCustomSessionEndpoint(`${url}/`,{poolName:entry.poolName,region:entry.region}).href.replace(/\/$/,'');}
-        catch (error) {throw new Error(`deployments.${name}.managementEndpoint ${error.message}`);}
-      })();
+      if(name!=='azure_custom_sessions_hyperv' || !sessionProtocol) throw new Error(`deployments.${name}.kind session requires an explicitly selected session route`);
+      const pools=requireObject(entry.profilePools,`deployments.${name}.profilePools`);
+      const profilePools={};
+      const endpoints=new Set();
+      for(const profile of config.routes.filter(r=>r?.deployment===name).map(r=>r.profile)) {
+        if(!PROFILES.includes(profile)) throw new Error(`invalid session profile`);
+        const pool=requireObject(pools[profile],`deployments.${name}.profilePools.${profile}`);
+        const url=httpsUrl(pool.managementEndpoint,`deployments.${name}.profilePools.${profile}.managementEndpoint`);
+        let managementEndpoint;
+        try {managementEndpoint=validateCustomSessionEndpoint(`${url}/`,{poolName:pool.poolName,region:pool.region}).href.replace(/\/$/,'');}
+        catch (error) {throw new Error(`deployments.${name}.profilePools.${profile} ${error.message}`);}
+        if(endpoints.has(managementEndpoint.toLowerCase())) throw new Error('session profiles must use distinct pool endpoints');
+        endpoints.add(managementEndpoint.toLowerCase());
+        profilePools[profile]={poolName:pool.poolName,region:pool.region,managementEndpoint};
+      }
       const sessionRegistryUrl=httpsUrl(entry.sessionRegistryUrl,`deployments.${name}.sessionRegistryUrl`);
       if(new URL(sessionRegistryUrl).pathname!=='/session-mappings')
         throw new Error(`deployments.${name}.sessionRegistryUrl must target the dedicated /session-mappings container`);
       deployments[name]={kind:'session',
-        managementEndpoint,
+        profilePools,
         resourceUrl:httpsUrl(entry.resourceUrl,`deployments.${name}.resourceUrl`),
         collectorUrl:httpsUrl(entry.collectorUrl,`deployments.${name}.collectorUrl`),
-        poolName:entry.poolName, region:entry.region,
         sessionRegistryUrl,
         fixtureBlobEndpoint:httpsUrl(entry.fixtureBlobEndpoint,`deployments.${name}.fixtureBlobEndpoint`),
         headerIsolationVerified:entry.headerIsolationVerified===true,

@@ -37,7 +37,12 @@ export function createSessionPilotAdapter({fixtureAdapter, managementEndpoint, p
       fingerprints.set(trial.runId,createHash('sha256').update(sessionId).digest('hex'));
       const token=await getAccessToken();
       validateSessionControlToken({token,expectedPrincipalId:expectedControllerPrincipalId});
-      const payload={runId:trial.runId,scenario:trial.scenario,...(trial.scenario==='U5'?{u5Marker:fixture.u5Marker}:{})};
+      // U5 is verified by correlating the collector's request ID with the
+      // workload observation. Use the same stable, run-scoped ID as the VM
+      // and Functions adapters; without it the collector evidence cannot be
+      // attributed to this attempt even when the request succeeds.
+      const requestId=trial.scenario==='U5'?`u5-${createHash('sha256').update(trial.runId).digest('hex')}`:undefined;
+      const payload={runId:trial.runId,scenario:trial.scenario,...(trial.scenario==='U5'?{u5Marker:fixture.u5Marker,requestId}:{})};
       let delegatedToken,mockToken;
       if(delegatedCredentials) {
         mockToken=await delegatedCredentials.getMockToken(trial);

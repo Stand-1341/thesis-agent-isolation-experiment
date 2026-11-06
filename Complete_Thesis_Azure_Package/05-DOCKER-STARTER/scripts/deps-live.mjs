@@ -103,6 +103,10 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
     selectedRoutes.has(`${route.deployment}:${route.profile}`));
   const tokenMode=env.THESIS_TOKEN_PROVIDER_MODE??'azure_cli';
   if(!['azure_cli','managed_identity'].includes(tokenMode)) throw new Error('THESIS_TOKEN_PROVIDER_MODE must be azure_cli or managed_identity');
+  // Fixture-owner and session-control principals must be distinct. A single
+  // Azure CLI login cannot supply both identities, so require explicit managed
+  // identity selectors for a session route.
+  if(needsSessions && tokenMode!=='managed_identity') throw new Error('session routes require separate managed control and fixture-owner identities');
   const missing=new Set();
   const notes=[];
 
@@ -157,6 +161,11 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
   const storageIdentityClientId=tokenMode==='managed_identity'?reader(env,missing,'THESIS_STORAGE_IDENTITY_CLIENT_ID'):undefined;
   const logsIdentityClientId=tokenMode==='managed_identity'?reader(env,missing,'THESIS_LOGS_IDENTITY_CLIENT_ID'):undefined;
   const sessionIdentityClientId=tokenMode==='managed_identity'&&needsSessions?reader(env,missing,'THESIS_SESSION_IDENTITY_CLIENT_ID'):undefined;
+  const sessionFixtureOwnerClientId=needsSessions?reader(env,missing,'THESIS_SESSION_FIXTURE_OWNER_IDENTITY_CLIENT_ID'):undefined;
+  const sessionControlPrincipalId=needsSessions?reader(env,missing,'THESIS_SESSION_CONTROL_PRINCIPAL_ID'):undefined;
+  const sessionFixtureOwnerPrincipalId=needsSessions?reader(env,missing,'THESIS_SESSION_FIXTURE_OWNER_PRINCIPAL_ID'):undefined;
+  if(needsSessions && sessionIdentityClientId && sessionFixtureOwnerClientId && sessionIdentityClientId.toLowerCase()===sessionFixtureOwnerClientId.toLowerCase())
+    throw new Error('session control and fixture owner must use different managed identities');
 
   // Fail before constructing anything, so the operator sees every missing variable
   // at once rather than one constructor's message at a time.
@@ -173,6 +182,7 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
       ?createManagedSessionsTokenProvider({clientId:sessionIdentityClientId})
       :createAzureCliSessionsTokenProvider({})
     :undefined;
+  const getSessionFixtureOwnerToken=needsSessions?createManagedStorageTokenProvider({clientId:sessionFixtureOwnerClientId}):undefined;
 
   // ---- independent network-denial evidence -------------------------------
   const denialReader=missing.size?undefined:createDenialReader({
@@ -276,24 +286,31 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
     const registryContainerUrl=typeof env.THESIS_SESSION_REGISTRY_URL==='string' && env.THESIS_SESSION_REGISTRY_URL.trim()
       ?env.THESIS_SESSION_REGISTRY_URL.trim():sessionDeployment.sessionRegistryUrl;
     const sessionRegistry=createAzureSessionRegistry({containerUrl:registryContainerUrl,getToken:getStorageToken,timeoutMs:15000});
-    const lifecycleObserver=createSessionLifecycleObserver({managementEndpoint:sessionDeployment.managementEndpoint,
-      poolName:sessionDeployment.poolName,region:sessionDeployment.region,getAccessToken:getSessionToken,
-      expectedPrincipalId:reader(env,missing,'THESIS_SESSION_CONTROL_PRINCIPAL_ID'),sessionRegistry,timeoutMs:30000});
     sessionFactory=route=>{
+      if(route?.deployment!=='azure_custom_sessions_hyperv' || !['P1','P2','P3'].includes(route.profile))
+        throw new Error('invalid session route');
+      const configured=config.routes.filter(entry=>entry.deployment===route.deployment && entry.profile===route.profile);
+      if(configured.length!==1 || configured[0].principalObjectId!==route.principalObjectId)
+        throw new Error('session route principal does not match configuration');
+      const pool=sessionDeployment.profilePools?.[route.profile];
+      if(!pool) throw new Error('a profile-specific session pool is required');
+      const lifecycleObserver=createSessionLifecycleObserver({managementEndpoint:pool.managementEndpoint,
+        poolName:pool.poolName,region:pool.region,getAccessToken:getSessionToken,
+        expectedPrincipalId:sessionControlPrincipalId,sessionRegistry,timeoutMs:30000});
       const controllerToken=controllerTokenFor(route);
       // Session workloads still share the research fixture service, but their
       // reset/evidence credentials are route-scoped just like the HTTP arms.
-      const base=createHttpPilotAdapter({agentUrl:sessionDeployment.managementEndpoint,
+      const base=createHttpPilotAdapter({agentUrl:pool.managementEndpoint,
         resourceUrl:sessionDeployment.resourceUrl,collectorUrl:sessionDeployment.collectorUrl,
         resourceAdminToken:route.credentials.resourceAdmin,collectorAdminToken:route.credentials.collectorAdmin,
         controllerToken,timeoutMs:sessionDeployment.timeoutMs??30000});
       const fixturePreparer=createSessionFixturePreparer({
-        managementEndpoint:sessionDeployment.managementEndpoint,poolName:sessionDeployment.poolName,
-        region:sessionDeployment.region,blobEndpoint:sessionDeployment.fixtureBlobEndpoint,
+        managementEndpoint:pool.managementEndpoint,poolName:pool.poolName,
+        region:pool.region,blobEndpoint:sessionDeployment.fixtureBlobEndpoint,
         blobResourceId:env.THESIS_BLOB_RESOURCE_ID,
         controllerToken,getControlToken:getSessionToken,
-        controlPrincipalId:env.THESIS_SESSION_CONTROL_PRINCIPAL_ID,
-        getOwnerToken:getSessionToken,ownerPrincipalId:env.THESIS_SESSION_FIXTURE_OWNER_PRINCIPAL_ID,
+        controlPrincipalId:sessionControlPrincipalId,
+        getOwnerToken:getSessionFixtureOwnerToken,ownerPrincipalId:sessionFixtureOwnerPrincipalId,
         sessionRegistry,lifecycleObserver,
         readAudit:createStorageAuditReader({workspaceId,getToken:getLogsToken})});
       const fixtureAdapter=createAzureFixtureAdapter({base,
@@ -301,9 +318,9 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
         getVerifierToken:getStorageToken,prepareSessionFixture:fixturePreparer,
         observeSessionFixture:fixtureRunId=>lifecycleObserver.observe(fixtureRunId)});
       return createSessionPilotAdapter({
-        fixtureAdapter,managementEndpoint:sessionDeployment.managementEndpoint,poolName:sessionDeployment.poolName,
-        region:sessionDeployment.region,getAccessToken:getSessionToken,
-        expectedControllerPrincipalId:env.THESIS_SESSION_CONTROL_PRINCIPAL_ID,
+        fixtureAdapter,managementEndpoint:pool.managementEndpoint,poolName:pool.poolName,
+        region:pool.region,getAccessToken:getSessionToken,
+        expectedControllerPrincipalId:sessionControlPrincipalId,
         controllerToken,sessionRegistry,lifecycleObserver,
         // This one must be established by a pilot, not assumed: it decides whether a
         // privileged token is forwarded into the workload.

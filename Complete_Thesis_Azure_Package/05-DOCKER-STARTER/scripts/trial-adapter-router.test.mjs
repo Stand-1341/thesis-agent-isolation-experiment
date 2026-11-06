@@ -29,3 +29,11 @@ test('an explicitly selected ACI P1/P2 route is accepted, while ACI P3 is reject
   assert.throws(()=>createTrialAdapterRouter({'azure_container_instances:P3':route},
     {requiredRoutes:['azure_container_instances:P3']}),/unknown required/);
 });
+
+test('a session route can only be selected explicitly and is bound to its own principal',async()=>{
+  const key='azure_custom_sessions_hyperv:P1';
+  const route={principalObjectId:'00000000-0000-4000-8000-000000000007',adapter:{reset:async()=>key,execute:async()=>({}),collect:async()=>({})}};
+  assert.throws(()=>createTrialAdapterRouter({[key]:route}),/revision-3/);
+  const router=createTrialAdapterRouter({[key]:route},{requiredRoutes:[key]});
+  assert.equal(await router.reset({deployment:'azure_custom_sessions_hyperv',profile:'P1'}),key);
+});

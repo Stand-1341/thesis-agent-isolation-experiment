@@ -108,7 +108,8 @@ export function describeRoutes(config, {routeKeys}={}) {
     return {route:key,kind:deployment.kind,
       principalObjectId:route.principalObjectId,
       target:deployment.kind==='http'?(route.agentUrl ?? deployment.agentUrl)
-        :deployment.kind==='aci'?`${deployment.resourceGroup} (${deployment.region})`:`${deployment.poolName} (${deployment.region})`,
+        :deployment.kind==='aci'?`${deployment.resourceGroup} (${deployment.region})`:
+          `${deployment.profilePools?.[route.profile]?.poolName ?? 'unconfigured'} (${deployment.profilePools?.[route.profile]?.region ?? 'unconfigured'})`,
       credentialVariables:Object.values(route.credentials).sort()};
   }).filter(Boolean).sort((a,b)=>a.route<b.route?-1:1);
 }

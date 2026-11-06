@@ -4,6 +4,31 @@ import {fileURLToPath} from 'node:url';
 import createLiveDeps,{principalForConfiguredTrial} from './deps-live.mjs';
 import {loadExperimentConfigShape,resolveCredentials} from './experiment-config.mjs';
 
+test('session factories bind each profile to its own configured pool and require distinct token providers',()=>{
+  const credentials={controller:'c'.repeat(40),resourceAdmin:'r'.repeat(40),collectorAdmin:'a'.repeat(40)};
+  const routes=[{deployment:'azure_custom_sessions_hyperv',profile:'P1',principalObjectId:'00000000-0000-4000-8000-000000000001',credentials},
+    {deployment:'azure_custom_sessions_hyperv',profile:'P2',principalObjectId:'00000000-0000-4000-8000-000000000002',credentials}];
+  const deployment={kind:'session',resourceUrl:'https://research.example.com',collectorUrl:'https://collector.example.com',
+    fixtureBlobEndpoint:'https://fixture.blob.core.windows.net',sessionRegistryUrl:'https://registry.blob.core.windows.net/session-mappings',
+    profilePools:{P1:{poolName:'pool1',region:'eastus',managementEndpoint:'https://pool1.env.eastus.azurecontainerapps.io'},
+      P2:{poolName:'pool2',region:'eastus',managementEndpoint:'https://wrong.env.eastus.azurecontainerapps.io'}}};
+  const config={deployments:{azure_custom_sessions_hyperv:deployment},routes};
+  const env={THESIS_LOG_ANALYTICS_WORKSPACE_ID:'00000000-0000-4000-8000-000000000003',THESIS_FIXTURE_BLOB_ENDPOINT:'https://fixture.blob.core.windows.net',
+    THESIS_BLOB_RESOURCE_ID:'/subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/fixture/blobServices/default',
+    THESIS_TOKEN_PROVIDER_MODE:'managed_identity',THESIS_STORAGE_IDENTITY_CLIENT_ID:'00000000-0000-4000-8000-000000000004',
+    THESIS_LOGS_IDENTITY_CLIENT_ID:'00000000-0000-4000-8000-000000000005',THESIS_SESSION_IDENTITY_CLIENT_ID:'00000000-0000-4000-8000-000000000006',
+    THESIS_SESSION_FIXTURE_OWNER_IDENTITY_CLIENT_ID:'00000000-0000-4000-8000-000000000007',
+    THESIS_SESSION_CONTROL_PRINCIPAL_ID:'00000000-0000-4000-8000-000000000008',
+    THESIS_SESSION_FIXTURE_OWNER_PRINCIPAL_ID:'00000000-0000-4000-8000-000000000009',THESIS_SESSION_HEADER_ISOLATION_VERIFIED:'true'};
+  assert.throws(()=>createLiveDeps({config,env:{...env,THESIS_TOKEN_PROVIDER_MODE:'azure_cli'},mode:'non_counted_pilot'}),/separate managed control/);
+  assert.throws(()=>createLiveDeps({config,env:{...env,THESIS_SESSION_FIXTURE_OWNER_IDENTITY_CLIENT_ID:''},mode:'non_counted_pilot'}),/THESIS_SESSION_FIXTURE_OWNER_IDENTITY_CLIENT_ID/);
+  assert.throws(()=>createLiveDeps({config,env:{...env,THESIS_SESSION_FIXTURE_OWNER_IDENTITY_CLIENT_ID:env.THESIS_SESSION_IDENTITY_CLIENT_ID},mode:'non_counted_pilot'}),/different managed identities/);
+  const deps=createLiveDeps({config,env,mode:'non_counted_pilot'});
+  assert.equal(typeof deps.sessionFactory(routes[0]).execute,'function');
+  assert.throws(()=>deps.sessionFactory(routes[1]),/pool|endpoint|hostname/i);
+  assert.throws(()=>deps.sessionFactory({...routes[0],principalObjectId:routes[1].principalObjectId}),/principal does not match/);
+});
+
 test('Blob verifier principal resolution accepts scheduled profile field and rejects conflicting labels',async()=>{
   const config=await loadExperimentConfigShape(fileURLToPath(new URL('../config/experiment.azure-live.json',import.meta.url)));
   const expected=config.routes.find(route=>route.deployment==='azure_functions_flex'&&route.profile==='P1').principalObjectId;

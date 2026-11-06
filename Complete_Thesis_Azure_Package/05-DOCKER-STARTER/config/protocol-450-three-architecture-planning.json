@@ -1,0 +1,14 @@
+{
+  "status": "planning_not_validated",
+  "revision": "original-three-architecture-450-planning",
+  "matrixFile": "03-PLANNED-TRIAL-MATRIX-450.csv",
+  "matrixSha256": "39bb833e0a3af2c7bcbd9c7460119cbac97c324cf07bda4ebcc3b10cfd532298",
+  "deployments": ["azure_vm", "azure_functions_flex", "azure_custom_sessions_hyperv"],
+  "profiles": ["P1", "P2", "P3"],
+  "scenarios": ["U1", "U2", "U3", "U4", "U5", "U6", "U7", "U8", "L1", "L2"],
+  "blocks": 5,
+  "expectedTrials": 450,
+  "measuredExecutionEnabled": false,
+  "sessionArchitectureStatus": "implementation_and_egress_unverified",
+  "note": "Planning only. U6 and U8 currently require sessions; the existing scope checker marks them not applicable for VM and Functions. A validated third architecture, network evidence, protocol decisions and readiness checks are required before execution."
+}

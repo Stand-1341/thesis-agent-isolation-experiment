@@ -8,6 +8,17 @@ import {validateExperimentConfig,resolveCredentials,loadExperimentConfig,EXPERIM
 
 const guid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 
+test('session routes require explicit selection and distinct profile pools',async()=>{
+  const raw=JSON.parse(await readFile(new URL('../config/experiment.450-three-architecture.example.json',import.meta.url),'utf8'));
+  const requiredRoutes=[...EXPERIMENT_ROUTES,...['P1','P2','P3'].map(p=>`azure_custom_sessions_hyperv:${p}`)];
+  assert.throws(()=>validateExperimentConfig(raw),/revision-3 routes/);
+  const parsed=validateExperimentConfig(raw,{requiredRoutes});
+  assert.equal(parsed.routes.length,9);
+  assert.equal(parsed.deployments.azure_custom_sessions_hyperv.profilePools.P2.poolName,'thesispoolp2');
+  raw.deployments.azure_custom_sessions_hyperv.profilePools.P2={...raw.deployments.azure_custom_sessions_hyperv.profilePools.P1};
+  assert.throws(()=>validateExperimentConfig(raw,{requiredRoutes}),/distinct pool endpoints/);
+});
+
 function baseConfig(){
   const routes=[];
   let n=1;
