@@ -153,16 +153,35 @@ per-arm non-counted fixture pilot proving `session-a`, `session-b` and `prior-se
 seed/read behaviour plus cross-namespace denial. These rows are scheduled, not
 not-applicable; they will not silently disappear.
 
-### 5.3 The "microVM" arm is a vendor-attested black box
+### 5.3 The "microVM" arm is vendor-attested, not mechanism-documented
 
 RQ2 asks how effectively VMs, serverless and microVM environments contain the same
-behaviour. Microsoft does not name the isolation mechanism behind ACA Sandboxes in
-Microsoft Learn. The architecture document states this plainly and forbids framing the
-result as a Firecracker comparison.
+behaviour. The vendor does describe the class of isolation, in two places at different
+levels of specificity:
 
-Consequence: the third arm can be measured as a black-box behaviour, but no mechanism
-claim can be defended from it. A reviewer will ask what the sandbox actually is, and
-the honest answer is that the documentation does not say.
+- **ACA Sandboxes product documentation** (`sandboxes.azure.com/docs/sandboxes/`) —
+  "Isolated microVMs, on demand", and "Strong isolation. Each sandbox runs in its own
+  secure boundary with its own kernel. Safe for untrusted code."
+- **Microsoft Learn** (`container-apps/sandboxes-overview`, updated 2026-10-16) —
+  "Strong isolation: Each sandbox runs in its own secure boundary, safe for untrusted
+  code execution." No microVM term, no kernel statement.
+
+So microVM-class isolation with a separate kernel per sandbox is a supportable vendor
+claim, sourced from the product documentation rather than from Microsoft Learn.
+
+What is still absent: **no document names a hypervisor or VMM**. There is no Firecracker
+comparison to make, and the architecture document's prohibition on framing the result
+that way still stands. Consequence for the write-up: the third arm may be described as
+a vendor-attested microVM-class boundary with its own kernel, and must not be described
+in terms of a specific mechanism. Say which document says what, because the two sources
+do not say the same thing.
+
+Related risk: the sandbox client in this repository targets data-plane API
+`2026-02-01-preview` against `https://management.{region}.azuredevcompute.io`. The
+endpoint pattern matches the documented architecture, but the product documentation now
+reads as generally available, so the preview API version may be stale. Verify the
+current data-plane API version before relying on it — this has never been exercised
+against the live service.
 
 ### 5.4 No Azure lane has ever executed
 
@@ -230,7 +249,36 @@ what any local test says.
 
 ---
 
-## 8. Summary
+## 8. The cheapest path to a first real observation
+
+Phase 1 says "create a registry, build an image, pin digests". That is the right sequence
+for the full study and it is **not** required to get one real observation. Two documented
+facts remove it from the critical path:
+
+1. Sandboxes can be created from **public prebuilt disk images**. The documented Python
+   quickstart creates a sandbox with `begin_create_sandbox(disk="ubuntu")` — no registry,
+   no build, no digest.
+2. Data-plane access is granted by one built-in role, *Container Apps SandboxGroup Data
+   Owner* (`c24cf47c-5077-412d-a19c-45202126392c`), assigned at sandbox-group scope.
+
+So the smallest real unit of this study is: one resource group, one sandbox group, one
+role assignment, one sandbox from the public image, one `exec`, one egress-decision read,
+one delete. That exercises the sandbox arm end to end — arm creation, command execution,
+egress telemetry, teardown readback — for the cost of a sandbox that exists for seconds
+at the XS or S tier.
+
+What that single run would settle, honestly: whether the preview data-plane API version
+still works, whether the endpoint pattern resolves in the chosen region, whether the
+egress-decision surface returns anything attributable, and whether the role assignment
+propagates. What it would not settle: anything about the VM or Jobs arms, any measured
+row, or any containment claim.
+
+Do this before creating a registry. It is the cheapest way to discover that the preview
+API has moved.
+
+---
+
+## 9. Summary
 
 Buildable by anyone with the credentials:
 
@@ -250,7 +298,7 @@ Cannot be fixed by deploying anything:
 
 - the 10 unsupported Jobs P3 rows
 - the 90 U6/U8 rows awaiting fixture proof
-- the undocumented nature of the sandbox isolation mechanism
+- the unnamed hypervisor behind the sandbox isolation boundary
 - the fact that no arm has ever executed
 
 The repository is deploy-shaped. It is not deploy-ready, and deploying it would not
