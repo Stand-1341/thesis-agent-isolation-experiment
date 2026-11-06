@@ -273,8 +273,41 @@ egress-decision surface returns anything attributable, and whether the role assi
 propagates. What it would not settle: anything about the VM or Jobs arms, any measured
 row, or any containment claim.
 
+This is implemented as `scripts/sandbox-first-light.mjs` (`npm run sandbox:first-light`).
+It refuses to run without `--execute`, creates one sandbox, runs one command, reads egress
+decisions, deletes the sandbox and confirms absence, then emits a `sandbox_first_light_v1`
+record. It exits `0` only when the whole chain ran **and** at least one attributable egress
+decision came back; `2` for a chain that completed without attributing evidence; `3` for a
+failed later step; `4` for identity or transport failure; `5` for usage.
+
 Do this before creating a registry. It is the cheapest way to discover that the preview
 API has moved.
+
+### 8.1 Observability is opt-in, and the current design can silently have none
+
+The platform exports telemetry only when a sandbox is created with a `telemetryConfig`
+attaching at least one endpoint. The documentation is explicit: *"If you omit
+`telemetryConfig`, no telemetry is exported."* `NetworkEgressDecisions` — the record that
+makes a P3 denial claim possible — is one of the categories that must be named in an
+endpoint's `data` array.
+
+Two consequences that the study design has to absorb:
+
+1. **Export and enforcement are independent.** Whether decisions are *exported* is
+   controlled only by the `data` array; whether denied requests are *blocked* is
+   controlled by the egress policy's enforcement mode. A run can enforce denials and
+   export nothing, or export every decision while enforcing nothing. Neither setting
+   implies the other, so both must be recorded separately.
+2. **A zero decision count is a missing sensor, not clean egress.** If
+   `NetworkEgressDecisions` was not configured, or was configured but nothing propagated,
+   the correct reading is *unobserved*. Treating an empty result as evidence of
+   containment would be the exact error the rest of this design works to avoid.
+
+`scripts/sandbox-first-light.mjs` encodes both rules. It records whether telemetry was
+declared, how many decisions came back, and classifies observability as `observed`,
+`partial` or `unobserved` accordingly. The record also carries the data-plane audience
+(`https://dynamicsessions.io/.default`) so an audience mismatch appears as a diagnosable
+401 rather than a mystery.
 
 ---
 

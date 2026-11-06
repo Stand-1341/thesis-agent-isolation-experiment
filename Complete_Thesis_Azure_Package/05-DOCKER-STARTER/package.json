@@ -17,7 +17,8 @@
     "check:deploy": "node scripts/run-experiment-cli.mjs --config config/experiment.example.json --dry-run",
     "smoke:live": "node scripts/live-deployment-smoke.mjs",
     "run:aci-p1-pilot": "node scripts/run-aci-p1-pilot.mjs",
-    "azure:inventory": "node scripts/azure-inventory.mjs"
+    "azure:inventory": "node scripts/azure-inventory.mjs",
+    "sandbox:first-light": "node scripts/sandbox-first-light.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
