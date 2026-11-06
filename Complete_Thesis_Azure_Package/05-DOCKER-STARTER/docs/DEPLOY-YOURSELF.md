@@ -37,6 +37,122 @@ and Path B depends on facts Path A establishes.
 
 ---
 
+## 0.5 If the subscription is brand new
+
+A fresh subscription is a different obstacle course from an established one. Four things
+behave differently, and three of them fail in ways that look like a broken template.
+
+**`centralus` is supported — but nothing in this repository points at it.** ACA Sandboxes is
+available in 40 regions including `centralus`, `eastus`, `eastus2`, `westus2` and `westus3`.
+It is **not** in Azure Government, Azure China, or Azure Germany. A sandbox group is bound to
+one region and snapshots do not move between regions.
+
+Every shipped example is pinned to Eastern US, so if you are deploying to `centralus` you
+must change these yourself. They are not merely cosmetic:
+
+| File | Current | What to do |
+| --- | --- | --- |
+| `infra/azure-supported-three-arm.parameters.example.json` | `"location": "eastus"` | Set to `centralus` in **your** parameter copy |
+| `config/experiment.azure-three-arm.example.json` | `deployments.azure_container_apps_sandboxes.region: "eastus2"` | Set to `centralus` to match where the sandbox groups actually are |
+| `config/experiment.450-three-architecture.example.json` | three `region: "eastus"` entries | Only if you use this superseded config |
+| `infra/controller-vm-pilot.parameters.example.json` | `"location": "eastus"` | Only if you use the controller-only template |
+
+The config validator checks that a deployment region is a well-formed region slug. It does
+**not** check that it matches reality, so a stale `eastus2` will pass validation and then
+send data-plane calls to a region where you have no sandbox group. That surfaces as a 404
+or a confusing 401, not as a config error.
+
+**Do not deploy `infra/vm-p3-centralus-pilot.bicep` on a new account.** Despite the name, it
+is a Central US *spoke* that routes all hub, research and internet traffic through an
+**existing East US Azure Firewall** — its defaults name `vnet-thesis-pilot-eus` and
+`thesis-p3-fw`. Those belong to a different subscription. On a clean account it will fail on
+missing resources, and it is deliberately excluded from the three-arm composition.
+
+**Every resource provider will read `NotRegistered`.** That is normal for a new
+subscription and it is not a fault. Most providers register automatically on first
+deployment, but check before blaming the template:
+
+```sh
+AZURE_DEVICE_CODE_AUTH=1 AZURE_SUBSCRIPTION_ID=<guid> AZURE_REGION=<region> npm run azure:inventory
+```
+
+Look at `providerRegistration`. The inventory deliberately does **not** auto-register
+anything — it is a read-only tool. If `Microsoft.App` is still `NotRegistered` after a
+deployment attempt, that is your first error, and it is not the Bicep's fault.
+
+**Pay-as-you-go defaults are lower than enterprise, and quota is only one of three gates.**
+Azure publishes no single guaranteed default, but a new pay-as-you-go subscription commonly
+lands in the 10–20 vCPU per region range rather than the ~350 that Enterprise Agreement
+subscriptions default to. Two tiers apply independently: total regional vCPUs, and vCPUs
+per VM family.
+
+Your three-arm plan is small — `Standard_F1as_v7` is 1 vCPU, so a controller plus a P3
+target is 2 — which fits comfortably inside a fresh PAYG allocation. The risk is not the
+CPU count, it is the other two gates:
+
+Azure evaluates three separate things and **all three** must pass: quota (your permission to
+request), capacity (hardware actually present in that region and zone), and SKU restriction
+(your offer type may not be allowed that VM family *at all*, even with quota free).
+
+This is why `vmVmSize` in the parameter file (`Standard_F1as_v7`) is a genuine risk on a
+new account even if the region is healthy. If the VM arm fails to deploy with a SKU or
+offer error, that is not a template bug — pick an available size. Check what your
+subscription can actually see before editing the parameter file:
+
+```sh
+az vm list-skus --location centralus --resource-type virtualMachines \
+  --query "[?name=='Standard_F1as_v7'].{name:name, restrictions:restrictions}" -o json
+```
+
+An empty `restrictions` array means the offer type allows it; any entries mean it is blocked
+for reasons that have nothing to do with quota.
+
+**Sandbox quota is 300 concurrent active cores per region per subscription** by default,
+plus 100,000 sandboxes per group and an API rate limit of 3,000 requests per minute. Your
+study does not approach this (an M sandbox is 1 core, so 300 concurrent sandboxes before
+you hit the ceiling), but check rather than assume:
+
+```sh
+AZURE_DEVICE_CODE_AUTH=1 AZURE_SUBSCRIPTION_ID=<guid> AZURE_REGION=<region> npm run azure:inventory
+```
+
+The `Microsoft.App` regional usage in that output **is** the Sandbox Cores quota — it is
+the same endpoint the vendor documentation points you at
+(`/providers/Microsoft.App/locations/{region}/usages?api-version=2024-03-01`). One command
+covers it.
+
+### Reserved address ranges — read this before designing the network
+
+Two IPv4 ranges are reserved for sandbox internal networking:
+
+| Range | Addresses |
+| --- | --- |
+| `192.168.0.0/24` | `192.168.0.0` – `192.168.0.255` |
+| `100.65.0.0/23` | `100.65.0.0` – `100.65.1.255` |
+
+Anything sandboxes must reach through a VNet connection cannot live in those ranges —
+including private endpoints, private container registries, custom DNS servers, resources
+over peering, and on-premises connectivity.
+
+**This is the nastiest failure mode in the whole setup:** a VNet connection can provision
+successfully and requests to those addresses still fail. An egress allow rule does not
+remove the restriction.
+
+The example parameter plan uses `10.48.x.x`, which does not overlap, so it is safe as
+written. Do not "tidy" it toward `192.168.x.x`, and do not use `100.64.0.0/10` for anything.
+
+### If this is a free-trial offer
+
+Some services and SKUs cannot be deployed at all on trial offers, independent of quota.
+And the cost model punishes leaving things up: `deployP3Firewall` brings Azure Firewall
+plus two public IPs plus policy plus route tables, billed hourly for as long as it exists.
+On trial credit that is a fast way to spend the whole balance on an idle network appliance.
+
+Start with Path A. It costs cents and it tells you whether the sandbox surface works on
+this account before you commit a credit balance to it.
+
+---
+
 ## 1. Learn your own subscription (free, read-only)
 
 Do this first. It tells you which region has capacity, what is already deployed, and
@@ -67,7 +183,25 @@ study needs and cannot invent.
 
 ### 2a. Create the resource group and sandbox group
 
-**Fastest — portal.** Open [sandboxes.azure.com/sandbox-groups](https://sandboxes.azure.com/sandbox-groups),
+**Fastest, and the one that verifies itself — the `aca` CLI.** It runs on top of `az login`
+and `sandboxgroup create` attempts to grant your signed-in user the Data Owner role for you.
+
+```sh
+curl -fsSL https://aka.ms/aca-cli-install | sh
+az login
+SUB=$(az account show --query id -o tsv)
+az group create --name <your-rg> --location <region>
+aca sandboxgroup create -g <your-rg> --name <your-sandbox-group> \
+  --location <region> -s "$SUB" --set-config
+aca doctor
+```
+
+`aca doctor` is the cheapest possible pre-flight: it tells you whether data-plane access
+actually resolves before you spend anything. **Run it before step 2c.** If it reports
+missing access, the role assignment has not propagated — or `sandboxgroup create` could
+not grant it, in which case do it manually (below).
+
+**Or portal.** Open [sandboxes.azure.com/sandbox-groups](https://sandboxes.azure.com/sandbox-groups),
 select **Create**, choose your subscription, a resource group, a name, and a region.
 Copy the name you chose; you need it in step 2c.
 
