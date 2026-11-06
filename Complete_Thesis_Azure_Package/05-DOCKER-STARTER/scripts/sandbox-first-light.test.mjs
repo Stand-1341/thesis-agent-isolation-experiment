@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {mkdtemp, readFile, stat} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 
 import {
   buildSandboxBody, main, parseArgs, runFirstLight, summarizeObservation, TELEMETRY_CATEGORIES
@@ -173,4 +176,27 @@ test('main reports missing inputs by name', async () => {
   assert.match(err, /AZURE_SUBSCRIPTION_ID/);
   assert.match(err, /--resource-group/);
   assert.match(err, /--sandbox-group/);
+});
+
+test('--out writes the record owner-only and still prints it when the chain fails', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'first-light-'));
+  const outPath = join(dir, 'first-light.json');
+  let out = '';
+  const code = await main({
+    argv: ['--execute', '--resource-group', 'rg-a', '--sandbox-group', 'grp-a', '--out', outPath],
+    env: {AZURE_SUBSCRIPTION_ID: SUBSCRIPTION, AZURE_REGION: 'eastus'},
+    getToken: async () => 'synthetic-token',
+    // A throwing transport keeps this offline: the chain is attempted and fails at create.
+    fetchImpl: async () => { throw new Error('offline'); },
+    stdout: {write: t => { out += t; }}, stderr: {write: () => {}}
+  });
+  assert.equal(code, 4);
+  const written = JSON.parse(await readFile(outPath, 'utf8'));
+  assert.equal(written.schema, 'sandbox_first_light_v1');
+  assert.equal(written.chain.confirmed, false);
+  assert.equal(written.failure.stage, 'create');
+  // The same record is printed, so --out cannot hide a result.
+  assert.deepEqual(JSON.parse(out), written);
+  const mode = (await stat(outPath)).mode & 0o777;
+  assert.equal(mode, 0o600, 'observation records are written owner-only');
 });

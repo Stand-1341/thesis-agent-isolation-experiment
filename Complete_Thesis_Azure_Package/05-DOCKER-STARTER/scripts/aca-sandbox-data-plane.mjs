@@ -1,5 +1,21 @@
+/**
+ * Verified against the official Azure Container Apps Sandbox SDK for Python
+ * (`azure-containerapps-sandbox` 0.1.0b4, `_helpers.py`).
+ *
+ * The audience is the Dynamic Sessions one even though the API surface is the Sandboxes
+ * data plane at `management.{region}.azuredevcompute.io`. That looks wrong and is not:
+ * the vendor SDK hardcodes the same three values, so they are a contract, not a bug.
+ * `scripts/sandbox-data-plane-contract.test.mjs` fails if any of them drift.
+ */
 const DATA_PLANE_SCOPE = 'https://dynamicsessions.io/.default';
 const DEFAULT_API_VERSION = '2026-02-01-preview';
+const DATA_PLANE_BASE = 'https://management.azuredevcompute.io';
+export const DATA_PLANE_CONTRACT = Object.freeze({
+  scope: DATA_PLANE_SCOPE,
+  apiVersion: DEFAULT_API_VERSION,
+  base: DATA_PLANE_BASE,
+  verifiedAgainst: 'azure-containerapps-sandbox 0.1.0b4'
+});
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SEGMENT_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$/;
 const REGION_PATTERN = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;

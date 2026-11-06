@@ -176,12 +176,23 @@ a vendor-attested microVM-class boundary with its own kernel, and must not be de
 in terms of a specific mechanism. Say which document says what, because the two sources
 do not say the same thing.
 
-Related risk: the sandbox client in this repository targets data-plane API
-`2026-02-01-preview` against `https://management.{region}.azuredevcompute.io`. The
-endpoint pattern matches the documented architecture, but the product documentation now
-reads as generally available, so the preview API version may be stale. Verify the
-current data-plane API version before relying on it — this has never been exercised
-against the live service.
+Data-plane constants **verified, not assumed**. The official SDK
+(`azure-containerapps-sandbox` 0.1.0b4, `_helpers.py`) hardcodes:
+
+```
+DATA_PLANE_SCOPE       = "https://dynamicsessions.io/.default"
+DATA_PLANE_BASE        = "https://management.azuredevcompute.io"
+DATA_PLANE_API_VERSION = "2026-02-01-preview"
+endpoint_for_region()  -> "https://management.{region}.azuredevcompute.io"
+```
+
+This repository uses the same three values. Two things that look like bugs and are not:
+the audience is the Dynamic Sessions one, and the API version is still a preview string
+even though the product is generally available. `scripts/sandbox-data-plane-contract.test.mjs`
+pins all three so a future edit cannot quietly "correct" them into a 401.
+
+What is still unproven is whether a live call succeeds — no request has ever been made.
+The contract test proves the values match the vendor SDK, which is a different claim.
 
 ### 5.4 No Azure lane has ever executed
 

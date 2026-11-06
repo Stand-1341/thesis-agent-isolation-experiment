@@ -18,16 +18,19 @@
  *   5  usage error
  */
 
-import {readFile} from 'node:fs/promises';
+import {readFile, writeFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {createAcaSandboxDataPlaneClient} from './aca-sandbox-data-plane.mjs';
 import {createAzureRestTokenProvider} from './azure-inventory.mjs';
 
 /**
- * Audience the shared sandbox client requests. Recorded in the observation because the
- * client's audience is the Dynamic Sessions one and the Sandboxes data plane is a
- * separate GA surface — an audience mismatch would surface as a 401, and having the
- * value in the record makes that diagnosable instead of mysterious.
+ * Audience the shared sandbox client requests, recorded in the observation so the value
+ * that produced any 401 is visible.
+ *
+ * Verified against `azure-containerapps-sandbox` 0.1.0b4 (`_helpers.py`), which hardcodes
+ * the same scope: the Sandboxes data plane is authenticated with the Dynamic Sessions
+ * audience. It reads like a mistake and is not one. Do not "correct" it without checking
+ * the vendor SDK first.
  */
 export const SANDBOX_DATA_PLANE_SCOPE = 'https://dynamicsessions.io/.default';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -344,6 +347,13 @@ export async function main({
   });
 
   const json = `${JSON.stringify(record)}\n`;
+  if (options.outPath) {
+    try {
+      await writeFile(options.outPath, json, {encoding: 'utf8', mode: 0o600});
+    } catch (error) {
+      stderr.write(`could not write --out ${options.outPath}\n`);
+    }
+  }
   stdout.write(json);
   return exitCode;
 }
