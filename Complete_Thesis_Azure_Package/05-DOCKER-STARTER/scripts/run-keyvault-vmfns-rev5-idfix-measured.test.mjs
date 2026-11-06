@@ -27,11 +27,15 @@ test('Rev5 IDFIX protocol and freeze lock pin the corrected 400-row schedule',as
   const env=Object.fromEntries(ASSERTIONS.map(name=>[name,'true']));
   const readiness=validateMeasuredRev5IdfixReadiness({protocol,protocolBytes,matrixBytes,freezeLock,env});
   assert.equal(readiness.matrixSha256,'2bd601c4de01900c318857901b36578b62fff95385f33f2e34a2c05b78a4bee5');
-  assert.equal(readiness.protocolSha256,createHash('sha256').update(protocolBytes).digest('hex'));
+  const protocolDigest=createHash('sha256').update(protocolBytes,'utf8').digest('hex');
+  assert.equal(protocolBytes.includes('\r'),false);
+  assert.equal(freezeLock.protocolSha256,protocolDigest);
+  assert.equal(readiness.protocolSha256,protocolDigest);
   assert.equal(protocol.revision,'azure-proposed-v1-rev5-vm-functions-idfix');
   assert.equal(protocol.matrix.file,'03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-EXECUTABLE-NO-ACI-DRAFT-V4-IDFIX.csv');
   assert.throws(()=>validateMeasuredRev5IdfixReadiness({protocol,protocolBytes,matrixBytes,
     freezeLock:{...freezeLock,protocolSha256:'0'.repeat(64)},env}),/freeze lock/);
+  assert.throws(()=>validateMeasuredRev5IdfixReadiness({protocol,protocolBytes:`${protocolBytes} `,matrixBytes,freezeLock,env}),/freeze lock/);
   const wrongBytes=Buffer.from(matrixBytes); wrongBytes[0]^=1;
   assert.throws(()=>validateMeasuredRev5IdfixReadiness({protocol,protocolBytes,matrixBytes:wrongBytes,freezeLock,env}),/matrix digest/);
   assert.throws(()=>validateMeasuredRev5IdfixReadiness({protocol,protocolBytes,matrixBytes,freezeLock,env:{}}),/verifier assertions/);
@@ -79,5 +83,14 @@ test('Rev5 IDFIX refuses before Key Vault access unless every verifier assertion
   await assert.rejects(runMeasuredRev5Idfix({env:{},fetchImpl:async()=>{fetchCalls++;throw new Error('unexpected network');},
     spawnImpl:()=>{spawnCalls++;throw new Error('unexpected child');}}),/verifier assertions are absent/);
   assert.equal(fetchCalls,0);
+  assert.equal(spawnCalls,0);
+});
+
+test('Rev5 IDFIX reaches credential preflight after validating the clean-checkout lock',async()=>{
+  const env=Object.fromEntries(ASSERTIONS.map(name=>[name,'true']));
+  let fetchCalls=0,spawnCalls=0;
+  await assert.rejects(runMeasuredRev5Idfix({env,fetchImpl:async()=>{fetchCalls++;throw new Error('offline test stub');},
+    spawnImpl:()=>{spawnCalls++;throw new Error('unexpected child');}}),/managed identity token request failed/);
+  assert.equal(fetchCalls,1);
   assert.equal(spawnCalls,0);
 });

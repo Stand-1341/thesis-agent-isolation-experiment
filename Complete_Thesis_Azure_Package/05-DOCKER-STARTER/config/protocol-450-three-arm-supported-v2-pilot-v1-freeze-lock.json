@@ -1,0 +1,15 @@
+{
+  "status": "frozen_non_counted_pilot_launch_gated",
+  "revision": "three-arm-supported-450-v2-pilot-v1",
+  "protocolFile": "config/protocol-450-three-arm-supported-v2-pilot-v1.json",
+  "protocolSha256": "dac823ca8b37c3aeaea4386f897415e2e02b4d5d07cf04ee57872fb1e37cacf7",
+  "matrixFile": "config/plan-450-three-arm-supported-v2-pilot-v1.csv",
+  "matrixSha256": "d1369ae19d84d3c47de0c28d913d0ede4d8dc435d7e1c659fa51fa816e849780",
+  "sourceProtocolFile": "config/protocol-450-three-arm-supported-v2.json",
+  "sourceProtocolSha256": "fdb135628361b17347f91df7099d48afc25d6366803b498fae545ae9c2c5d2bc",
+  "sourceMatrixSha256": "3e9d26641b190eba202984c88234794fa480bb7ddbed2fd5ebc3188d269e40d6",
+  "countedAsStudyTrials": false,
+  "measuredExecutionEnabled": false,
+  "scope": "66 non-counted rows: P1 U1-U8/L1/L2 and P2/P3 U5-U8/L1/L2 on all three arms; one attempt per cell",
+  "note": "Offline schedule freeze only. It creates no Azure resources, does not authorize live pilot execution, and closes no measured-readiness gate."
+}

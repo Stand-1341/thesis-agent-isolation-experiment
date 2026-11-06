@@ -1,5 +1,5 @@
 /** Candidate HTTP adapter for the research fixtures. Not validated for cloud use. */
-import {createHash} from 'node:crypto';
+import {requestIdForScenario} from '../dist/request-id.js';
 function baseUrl(value) {
   const url = new URL(value);
   if (url.username || url.password || url.search || url.hash || !['https:', 'http:'].includes(url.protocol)) throw new Error('invalid endpoint');
@@ -7,9 +7,12 @@ function baseUrl(value) {
   return url.href.replace(/\/$/, '');
 }
 
-export function createHttpPilotAdapter({resourceUrl, collectorUrl, agentUrl, resourceAdminToken, collectorAdminToken, controllerToken, functionKey, timeoutMs=15000, readinessTimeoutMs=30000, readinessPollMs=500}) {
-  const resource=baseUrl(resourceUrl), collector=baseUrl(collectorUrl), agent=baseUrl(agentUrl);
-  if (![resourceAdminToken,collectorAdminToken,controllerToken].every(x => typeof x === 'string' && x.length > 0)) throw new Error('missing credentials');
+export function createHttpPilotAdapter({resourceUrl,collectorUrl,restrictedUrl,agentUrl,resourceAdminToken,collectorAdminToken,controllerToken,functionKey,timeoutMs=15000,readinessTimeoutMs=30000,readinessPollMs=500}) {
+  const fixtureServiceOnly=agentUrl===undefined && controllerToken===undefined;
+  if ((agentUrl===undefined)!==(controllerToken===undefined)) throw new Error('agentUrl and controllerToken must be supplied together');
+  const resource=baseUrl(resourceUrl), collector=baseUrl(collectorUrl), agent=fixtureServiceOnly?undefined:baseUrl(agentUrl),
+    restricted=restrictedUrl===undefined?undefined:baseUrl(restrictedUrl);
+  if (![resourceAdminToken,collectorAdminToken,...(fixtureServiceOnly?[]:[controllerToken])].every(x => typeof x === 'string' && x.length > 0)) throw new Error('missing credentials');
   if (functionKey!==undefined && (typeof functionKey!=='string' || !functionKey || /[\r\n]/.test(functionKey))) throw new Error('invalid function key');
   if (!Number.isInteger(timeoutMs) || timeoutMs<1 || timeoutMs>60000) throw new Error('invalid timeout');
   if (!Number.isInteger(readinessTimeoutMs) || readinessTimeoutMs<1 || readinessTimeoutMs>60000 || !Number.isInteger(readinessPollMs) || readinessPollMs<1 || readinessPollMs>5000) throw new Error('invalid readiness timing');
@@ -43,7 +46,7 @@ export function createHttpPilotAdapter({resourceUrl, collectorUrl, agentUrl, res
     async reset(trial) {
       // Readiness retries are limited to unauthenticated GETs. Never retry the
       // non-idempotent reset requests after they have been sent.
-      await Promise.all([waitForHealth(resource),waitForHealth(collector)]);
+      await Promise.all([waitForHealth(resource),waitForHealth(collector),...(restricted?[waitForHealth(restricted)]:[])]);
       const fixture=await call(`${resource}/admin/reset`,{method:'POST',token:resourceAdminToken,header:'x-admin-token',body:{runId:trial.runId}});
       try {
         await call(`${collector}/admin/reset`,{method:'POST',token:collectorAdminToken,header:'x-admin-token',body:{runId:trial.runId}});
@@ -59,9 +62,10 @@ export function createHttpPilotAdapter({resourceUrl, collectorUrl, agentUrl, res
       return fixture;
     },
     async execute(trial, fixture) {
-      const requestId=trial.scenario==='U5'?`u5-${createHash('sha256').update(trial.runId).digest('hex')}`:undefined;
+      if(fixtureServiceOnly) throw new Error('fixture-service-only adapter cannot execute without an agent endpoint');
+      const requestId=requestIdForScenario(trial.runId,trial.scenario);
       return call(`${agent}/run`,{method:'POST',token:controllerToken,header:'x-trial-key',agentRequest:true,body:{runId:trial.runId,scenario:trial.scenario,
-        ...(trial.scenario==='U5'?{u5Marker:fixture.u5Marker,requestId}:{})}});
+        ...(trial.scenario==='U5'?{u5Marker:fixture.u5Marker}:{}),...(requestId?{requestId}:{})}});
     },
     async collect(trial) {
       const id=encodeURIComponent(trial.runId);

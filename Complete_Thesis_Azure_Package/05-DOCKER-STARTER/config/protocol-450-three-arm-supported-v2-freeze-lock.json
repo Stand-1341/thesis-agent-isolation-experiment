@@ -1,0 +1,11 @@
+{
+  "status": "frozen_structural_launch_gated",
+  "protocolFile": "config/protocol-450-three-arm-supported-v2.json",
+  "protocolSha256": "fdb135628361b17347f91df7099d48afc25d6366803b498fae545ae9c2c5d2bc",
+  "matrixFile": "config/plan-450-three-arm-supported-v2.csv",
+  "matrixSha256": "3e9d26641b190eba202984c88234794fa480bb7ddbed2fd5ebc3188d269e40d6",
+  "evidence": "docs/AZURE-SUPPORTED-THREE-ARM-ARCHITECTURE.md",
+  "scope": "owner-directed additive three-arm structural freeze scheduling all ten thesis scenarios (azure_vm, azure_container_apps_jobs, azure_container_apps_sandboxes; 3 x 3 x 10 x 5 = 450 rows); U6/U8 scheduled on every arm and gated on per-arm azure_blob_external_namespace declaration plus non-counted fixture validation; no institutional approval claimed",
+  "measuredExecutionEnabled": false,
+  "note": "Exact-byte digests are declared over the bytes on disk. Structural freeze only: live identity, per-arm non-counted pilots (including the session-namespace fixture validation), no-op network baseline, quota/capacity, verifier wiring and the owner's measured freeze all remain open gates. Existing freeze locks and their artifacts — including the 360-v1 three-arm revision and the legacy 450 planning artifact — are untouched and remain byte-identical."
+}

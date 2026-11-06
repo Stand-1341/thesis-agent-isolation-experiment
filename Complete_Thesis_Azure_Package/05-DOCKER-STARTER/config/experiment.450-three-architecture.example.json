@@ -5,6 +5,7 @@
   "deployments": {
     "azure_vm": {
       "kind": "http",
+      "sessionDataStore": "azure_blob_external_namespace",
       "agentUrl": "https://REPLACE-VM.REPLACE-REGION.cloudapp.azure.com",
       "resourceUrl": "https://REPLACE-RESOURCE.REPLACE-REGION.cloudapp.azure.com",
       "collectorUrl": "https://REPLACE-COLLECTOR.REPLACE-REGION.cloudapp.azure.com",
@@ -12,6 +13,7 @@
     },
     "azure_functions_flex": {
       "kind": "http",
+      "sessionDataStore": "azure_blob_external_namespace",
       "resourceUrl": "https://REPLACE-RESOURCE.REPLACE-REGION.cloudapp.azure.com",
       "collectorUrl": "https://REPLACE-COLLECTOR.REPLACE-REGION.cloudapp.azure.com",
       "timeoutMs": 30000

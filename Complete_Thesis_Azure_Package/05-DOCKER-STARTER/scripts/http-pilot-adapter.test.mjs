@@ -76,3 +76,78 @@ test('reports partial reset when collector reset fails after resource reset',asy
     assert.equal(seen.filter(path=>path==='/collector/admin/reset').length,1);
   } finally {server.closeAllConnections();server.close();await once(server,'close');}
 });
+
+test('controller adapter sends deterministic request IDs for every Blob-correlated operation',async()=>{
+  const executions=[];
+  const server=createServer((req,res)=>{
+    let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>{
+      res.setHeader('content-type','application/json');
+      if(req.url.endsWith('/health')) return res.end('{"ready":true}');
+      if(req.url==='/resource/admin/reset') return res.end('{"u5Marker":"SYNTHETIC-correlation"}');
+      if(req.url==='/collector/admin/reset') return res.end('{"ok":true}');
+      if(req.url==='/agent/run') {executions.push(JSON.parse(body));return res.end('{"ok":true}');}
+      res.statusCode=404;res.end('{}');
+    });
+  }).listen(0,'127.0.0.1');
+  await once(server,'listening');
+  try {
+    const origin=`http://127.0.0.1:${server.address().port}`;
+    const adapter=createHttpPilotAdapter({resourceUrl:`${origin}/resource`,collectorUrl:`${origin}/collector`,agentUrl:`${origin}/agent`,
+      resourceAdminToken:'r',collectorAdminToken:'c',controllerToken:'t'});
+    const trial={runId:'correlation-run-01'};
+    const fixture=await adapter.reset(trial);
+    for(const scenario of ['U1','U5','U6','U8']) await adapter.execute({...trial,scenario},fixture);
+    assert.equal(executions.length,4);
+    for(const [index,scenario] of ['U1','U5','U6','U8'].entries()) {
+      assert.match(executions[index].requestId,new RegExp(`^${scenario.toLowerCase()}-[a-f0-9]{64}$`));
+      assert.equal(executions[index].runId,trial.runId);
+      assert.equal(executions[index].scenario,scenario);
+      assert.equal(executions[index].u5Marker,scenario==='U5'?'SYNTHETIC-correlation':undefined);
+    }
+  } finally {server.closeAllConnections();server.close();await once(server,'close');}
+});
+
+test('restricted-service readiness is probed independently of collector readiness',async()=>{
+  const requests=[];
+  const server=createServer((req,res)=>{
+    requests.push(req.url);
+    res.setHeader('content-type','application/json');
+    res.end(req.url.endsWith('/health')?'{"ready":true}':req.url.endsWith('/admin/reset')?'{"u5Marker":"SYNTHETIC-test"}':'{}');
+  }).listen(0,'127.0.0.1');
+  await once(server,'listening');
+  try {
+    const origin=`http://127.0.0.1:${server.address().port}`;
+    const adapter=createHttpPilotAdapter({resourceUrl:`${origin}/resource`,collectorUrl:`${origin}/collector`,
+      restrictedUrl:`${origin}/restricted-service`,agentUrl:`${origin}/agent`,resourceAdminToken:'r',collectorAdminToken:'c',controllerToken:'t'});
+    await adapter.reset({runId:'restricted-target-readiness'});
+    const healthPaths=requests.filter(path=>path.endsWith('/health')).sort();
+    assert.deepEqual(healthPaths,['/collector/health','/resource/health','/restricted-service/health']);
+  } finally {server.closeAllConnections();server.close();await once(server,'close');}
+});
+
+test('fixture-service-only mode resets and collects without an agent endpoint and rejects execute before network I/O',async()=>{
+  const requests=[];
+  const server=createServer((req,res)=>{
+    requests.push(req.url);
+    let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>{
+      res.setHeader('content-type','application/json');
+      if(req.url.endsWith('/health')) return res.end('{"ready":true}');
+      if(req.url==='/resource/admin/reset') return res.end('{"fixture":"reset"}');
+      res.end('{"evidence":true}');
+    });
+  }).listen(0,'127.0.0.1');
+  await once(server,'listening');
+  try {
+    const origin=`http://127.0.0.1:${server.address().port}`;
+    const adapter=createHttpPilotAdapter({resourceUrl:`${origin}/resource`,collectorUrl:`${origin}/collector`,
+      resourceAdminToken:'resource-admin',collectorAdminToken:'collector-admin'});
+    const trial={runId:'fixture-only-run',scenario:'U1'};
+    assert.deepEqual(await adapter.reset(trial),{fixture:'reset'});
+    assert.deepEqual(await adapter.collect(trial),{resource:{evidence:true},collector:{evidence:true}});
+    const beforeExecute=requests.length;
+    await assert.rejects(adapter.execute(trial,{}),/fixture-service-only|agent endpoint/i);
+    assert.equal(requests.length,beforeExecute);
+    assert.throws(()=>createHttpPilotAdapter({resourceUrl:`${origin}/resource`,collectorUrl:`${origin}/collector`,
+      resourceAdminToken:'r',collectorAdminToken:'c',agentUrl:`${origin}/agent`}),/agentUrl and controllerToken/i);
+  } finally {server.closeAllConnections();server.close();await once(server,'close');}
+});

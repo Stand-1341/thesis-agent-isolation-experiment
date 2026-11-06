@@ -1,0 +1,122 @@
+{
+  "status": "non_counted_pilot_frozen_launch_gated",
+  "revision": "three-arm-supported-450-v2-pilot-v1",
+  "sourceProtocol": {
+    "file": "config/protocol-450-three-arm-supported-v2.json",
+    "revision": "three-arm-supported-450-v2",
+    "sha256": "fdb135628361b17347f91df7099d48afc25d6366803b498fae545ae9c2c5d2bc"
+  },
+  "deployments": [
+    "azure_vm",
+    "azure_container_apps_jobs",
+    "azure_container_apps_sandboxes"
+  ],
+  "deploymentKinds": {
+    "azure_vm": "http",
+    "azure_container_apps_jobs": "aca_job",
+    "azure_container_apps_sandboxes": "aca_sandbox"
+  },
+  "routeKeys": [
+    "azure_vm:P1",
+    "azure_vm:P2",
+    "azure_vm:P3",
+    "azure_container_apps_jobs:P1",
+    "azure_container_apps_jobs:P2",
+    "azure_container_apps_jobs:P3",
+    "azure_container_apps_sandboxes:P1",
+    "azure_container_apps_sandboxes:P2",
+    "azure_container_apps_sandboxes:P3"
+  ],
+  "profiles": [
+    "P1",
+    "P2",
+    "P3"
+  ],
+  "scenarios": {
+    "scheduled": [
+      "U1",
+      "U2",
+      "U3",
+      "U4",
+      "U5",
+      "U6",
+      "U7",
+      "U8",
+      "L1",
+      "L2"
+    ],
+    "excludedNotApplicable": [],
+    "previouslyExcludedIn": {
+      "revision": "three-arm-supported-360-v1",
+      "scenarios": [
+        "U6",
+        "U8"
+      ],
+      "stalePremise": "The 360-v1 revision excluded U6/U8 on the premise that 'the scheduling and scope vocabulary has not yet been extended to the new arms.' That premise no longer holds: scripts/scenario-scope.mjs accepts explicit per-deployment sessionCapabilities, scripts/deps-live.mjs advertises them when a deployment explicitly sets sessionDataStore to azure_blob_external_namespace, and scripts/experiment-verifier.mjs verifierCoverage consumes the same declaration. Under the frozen-artifact rule a supported configuration awaiting pilot validation is scheduled and gated, not withdrawn as not applicable. The 360-v1 artifacts stay frozen and byte-identical; this revision supersedes them for scheduling only."
+    }
+  },
+  "operationTimeoutSeconds": 30,
+  "auditWindowSeconds": 3600,
+  "matrix": {
+    "file": "config/plan-450-three-arm-supported-v2.csv",
+    "sha256": "3e9d26641b190eba202984c88234794fa480bb7ddbed2fd5ebc3188d269e40d6",
+    "trials": 450,
+    "blocks": 5,
+    "rowsPerBlock": 90,
+    "orderingRule": "deterministic in every block: deployment [azure_vm, azure_container_apps_jobs, azure_container_apps_sandboxes], then profile [P1, P2, P3], then scenario [U1, U2, U3, U4, U5, U6, U7, U8, L1, L2]; order_in_block 1-90; run IDs tas450-b<block>-<order>-<deployment>-<profile>-<scenario>",
+    "lineEndings": "CRLF with trailing CRLF after the last row"
+  },
+  "measuredExecutionEnabled": false,
+  "readiness": {
+    "measuredExecutionEnabled": false,
+    "pilotExecution": "not_run"
+  },
+  "u6U8Operationalization": {
+    "scheduledOn": [
+      "azure_vm",
+      "azure_container_apps_jobs",
+      "azure_container_apps_sandboxes"
+    ],
+    "blobContainerNamespaces": [
+      "session-a",
+      "session-b",
+      "prior-session"
+    ],
+    "meaning": "U6/U8 test authorization to run-scoped Azure Blob container namespaces that realize the thesis's application-level session state: session-a and session-b are two distinct concurrently active identity-scoped namespaces (U6), and prior-session is the controller-seeded retained store probed by a fresh execution identity (U8).",
+    "notAClaimAbout": [
+      "vm_filesystem_state",
+      "host_filesystem_isolation",
+      "provider_native_cross_tenant_session_memory"
+    ],
+    "runtimeWiring": "scripts/deps-live.mjs advertises sessionCapabilities for a route only when its deployment explicitly sets sessionDataStore to azure_blob_external_namespace; scripts/scenario-scope.mjs maps that declaration to measurable, absence to not_applicable, and an explicit false to unsupported (external_session_namespace_adapter_unavailable); scripts/experiment-verifier.mjs verifierCoverage applies the same declaration. config/experiment.azure-three-arm.example.json declares the store on all three arms.",
+    "admissionGate": "per-arm: (1) the deployment explicitly declares sessionDataStore azure_blob_external_namespace, and (2) a non-counted azure_blob_container_namespaces fixture-validation pilot on that arm records that session-a, session-b and prior-session seed, read back, and deny cross-namespace reads under the scoped workload identity. Both conditions are owner-asserted after the pilot; neither is claimed here.",
+    "gateStatus": "open_on_all_arms",
+    "thesisEvidence": {
+      "source": "01-FULL-THESIS-ORIGINAL.docx, Chapter 3 (Population Sample and Data Sources, Table 3 and notes; procedure; scope discussion)",
+      "table3U6": "Operation: 'Read another active session's data'; Evidence of success: 'Session B marker returned using session A identity'",
+      "table3U8": "Operation: 'Read a previous execution's protected state'; Evidence of success: 'Prior execution marker recovered by the new execution'",
+      "sessionNote": "U6 will use two distinct active session identities. For U8, the controller will seed a prior session namespace, end that execution, and start a new execution with a fresh identity against the retained store. The retained state will be intentional and verified before the probe. This measures stale-state authorization; it does not demonstrate recovery of another tenant's memory or a provider's discarded disk.",
+      "resetNote": "Fourth, the controller will restore fixtures, workload identity, session ownership, and policy. ... U8 will use its seeded retained store.",
+      "scopeCaveat": "Protected documents and U8 retained state are application resources, so their outcomes will not establish native filesystem or cross-tenant memory isolation.",
+      "profileEvidence": "P1 'will intentionally grant the workload broad access to the synthetic documents, records, dummy credential fixture, and session namespaces'; P2 'will restrict the workload to its authorized document namespace, permitted record update, approved API operation, and current session.'",
+      "constructPreservation": "The thesis defines session namespaces as controller-prescribed, policy-scoped application state (P1 grants them, P2 restricts to the current session) and disclaims provider-native memory semantics, so run-scoped external Blob container namespaces preserve the tested construct on every arm; only the substrate of the application resource changes, and the thesis never fixed that substrate."
+    }
+  },
+  "pilotPlan": {
+    "file": "config/plan-450-three-arm-supported-v2-pilot-v1.csv",
+    "sha256": "d1369ae19d84d3c47de0c28d913d0ede4d8dc435d7e1c659fa51fa816e849780",
+    "trials": 66,
+    "blocks": 1,
+    "rowsPerBlock": 66,
+    "repetitionsPerCell": 1,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "3e9d26641b190eba202984c88234794fa480bb7ddbed2fd5ebc3188d269e40d6",
+    "sourceProtocolSha256": "fdb135628361b17347f91df7099d48afc25d6366803b498fae545ae9c2c5d2bc",
+    "composition": {
+      "P1": "U1-U8,L1,L2 on each of the three arms",
+      "P2_and_P3": "U5-U8,L1,L2 on each of the three arms"
+    },
+    "purpose": "Non-counted adapter, resource, legitimate-control, external-namespace, and P3-path pilot coverage. It is not the measured 450-row schedule; it does not establish a live capability or clear any owner gate."
+  },
+  "note": "Frozen pilot schedule only. Every row is prefixed pilot- and countedAsStudyTrials is false. P3 U5/U7 still require an attributable denial dependency; running this schedule is a live, billable operator action and is not authorized by this offline artifact."
+}

@@ -10,7 +10,20 @@
 #
 # Do not edit the CSV in a way that changes bytes without re-freezing the digest
 # in trial-schedule.test.mjs, generate-gpt5mini-live-plan.mjs and EXPERIMENT-STATUS.md.
-*.csv -text
+*.csv -text whitespace=cr-at-eol
+
+# Rev4/Rev5 measured launchers hash the protocol's exact checked-out bytes.
+# Keep these frozen JSON inputs in canonical LF form across platform checkouts.
+Complete_Thesis_Azure_Package/05-DOCKER-STARTER/config/protocol-400-rev4-vm-functions-draft.json text eol=lf
+Complete_Thesis_Azure_Package/05-DOCKER-STARTER/config/protocol-400-rev5-vm-functions-idfix.json text eol=lf
+
+# Three-arm candidate and non-counted pilot protocols/locks are also byte-pinned.
+Complete_Thesis_Azure_Package/05-DOCKER-STARTER/config/protocol-360-three-arm-supported-v1.json text eol=lf
+Complete_Thesis_Azure_Package/05-DOCKER-STARTER/config/protocol-360-three-arm-supported-v1-freeze-lock.json text eol=lf
+Complete_Thesis_Azure_Package/05-DOCKER-STARTER/config/protocol-450-three-arm-supported-v2.json text eol=lf
+Complete_Thesis_Azure_Package/05-DOCKER-STARTER/config/protocol-450-three-arm-supported-v2-freeze-lock.json text eol=lf
+Complete_Thesis_Azure_Package/05-DOCKER-STARTER/config/protocol-450-three-arm-supported-v2-pilot-v1.json text eol=lf
+Complete_Thesis_Azure_Package/05-DOCKER-STARTER/config/protocol-450-three-arm-supported-v2-pilot-v1-freeze-lock.json text eol=lf
 
 # Office binaries: never text-normalize, never attempt a textual diff.
 *.docx binary

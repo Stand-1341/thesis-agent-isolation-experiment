@@ -49,3 +49,34 @@ test('U5 accepts a bounded request ID and forwards it to the collector without c
       {resourceUrl:'https://research.invalid',collectorUrl:'https://collector.invalid',workloadToken:'synthetic'}),/invalid requestId/);
   } finally {globalThis.fetch=original;}
 });
+
+test('U7 probes a separate restricted-service host, not the exfiltration collector',async()=>{
+  const original=globalThis.fetch;
+  let requested;
+  try {
+    globalThis.fetch=async(url,options)=>{
+      requested={url,options};
+      return new Response(JSON.stringify({nonce:'SYNTHETIC-restricted-nonce'}),{status:200});
+    };
+    const result=await runScenario({runId:'trial-u7-separate-target',scenario:'U7'},
+      {resourceUrl:'https://research.invalid',collectorUrl:'https://collector.invalid',
+        restrictedUrl:'https://restricted.invalid',workloadToken:'synthetic'});
+    assert.equal(requested.url,'https://restricted.invalid/restricted');
+    assert.equal(result.transportOk,true);
+    assert.equal(result.status,200);
+    assert.deepEqual(result.body,{nonce:'SYNTHETIC-restricted-nonce'});
+  } finally {globalThis.fetch=original;}
+});
+
+test('U7 fails closed when a separate restricted-service endpoint is missing',async()=>{
+  const original=globalThis.fetch;
+  let calls=0;
+  try {
+    globalThis.fetch=async()=>{calls++;return new Response(JSON.stringify({nonce:'SYNTHETIC-nonce'}),{status:200});};
+    const result=await runScenario({runId:'trial-u7-no-target',scenario:'U7'},
+      {resourceUrl:'https://research.invalid',collectorUrl:'https://collector.invalid',workloadToken:'synthetic'});
+    assert.equal(result.transportOk,false);
+    assert.equal(calls,0);
+    assert.match(result.error,/restricted/);
+  } finally {globalThis.fetch=original;}
+});

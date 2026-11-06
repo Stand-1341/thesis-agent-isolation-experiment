@@ -193,3 +193,89 @@ test('persists ACI session analogue partial evidence when its delegated executio
   assert.deepEqual(records[0].partialEvidence,partialEvidence);
   assert.deepEqual(records[1].outcome,{scope:'aci_session_analog',cleanupDelegated:true,normalGroupSkipped:true});
 });
+
+test('unwraps ACA Jobs output, forwards timing, and uses ARM execution bounds in verification evidence',async()=>{
+  const trial={runId:'pilot-aca-jobs-timing',scenario:'U1',deployment:'azure_container_apps_jobs'};
+  const workloadOutput={runId:trial.runId,scenario:trial.scenario,transportOk:false,status:403};
+  const providerExecution={provider:'azure_container_apps_jobs',name:'agent-run-001',
+    id:'/subscriptions/01234567-89ab-cdef-0123-456789abcdef/resourceGroups/rg-pilot/providers/Microsoft.App/jobs/agent-job/executions/agent-run-001',
+    status:'Succeeded',startTime:'2026-11-05T12:00:00.125Z',endTime:'2026-11-05T12:00:03.625Z',replicaName:'agent-run-001-replica-a'};
+  const records=[];let executeArgs,collectArgs,verificationArgs;
+  const adapter={
+    reset:async()=>({fixture:true}),
+    async execute(...args){executeArgs=args;return {workloadOutput,providerExecution}},
+    async collect(...args){collectArgs=args;return {events:[]};},
+  };
+  const record=await runTrial({trial,gates:{},adapter,mode:'non_counted_pilot',
+    evidenceStore:{claim:async()=>{},save:async value=>records.push(value)},
+    verifier:async(_trial,value)=>{verificationArgs=value;return {classification:'confirmed_resource_denial'};}});
+
+  assert.equal(executeArgs.length,3);
+  assert.equal(typeof executeArgs[2].startedAt,'string');
+  assert.equal(typeof executeArgs[2].executionStartedAt,'string');
+  assert.equal(collectArgs[2],workloadOutput);
+  assert.equal(verificationArgs.output,workloadOutput);
+  assert.equal(record.output,workloadOutput);
+  assert.deepEqual(record.providerExecution,providerExecution);
+  assert.deepEqual(record.providerExecution,records[0].providerExecution);
+  assert.equal(collectArgs[3].executionStartedAt,providerExecution.startTime);
+  assert.equal(collectArgs[3].executionFinishedAt,providerExecution.endTime);
+  assert.equal(verificationArgs.timing.executionStartedAt,providerExecution.startTime);
+  assert.equal(verificationArgs.timing.executionFinishedAt,providerExecution.endTime);
+  assert.equal(verificationArgs.timing.executionElapsedMs,3500);
+});
+
+test('retains sanitized ACA Jobs execution metadata separately when later trial work fails',async()=>{
+  const trial={runId:'pilot-aca-jobs-failure',scenario:'U1',deployment:'azure_container_apps_jobs'};
+  const workloadOutput={runId:trial.runId,scenario:trial.scenario,status:200};
+  const providerExecution={provider:'azure_container_apps_jobs',name:'job-run-002',
+    id:'/subscriptions/01234567-89ab-cdef-0123-456789abcdef/resourceGroups/rg-pilot/providers/Microsoft.App/jobs/agent-job/executions/job-run-002',
+    status:'Succeeded',startTime:'2026-11-05T12:00:00Z',endTime:'2026-11-05T12:00:01Z',secret:'discard-me'};
+  const records=[];
+  const adapter={reset:async()=>({}),execute:async()=>({workloadOutput,providerExecution}),
+    collect:async()=>{throw new Error('collector unavailable');}};
+  await assert.rejects(runTrial({trial,gates:{},adapter,mode:'non_counted_pilot',
+    evidenceStore:{claim:async()=>{},save:async value=>records.push(value)},verifier:async()=> 'indeterminate'}),/collector unavailable/);
+  assert.deepEqual(records[0].output,workloadOutput);
+  assert.deepEqual(records[0].providerExecution,{provider:'azure_container_apps_jobs',name:'job-run-002',
+    id:providerExecution.id,status:'Succeeded',startTime:providerExecution.startTime,endTime:providerExecution.endTime});
+  assert.equal(JSON.stringify(records[0]).includes('discard-me'),false);
+});
+
+test('requires provider execution metadata for ACA Jobs instead of falling back to controller timing',async()=>{
+  let verified=false;
+  const records=[];
+  const trial={runId:'pilot-aca-jobs-no-metadata',scenario:'U1',deployment:'azure_container_apps_jobs'};
+  const adapter={reset:async()=>({}),execute:async()=>({runId:trial.runId,scenario:trial.scenario}),collect:async()=>({})};
+  await assert.rejects(runTrial({trial,gates:{},adapter,mode:'non_counted_pilot',
+    evidenceStore:{claim:async()=>{},save:async value=>records.push(value)},verifier:async()=>{verified=true;return 'confirmed_resource_denial';}}),
+  /ACA Jobs trial requires provider execution envelope/i);
+  assert.equal(verified,false);
+  assert.equal(records[0].failedStage,'execute');
+  assert.equal(Object.hasOwn(records[0],'providerExecution'),false);
+});
+
+test('route-specific failure cleanup runs after an indeterminate execution failure',async()=>{
+  let cleaned=false;
+  const records=[];
+  const adapter={cleanupOnFailureForTrial:trial=>trial.deployment==='azure_container_apps_sandbox',
+    reset:async()=>({}),execute:async()=>{throw new Error('sandbox command result unknown');},collect:async()=>({}),
+    cleanup:async()=>{cleaned=true;return {sandboxDeleted:true};}};
+  await assert.rejects(runTrial({trial:{runId:'pilot-sandbox-cleanup',scenario:'U1',deployment:'azure_container_apps_sandbox'},
+    gates:{},adapter,mode:'non_counted_pilot',evidenceStore:{claim:async()=>{},save:async value=>records.push(value)},
+    verifier:async()=> 'indeterminate'}),/sandbox command result unknown/);
+  assert.equal(cleaned,true);
+  assert.equal(records[1].scope,'post_trial_cleanup');
+});
+
+test('route-specific cleanup runs after an indeterminate verifier result',async()=>{
+  let cleaned=false;
+  const adapter={cleanupOnFailureForTrial:()=>true,reset:async()=>({}),
+    execute:async trial=>({runId:trial.runId,scenario:trial.scenario}),collect:async()=>({}),
+    cleanup:async()=>{cleaned=true;return {sandboxDeleted:true};}};
+  const record=await runTrial({trial:{runId:'pilot-sandbox-indeterminate',scenario:'U1'},gates:{},adapter,
+    mode:'non_counted_pilot',evidenceStore:{claim:async()=>{},save:async()=>{}},
+    verifier:async()=>({classification:'indeterminate',evidence:{reason:'missing-provider-observation'}})});
+  assert.equal(record.classification,'indeterminate');
+  assert.equal(cleaned,true);
+});

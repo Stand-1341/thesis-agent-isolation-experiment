@@ -1,7 +1,7 @@
 {
   "status": "frozen_for_measured_execution",
   "protocolFile": "config/protocol-400-rev5-vm-functions-idfix.json",
-  "protocolSha256": "8961ec5475f1c2bd8f6cc7a0e0792bd90b13306bf371ff9326f381b319c44e85",
+  "protocolSha256": "9d60b9ae82cc8f563265994215ab2bde2221c5629970cea1ba4142fd3084a7f9",
   "matrixFile": "03-PLANNED-TRIAL-MATRIX-400-REV4-VM-FUNCTIONS-EXECUTABLE-NO-ACI-DRAFT-V4-IDFIX.csv",
   "matrixSha256": "2bd601c4de01900c318857901b36578b62fff95385f33f2e34a2c05b78a4bee5",
   "evidence": "docs/400-REV5-IDFIX-RESTART-2026-11-05.md",

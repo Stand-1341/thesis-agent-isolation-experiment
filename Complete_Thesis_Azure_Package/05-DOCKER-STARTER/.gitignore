@@ -1,5 +1,5 @@
-node_modules/
-**/node_modules/
+node_modules
+**/node_modules
 # The starter is meant to be extracted and published on its own, so it carries the
 # same secret and artifact rules as the repository root instead of relying on them.
 .env

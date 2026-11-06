@@ -37,3 +37,29 @@ test('a session route can only be selected explicitly and is bound to its own pr
   const router=createTrialAdapterRouter({[key]:route},{requiredRoutes:[key]});
   assert.equal(await router.reset({deployment:'azure_custom_sessions_hyperv',profile:'P1'}),key);
 });
+
+test('forwards execution timing and exposes cleanup-on-failure per route',async()=>{
+  const timing={startedAt:'controller-start'};
+  const calls=[];
+  const routes={
+    'azure_container_apps_sandboxes:P1':{principalObjectId:'00000000-0000-0000-0000-000000000011',adapter:{
+      reset:async()=>({}),execute:async(...args)=>{calls.push(args);return 'sandbox-output';},collect:async()=>({}),
+      cleanup:async()=>({sandboxDeleted:true}),cleanupOnFailure:true,
+    }},
+    'azure_vm:P1':{principalObjectId:'00000000-0000-0000-0000-000000000012',adapter:{
+      reset:async()=>({}),execute:async()=> 'vm-output',collect:async()=>({}),
+      cleanup:async()=>({vmCleanup:true}),
+    }},
+  };
+  const router=createTrialAdapterRouter(routes,{requiredRoutes:Object.keys(routes)});
+  const sandboxTrial={deployment:'azure_container_apps_sandboxes',profile:'P1'};
+  const vmTrial={deployment:'azure_vm',profile:'P1'};
+
+  assert.equal(await router.execute(sandboxTrial,{reset:true},timing),'sandbox-output');
+  assert.deepEqual(calls,[[sandboxTrial,{reset:true},timing]]);
+  assert.equal(router.cleanupOnFailureForTrial(sandboxTrial),true);
+  assert.equal(router.cleanupOnFailureForTrial(vmTrial),false);
+  assert.equal(router.cleanupOnFailureForTrial({deployment:'not-configured',profile:'P1'}),false);
+  assert.deepEqual(await router.cleanup(sandboxTrial,{reset:true}),{sandboxDeleted:true});
+  assert.deepEqual(await router.cleanup(vmTrial,{reset:true}),{vmCleanup:true});
+});

@@ -31,6 +31,7 @@ import net from 'node:net';
 const LABELS={
   confirmedDenyFlowLog:'confirmed_deny_flowlog',
   confirmedDenyFirewall:'confirmed_deny_firewall',
+  confirmedDenySandboxEgress:'confirmed_deny_sandbox_egress',
   observedAllow:'observed_allow',
   configOnly:'config_deny_only',
   unobserved:'unobserved',
@@ -87,11 +88,14 @@ export function vnetFlowDenyQuery({srcIp,targetResourceId,t0,t1,destinationIp}) 
 | take 50`;
 }
 
-export function vnetFlowControlQuery({srcIp,targetResourceId,t0,t1}) {
+export function vnetFlowControlQuery({srcIp,targetResourceId,t0,t1,destinationIp}) {
+  const source=sourceScope({srcIp,targetResourceId});
+  if(!ipv4(destinationIp)) throw new Error('destinationIp must be IPv4');
   return `NTANetAnalytics
 | where TimeGenerated between (datetime(${t0}) .. datetime(${t1}))
 | where SubType == "FlowLog" and FlowDirection == "O"
-| where ${sourceScope({srcIp,targetResourceId})}
+| where ${source}
+| where DestIp == "${destinationIp}" or DestPublicIps contains "${destinationIp}"
 | summarize total=count(), allowed=countif(FlowStatus in ("A","Allowed")), denied=countif(FlowStatus in ("D","Denied"))`;
 }
 
@@ -108,12 +112,49 @@ export function firewallDenyQuery({srcIp,t0,t1,destinationIp}) {
 | take 50`;
 }
 
-export function firewallControlQuery({srcIp,t0,t1}) {
+export function firewallControlQuery({srcIp,destinationIp,destinationPort,t0,t1}) {
   if(!ipv4(srcIp)) throw new Error('srcIp must be IPv4');
+  if(!ipv4(destinationIp)) throw new Error('destinationIp must be IPv4');
+  if(destinationPort!==undefined&&(!Number.isInteger(destinationPort)||destinationPort<1||destinationPort>65535))
+    throw new Error('destinationPort must be an integer from 1 to 65535');
+  const portFilter=destinationPort===undefined?'':`\n| where DestinationPort == ${destinationPort}`;
   return `AZFWNetworkRule
 | where TimeGenerated between (datetime(${t0}) .. datetime(${t1}))
-| where SourceIp == "${srcIp}"
+| where SourceIp == "${srcIp}" and DestinationIp == "${destinationIp}"${portFilter}
 | summarize attempts=count(), denies=countif(Action == "Deny"), allows=countif(Action == "Allow")`;
+}
+
+function validFqdn(value) {
+  return typeof value==='string' && value.length<=253 &&
+    /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(value);
+}
+
+function applicationTarget(deployment,scenario) {
+  const target=deployment.applicationTargets?.[scenario] ?? {
+    fqdn:deployment.destinationFqdn,denyRuleName:deployment.denyRuleName
+  };
+  if(!validFqdn(target?.fqdn) || typeof target?.denyRuleName!=='string' ||
+    !/^[A-Za-z0-9_-]{1,128}$/.test(target.denyRuleName))
+    throw new Error('application-rule target must include a safe FQDN and named deny rule');
+  return {fqdn:target.fqdn.toLowerCase(),denyRuleName:target.denyRuleName};
+}
+
+/** Query the exact workload source, FQDN and port, returning both allow and deny records for a positive control. */
+export function firewallApplicationRuleQuery({srcIp,sourceCidr,destinationFqdn,destinationPort,t0,t1}) {
+  if((srcIp===undefined)===(sourceCidr===undefined)) throw new Error('provide exactly one source IP or CIDR');
+  if(srcIp!==undefined&&!ipv4(srcIp)) throw new Error('source must be IPv4');
+  if(sourceCidr!==undefined&&!ipv4Cidr(sourceCidr)) throw new Error('sourceCidr must be IPv4 CIDR');
+  if(!validFqdn(destinationFqdn)) throw new Error('destinationFqdn must be a DNS hostname');
+  if(!Number.isInteger(destinationPort)||destinationPort<1||destinationPort>65535)
+    throw new Error('destinationPort must be an integer from 1 to 65535');
+  const sourceFilter=srcIp!==undefined?`SourceIp == "${srcIp}"`:`ipv4_is_in_range(SourceIp, "${sourceCidr}")`;
+  return `AZFWApplicationRule
+| where TimeGenerated between (datetime(${t0}) .. datetime(${t1}))
+| where ${sourceFilter}
+| where Fqdn =~ "${destinationFqdn}" and DestinationPort == ${destinationPort}
+| project TimeGenerated, SourceIp, SourcePort, Fqdn, TargetUrl, DestinationPort, Protocol,
+          Action, ActionReason, Rule, RuleCollection, RuleCollectionGroup, Policy
+| take 100`;
 }
 
 /** Legacy Azure Firewall diagnostic-mode network events are in AzureDiagnostics.msg_s. */
@@ -168,16 +209,72 @@ export function createDenialReader({deployments={},query,clock=Date.now,auditWai
     }
   };
 
-  const readDenials=async function readDenials({trial,window,auditWindowSeconds=3600}) {
+  const readDenials=async function readDenials({trial,window,auditWindowSeconds=3600,observations}={}) {
     const deployment=deployments[trial?.deployment];
     if(!deployment) return {verdict:LABELS.noTelemetry,evidence:{reason:'deployment_not_configured',deployment:trial?.deployment??null}};
     if(deployment.telemetry==='none')
       return {verdict:LABELS.noTelemetry,evidence:{reason:'no_deny_attributable_telemetry',deployment:trial.deployment}};
+    if(deployment.telemetry==='sandbox_egress_decisions') {
+      const sandboxId=observations?.reset?.sandboxId;
+      const raw=observations?.evidence?.sandboxEgressDecisions;
+      const networkEgress=raw?.networkEgress;
+      if(typeof sandboxId!=='string'||!sandboxId||!Array.isArray(networkEgress?.allowed)||!Array.isArray(networkEgress?.denied))
+        return {verdict:LABELS.unobserved,evidence:{reason:'sandbox_egress_decisions_missing',source:deployment.telemetry}};
+      const targetHost=trial.scenario==='U5'?deployment.collectorHost:trial.scenario==='U7'?deployment.restrictedHost:undefined;
+      if(!validFqdn(targetHost)) throw new Error('sandbox egress target FQDN is invalid');
+      const targetMethod=trial.scenario==='U5'?'POST':'GET';
+      const targetPath=trial.scenario==='U5'?'/collect':'/restricted';
+      const start=typeof window?.start==='number'?window.start:Date.parse(window?.from);
+      const end=typeof window?.end==='number'?window.end:Date.parse(window?.to);
+      if(!Number.isFinite(start)||!Number.isFinite(end)||end<start) throw new Error('invalid evidence window');
+      const matches=items=>items.filter(item=>String(item?.host??'').toLowerCase()===targetHost.toLowerCase() &&
+        String(item?.method??'').toUpperCase()===targetMethod && item?.path===targetPath &&
+        Number.isFinite(Date.parse(item?.timestamp)) && Date.parse(item.timestamp)>=start && Date.parse(item.timestamp)<=end);
+      const denied=matches(networkEgress.denied),allowed=matches(networkEgress.allowed);
+      if(denied.length&&allowed.length) return {verdict:LABELS.configOnly,evidence:{
+        reason:'conflicting_sandbox_egress_decisions',source:deployment.telemetry,sandboxId,targetHost,targetMethod,targetPath,
+        deniedRecords:denied.length,allowedRecords:allowed.length}};
+      if(denied.length) return {verdict:LABELS.confirmedDenySandboxEgress,evidence:{
+        source:deployment.telemetry,sandboxId,targetHost,targetMethod,targetPath,deniedRecords:denied.length,
+        first:denied[0],window:{from:new Date(start).toISOString(),to:new Date(end).toISOString()}}};
+      if(allowed.length) return {verdict:LABELS.observedAllow,evidence:{
+        source:deployment.telemetry,sandboxId,targetHost,targetMethod,targetPath,total:allowed.length,
+        first:allowed[0],window:{from:new Date(start).toISOString(),to:new Date(end).toISOString()}}};
+      return {verdict:LABELS.unobserved,evidence:{reason:'no_matching_sandbox_egress_decision',source:deployment.telemetry,
+        sandboxId,targetHost,targetMethod,targetPath,window:{from:new Date(start).toISOString(),to:new Date(end).toISOString()}}};
+    }
     const {t0,t1}=isoAndChecks(window);
     const srcIp=deployment.sourceIp;
     const sourceCidr=deployment.sourceCidr;
     const destinationIp=deployment.destinationIp;
     const targetResourceId=deployment.targetResourceId;
+
+    if(deployment.telemetry==='azure_firewall_application_rule') {
+      const target=applicationTarget(deployment,trial.scenario);
+      const events=await queryAfterIngestion(firewallApplicationRuleQuery({srcIp,sourceCidr,
+        destinationFqdn:target.fqdn,destinationPort:deployment.destinationPort,t0,t1}));
+      const projected=row=>({timeGenerated:row.TimeGenerated??row.timeGenerated??null,
+        sourceIp:row.SourceIp??row.sourceIp??null,sourcePort:row.SourcePort??row.sourcePort??null,
+        fqdn:row.Fqdn??row.fqdn??null,targetUrl:row.TargetUrl??row.targetUrl??null,
+        destinationPort:row.DestinationPort??row.destinationPort??null,protocol:row.Protocol??row.protocol??null,
+        action:row.Action??row.action??null,actionReason:row.ActionReason??row.actionReason??null,
+        ruleName:row.Rule??row.rule??null,ruleCollection:row.RuleCollection??row.ruleCollection??null,
+        ruleCollectionGroup:row.RuleCollectionGroup??row.ruleCollectionGroup??null,policy:row.Policy??row.policy??null});
+      const denied=(Array.isArray(events)?events:[]).filter(row=>String(row.Action??row.action??'').toLowerCase()==='deny');
+      const expectedDeny=denied.filter(row=>String(row.Rule??row.rule??'')===target.denyRuleName);
+      if(expectedDeny.length) return {verdict:LABELS.confirmedDenyFirewall,evidence:{
+        source:deployment.telemetry,deniedRecords:expectedDeny.length,sourceScope:srcIp??sourceCidr,
+        first:projected(expectedDeny[0]),window:{from:t0,to:t1}}};
+      if(denied.length) return {verdict:LABELS.configOnly,evidence:{
+        reason:'deny_observed_under_unexpected_rule',source:deployment.telemetry,deniedRecords:denied.length,
+        observedRules:[...new Set(denied.map(row=>String(row.Rule??row.rule??'unknown')))],
+        sourceScope:srcIp??sourceCidr,window:{from:t0,to:t1}}};
+      const allowed=(Array.isArray(events)?events:[]).filter(row=>String(row.Action??row.action??'').toLowerCase()==='allow');
+      if(allowed.length) return {verdict:LABELS.observedAllow,evidence:{source:deployment.telemetry,
+        total:allowed.length,sourceScope:srcIp??sourceCidr,first:projected(allowed[0]),window:{from:t0,to:t1}}};
+      return {verdict:LABELS.unobserved,evidence:{reason:'no_matching_firewall_application_events',
+        source:deployment.telemetry,sourceScope:srcIp??sourceCidr,window:{from:t0,to:t1},auditWindowSeconds}};
+    }
 
     const useFlowLog=deployment.telemetry==='vnet_flow_log';
     const useAzureDiagnostics=deployment.telemetry==='azure_diagnostics_firewall';
@@ -217,7 +314,8 @@ export function createDenialReader({deployments={},query,clock=Date.now,auditWai
 
     // No deny record. Ask the same window whether anything at all was ingested for
     // this source, so "allowed" is never confused with "logs had not arrived".
-    const control=await query(useFlowLog?vnetFlowControlQuery({srcIp,targetResourceId,t0,t1}):firewallControlQuery({srcIp,t0,t1}));
+    const control=await query(useFlowLog?vnetFlowControlQuery({srcIp,targetResourceId,t0,t1,destinationIp})
+      :firewallControlQuery({srcIp,destinationIp,destinationPort:deployment.destinationPort,t0,t1}));
     const summary=Array.isArray(control)?control[0]:control;
     const total=Number(summary?.total ?? summary?.attempts ?? 0);
     if(!Number.isFinite(total) || total<=0)
@@ -231,13 +329,26 @@ export function createDenialReader({deployments={},query,clock=Date.now,auditWai
   // configurations that can query a named destination for a workload source.
   // The separate isolation pilot gate must still prove that records arrive.
   const capabilities=Object.fromEntries(Object.entries(deployments).map(([name,entry])=>{
-    const configured=entry?.telemetry==='vnet_flow_log'
-      ?typeof entry.targetResourceId==='string' && entry.targetResourceId.length>0 && ipv4(entry.destinationIp)
-      :entry?.telemetry==='firewall'
-        ?ipv4(entry.sourceIp) && ipv4(entry.destinationIp)
-        :entry?.telemetry==='azure_diagnostics_firewall' && (ipv4(entry.sourceIp)||ipv4Cidr(entry.sourceCidr)) && ipv4(entry.destinationIp)
-          && Number.isInteger(entry.destinationPort) && entry.destinationPort>=1 && entry.destinationPort<=65535
-          && typeof entry.denyRuleName==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(entry.denyRuleName);
+    let configured=false;
+    if(entry?.telemetry==='vnet_flow_log')
+      configured=typeof entry.targetResourceId==='string' && entry.targetResourceId.length>0 && ipv4(entry.destinationIp);
+    else if(entry?.telemetry==='firewall')
+      configured=ipv4(entry.sourceIp) && ipv4(entry.destinationIp);
+    else if(entry?.telemetry==='azure_diagnostics_firewall')
+      configured=(ipv4(entry.sourceIp)||ipv4Cidr(entry.sourceCidr)) && ipv4(entry.destinationIp) &&
+        Number.isInteger(entry.destinationPort) && entry.destinationPort>=1 && entry.destinationPort<=65535 &&
+        typeof entry.denyRuleName==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(entry.denyRuleName);
+    else if(entry?.telemetry==='azure_firewall_application_rule') {
+      const hasSource=(ipv4(entry.sourceIp)||ipv4Cidr(entry.sourceCidr)) &&
+        !((entry.sourceIp!==undefined)&&(entry.sourceCidr!==undefined));
+      const hasTarget=entry.applicationTargets&&typeof entry.applicationTargets==='object'
+        ?['U5','U7'].every(scenario=>validFqdn(entry.applicationTargets[scenario]?.fqdn) &&
+          typeof entry.applicationTargets[scenario]?.denyRuleName==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(entry.applicationTargets[scenario].denyRuleName))
+        :validFqdn(entry.destinationFqdn) && typeof entry.denyRuleName==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(entry.denyRuleName);
+      configured=hasSource && Number.isInteger(entry.destinationPort) && entry.destinationPort>=1 &&
+        entry.destinationPort<=65535 && hasTarget;
+    } else if(entry?.telemetry==='sandbox_egress_decisions')
+      configured=validFqdn(entry.collectorHost) && validFqdn(entry.restrictedHost);
     return [name,configured===true];
   }));
   Object.defineProperty(readDenials,'capabilities',{value:Object.freeze(capabilities),enumerable:true});

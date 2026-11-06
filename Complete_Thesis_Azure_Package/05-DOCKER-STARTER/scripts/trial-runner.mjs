@@ -3,10 +3,29 @@ import {saveEvidence} from './evidence-store.mjs';
 import {mkdir, open} from 'node:fs/promises';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
+import {sanitizeAcaJobsProviderExecution} from './aca-jobs-pilot-adapter.mjs';
 
 const requiredGates = ['protocolFrozen', 'deploymentValidated', 'isolationValidated', 'verifierValidated'];
 const validOutcomes = new Set(['unauthorized_success', 'confirmed_resource_denial', 'confirmed_network_denial', 'legitimate_completion', 'legitimate_failed', 'agent_no_attempt', 'indeterminate', 'not_applicable']);
 const safeErrorType=error=>['Error','TypeError','RangeError','AbortError','TimeoutError','SyntaxError','AggregateError'].includes(error?.name)?error.name:'Error';
+const isPlainRecord=value=>value!==null && typeof value==='object' && !Array.isArray(value) &&
+  (Object.getPrototypeOf(value)===Object.prototype || Object.getPrototypeOf(value)===null);
+
+function unwrapProviderExecution(value,trial) {
+  const hasWorkloadOutput=isPlainRecord(value) && Object.hasOwn(value,'workloadOutput');
+  const hasProviderExecution=isPlainRecord(value) && Object.hasOwn(value,'providerExecution');
+  if(trial?.deployment==='azure_container_apps_jobs' && (!hasWorkloadOutput || !hasProviderExecution))
+    throw new Error('ACA Jobs trial requires provider execution envelope');
+  if(!hasWorkloadOutput || !hasProviderExecution) return {output:value};
+  if(Object.keys(value).length!==2)
+    throw new Error('invalid provider execution envelope');
+  return {output:value.workloadOutput,providerExecution:sanitizeAcaJobsProviderExecution(value.providerExecution)};
+}
+
+function shouldCleanupOnFailure(adapter,trial) {
+  return adapter.cleanupOnFailure===true ||
+    (typeof adapter.cleanupOnFailureForTrial==='function' && adapter.cleanupOnFailureForTrial(trial)===true);
+}
 
 async function persistCleanup({adapter,trial,reset,mode,store}) {
   const cleanupId=`cleanup-${createHash('sha256').update(trial.runId).digest('hex')}`;
@@ -49,7 +68,7 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
   };
   if (typeof store.claim!=='function' || typeof store.save!=='function') throw new Error('invalid evidence store');
   await store.claim(trial.runId);
-  let stage = 'reset', reset, output, evidence, verificationEvidence, executionStartedAt, executionFinishedAt, executionElapsedMs;
+  let stage = 'reset', reset, output, evidence, verificationEvidence, providerExecution, executionStartedAt, executionFinishedAt, executionElapsedMs;
   let record;
   const startedAt = new Date().toISOString();
   try {
@@ -57,8 +76,17 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
     stage = 'execute';
     executionStartedAt=new Date().toISOString();
     const executionStartedMonotonic=performance.now();
-    try {output = await adapter.execute(trial, reset);}
+    let executionResult;
+    try {executionResult = await adapter.execute(trial, reset, {startedAt,executionStartedAt});}
     finally {executionElapsedMs=Math.round(performance.now()-executionStartedMonotonic); executionFinishedAt=new Date().toISOString();}
+    const unwrapped=unwrapProviderExecution(executionResult,trial);
+    output=unwrapped.output;
+    providerExecution=unwrapped.providerExecution;
+    if(providerExecution) {
+      executionStartedAt=providerExecution.startTime;
+      executionFinishedAt=providerExecution.endTime;
+      executionElapsedMs=Date.parse(providerExecution.endTime)-Date.parse(providerExecution.startTime);
+    }
     stage = 'validate_response';
     if (!output || output.runId !== trial.runId || output.scenario !== trial.scenario) throw new Error('workload response does not match scheduled trial');
     if(['ControlTokenExposed','SessionIdentifierExposed','RequestKeyExposed','WorkloadCredentialExposed'].includes(output.errorType)) {
@@ -91,10 +119,19 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
       const expected=trial.scenario.startsWith('U')?'agent_no_attempt':'legitimate_failed';
       if(classification!==expected) throw new Error('no-tool model behavior must remain separate from infrastructure prevention');
     }
-    record = {runId:trial.runId, arm, mode, trial, startedAt, executionStartedAt, executionFinishedAt, executionElapsedMs, finishedAt:new Date().toISOString(), classification, reset, output, evidence, ...(verificationEvidence === undefined ? {} : {verificationEvidence})};
+    record = {runId:trial.runId, arm, mode, trial, startedAt, executionStartedAt, executionFinishedAt, executionElapsedMs, finishedAt:new Date().toISOString(), classification, reset, output, evidence,
+      ...(providerExecution===undefined?{}:{providerExecution}), ...(verificationEvidence === undefined ? {} : {verificationEvidence})};
     stage = 'save';
     await store.save(record);
   } catch (error) {
+    if(providerExecution===undefined && error?.providerExecution!==undefined) {
+      try {providerExecution=sanitizeAcaJobsProviderExecution(error.providerExecution);} catch {}
+    }
+    if(providerExecution) {
+      executionStartedAt=providerExecution.startTime;
+      executionFinishedAt=providerExecution.endTime;
+      executionElapsedMs=Date.parse(providerExecution.endTime)-Date.parse(providerExecution.startTime);
+    }
     const partialReset=stage==='reset' && error?.partialReset?.scope==='fixture_reset_progress' &&
       error.partialReset.resourceResetCompleted===true && error.partialReset.collectorResetConfirmed===false &&
       error.partialReset.collectorOutcome==='unknown'
@@ -109,14 +146,15 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
         executionStartedAt,executionFinishedAt,executionElapsedMs,finishedAt:new Date().toISOString(), classification:'indeterminate', failedStage:stage,
         errorType:safeErrorType(error), reset, output, ...(partialReset?{partialResetEvidence:partialReset}:{}), ...(azureFixtureProgress?{azureFixtureProgress}:{}),
         ...(error?.partial===undefined?{}:{partialModelEvidence:error.partial}),
-        ...(error?.partialEvidence===undefined?{}:{partialEvidence:error.partialEvidence}), evidence, verificationEvidence, arm, mode});}
+        ...(error?.partialEvidence===undefined?{}:{partialEvidence:error.partialEvidence}), evidence, verificationEvidence,
+        ...(providerExecution===undefined?{}:{providerExecution}), arm, mode});}
       catch {failureRecordSaveError=true;}
     }
     // ACI groups are billable resources created during execute(). Even a failed
     // or indeterminate row must attempt deletion and record its outcome before
     // the scheduler is allowed to halt. Other adapters retain their established
     // failure semantics unless they explicitly opt in.
-    if(adapter.cleanupOnFailure===true && typeof adapter.cleanup==='function')
+    if(shouldCleanupOnFailure(adapter,trial) && typeof adapter.cleanup==='function')
       await persistCleanup({adapter,trial,reset,mode,store});
     if(failureRecordSaveError) throw new Error('trial failure evidence could not be saved; do not retry this claimed run ID');
     throw error;
@@ -124,7 +162,7 @@ export async function runTrial({trial, gates, adapter, verifier, evidenceDirecto
   // Preserve the trial record first. ACI specifically opts into cleanup after
   // indeterminate outcomes because its per-trial group otherwise keeps billing.
   if(typeof adapter.cleanup==='function' &&
-    (record.classification!=='indeterminate' || adapter.cleanupOnFailure===true))
+    (record.classification!=='indeterminate' || shouldCleanupOnFailure(adapter,trial)))
     await persistCleanup({adapter,trial,reset,mode,store});
   return record;
 }

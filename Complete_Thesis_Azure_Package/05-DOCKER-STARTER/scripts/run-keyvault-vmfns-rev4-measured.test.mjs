@@ -21,6 +21,16 @@ async function artifacts(){
     freezeLock:JSON.parse(await readFile(resolve(ROOT,'config/protocol-400-rev4-vm-functions-freeze-lock.json'),'utf8'))};
 }
 
+test('frozen Rev4 lock matches canonical LF protocol bytes and rejects byte drift',async()=>{
+  const {protocol,protocolBytes,matrixBytes,freezeLock}=await artifacts();
+  const protocolDigest=createHash('sha256').update(protocolBytes,'utf8').digest('hex');
+  const env=Object.fromEntries(ASSERTIONS.map(name=>[name,'true']));
+  assert.equal(protocolBytes.includes('\r'),false);
+  assert.equal(freezeLock.protocolSha256,protocolDigest);
+  assert.equal(validateMeasuredRev4Readiness({protocol,protocolBytes,matrixBytes,freezeLock,env}).protocolSha256,protocolDigest);
+  assert.throws(()=>validateMeasuredRev4Readiness({protocol,protocolBytes:`${protocolBytes} `,matrixBytes,freezeLock,env}),/freeze lock/);
+});
+
 test('measured Rev4 guard rejects an explicitly pending protocol fixture',async()=>{
   const {protocol,protocolBytes,matrixBytes,freezeLock}=await artifacts();
   protocol.status='owner_directed_pending_validation_and_freeze';
@@ -114,5 +124,14 @@ test('current frozen candidate still refuses before Key Vault without assertion 
   await assert.rejects(runMeasuredRev4({env:{},fetchImpl:async()=>{fetchCalls++;throw new Error('unexpected network');},
     spawnImpl:()=>{spawnCalls++;throw new Error('unexpected child');}}),/verifier assertions are absent/);
   assert.equal(fetchCalls,0);
+  assert.equal(spawnCalls,0);
+});
+
+test('measured Rev4 reaches credential preflight after validating the clean-checkout lock',async()=>{
+  const env=Object.fromEntries(ASSERTIONS.map(name=>[name,'true']));
+  let fetchCalls=0,spawnCalls=0;
+  await assert.rejects(runMeasuredRev4({env,fetchImpl:async()=>{fetchCalls++;throw new Error('offline test stub');},
+    spawnImpl:()=>{spawnCalls++;throw new Error('unexpected child');}}),/managed identity token request failed/);
+  assert.equal(fetchCalls,1);
   assert.equal(spawnCalls,0);
 });

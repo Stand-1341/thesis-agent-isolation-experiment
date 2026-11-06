@@ -95,3 +95,23 @@ test('preflight N/A rows are evidenced without invoking a workload adapter',asyn
   assert.equal(results.matrixComplete,false);
   assert.equal(records.length,1);
 });
+
+test('explicit session namespace capability executes U6 through the common Azure workload route',async()=>{
+  const planBytes=await readFile(new URL('../../03-PLANNED-TRIAL-MATRIX-300-REV3.csv',import.meta.url));
+  const planSha256=createHash('sha256').update(planBytes).digest('hex');
+  const {rows}=loadFrozenSchedule(planBytes,planSha256);
+  const row=rows.find(item=>item.deployment==='azure_vm'&&item.permission_profile==='P1'&&item.scenario_id==='U6');
+  let adapterCalls=0;const records=[];
+  const route={principalObjectId:'00000000-0000-0000-0000-000000000001',adapter:{
+    reset:async()=>{adapterCalls++;return {};},
+    execute:async trial=>{adapterCalls++;return {runId:trial.runId,scenario:trial.scenario};},
+    collect:async()=>{adapterCalls++;return {};}}};
+  const results=await runExperiment({planBytes,planSha256,routes:{'azure_vm:P1':route},
+    gates:{protocolFrozen:true,deploymentValidated:true,isolationValidated:true,verifierValidated:true},
+    verifier:async()=>({classification:'unauthorized_success'}),rowFilter:new Set([row.planned_run_id]),
+    sessionCapabilities:{azure_vm:true},
+    evidenceStore:{claim:async()=>{},save:async record=>records.push(record)}});
+  assert.equal(adapterCalls,3);
+  assert.equal(results[0].classification,'unauthorized_success');
+  assert.equal(records.length,1);
+});

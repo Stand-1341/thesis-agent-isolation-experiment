@@ -1,0 +1,158 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": {
+      "value": "th3arm"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "trustedControllerPublicIp": {
+      "value": "203.0.113.10/32"
+    },
+    "sshPublicKey": {
+      "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIREPLACE-WITH-REAL-PUBLIC-KEY-MATERIAL"
+    },
+    "vmImageVersion": {
+      "value": "REPLACE-with-current-pinned-Ubuntu-22.04-image-version"
+    },
+    "controllerSourcePrefixes": {
+      "value": [
+        "10.48.11.0/24"
+      ]
+    },
+    "researchSourcePrefixes": {
+      "value": [
+        "10.48.0.0/24",
+        "10.48.7.0/24",
+        "10.48.8.0/24",
+        "10.48.12.0/27",
+        "10.48.12.32/27"
+      ]
+    },
+    "collectorSourcePrefixes": {
+      "value": [
+        "10.48.0.0/24",
+        "10.48.7.0/24",
+        "10.48.12.0/27"
+      ]
+    },
+    "operatorSourcePrefixes": {
+      "value": [
+        "10.48.11.0/24"
+      ]
+    },
+    "agentImageP1": {
+      "value": "th3armacr.azurecr.io/thesis/agent@sha256:REPLACE-WITH-PINNED-64-HEX-DIGEST"
+    },
+    "agentImageP2": {
+      "value": "th3armacr.azurecr.io/thesis/agent@sha256:REPLACE-WITH-PINNED-64-HEX-DIGEST"
+    },
+    "agentImageP3": {
+      "value": "th3armacr.azurecr.io/thesis/agent@sha256:REPLACE-WITH-PINNED-64-HEX-DIGEST"
+    },
+    "jobReplicaTimeoutSeconds": {
+      "value": 1800
+    },
+    "jobContainerCpu": {
+      "value": 1
+    },
+    "jobContainerMemory": {
+      "value": "2Gi"
+    },
+    "deployVmArm": {
+      "value": false
+    },
+    "vmVmSize": {
+      "value": "Standard_F1as_v7"
+    },
+    "deployResearchHost": {
+      "value": false
+    },
+    "researchServicePort": {
+      "value": 443
+    },
+    "researchHostVmSize": {
+      "value": "Standard_F1as_v7"
+    },
+    "researchServicePrivateIp": {
+      "value": "10.48.9.4"
+    },
+    "collectorPrivateIp": {
+      "value": "10.48.9.5"
+    },
+    "deployEvidenceStore": {
+      "value": false
+    },
+    "evidenceStorageName": {
+      "value": "th3armevd"
+    },
+    "evidenceRetentionDays": {
+      "value": 7
+    },
+    "evidenceEndpointPrivateIp": {
+      "value": "10.48.4.21"
+    },
+    "deploySyntheticFixtures": {
+      "value": false
+    },
+    "fixtureStorageName": {
+      "value": "th3armfx"
+    },
+    "fixtureEndpointPrivateIp": {
+      "value": "10.48.4.22"
+    },
+    "createRecordUpdateRole": {
+      "value": false
+    },
+    "recordUpdateRoleId": {
+      "value": ""
+    },
+    "deployRegistryPrivateEndpoint": {
+      "value": false
+    },
+    "deployRegistryMetadataReader": {
+      "value": false
+    },
+    "linkVaultSecretReader": {
+      "value": false
+    },
+    "vaultName": {
+      "value": ""
+    },
+    "deploySandboxGroups": {
+      "value": false
+    },
+    "sandboxDiskImageNameP1": {
+      "value": "agent-p1"
+    },
+    "sandboxDiskImageNameP2": {
+      "value": "agent-p2"
+    },
+    "sandboxDiskImageNameP3": {
+      "value": "agent-p3"
+    },
+    "sandboxDefaultCpu": {
+      "value": "1"
+    },
+    "sandboxDefaultMemory": {
+      "value": "1Gi"
+    },
+    "sandboxDefaultDisk": {
+      "value": "10Gi"
+    },
+    "sandboxMaxSandboxCount": {
+      "value": 1
+    },
+    "sandboxDefaultTimeoutSeconds": {
+      "value": 1800
+    },
+    "deployP3Firewall": {
+      "value": false
+    },
+    "deployEnvironmentNsg": {
+      "value": false
+    }
+  }
+}

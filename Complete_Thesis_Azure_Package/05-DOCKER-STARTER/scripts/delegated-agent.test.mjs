@@ -21,8 +21,14 @@ test('delegated agent does not echo per-trial credentials and rejects identity m
   const principal='00000000-0000-0000-0000-000000000001',encode=x=>Buffer.from(JSON.stringify(x)).toString('base64url');
   const token=`${encode({alg:'RS256',padding:'x'.repeat(50)})}.${encode({aud:'https://storage.azure.com/',oid:principal,exp:Math.floor(Date.now()/1000)+3600})}.synthetic-signature`;
   const mock='m'.repeat(32),child=spawn(process.execPath,['--import',pathToFileURL(hook).href,agent],{env});
+  const sanitizeStderr=stderr=>[token,mock,'controller-key'].reduce((text,secret)=>text.replaceAll(secret,'[redacted]'),stderr).slice(0,1000);
+  let childStderr='';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data',chunk=>{childStderr+=chunk;});
   try {
-    await Promise.race([once(child.stdout,'data'),once(child,'exit').then(()=>{throw new Error('agent exited');}),new Promise((_,reject)=>setTimeout(()=>reject(new Error('agent timeout')),5000).unref())]);
+    await Promise.race([once(child.stdout,'data'),once(child,'exit').then(([code,signal])=>{
+      throw new Error(`agent exited before readiness (${code??signal}): ${sanitizeStderr(childStderr)}`);
+    }),new Promise((_,reject)=>setTimeout(()=>reject(new Error('agent timeout')),5000).unref())]);
     const send=expectedPrincipalId=>fetch(`http://127.0.0.1:${port}/run`,{method:'POST',headers:{'content-type':'application/json','x-trial-key':'controller-key'},
       body:JSON.stringify({runId:'run-1',scenario:'U1',azureAccessToken:token,expectedPrincipalId,mockWorkloadToken:mock})});
     const response=await send(principal),text=await response.text();
@@ -38,8 +44,11 @@ test('delegated agent does not echo per-trial credentials and rejects identity m
     assert.equal(seed.status,200);
     assert.equal(JSON.parse(seedText).status,201);
     assert.ok(!seedText.includes(token) && !seedText.includes('SYNTHETIC-b'));
-    const invalid=spawnSync(process.execPath,[agent],{env:{...env,WORKLOAD_TOKEN:'should-not-be-present'},timeout:5000,encoding:'utf8'});
+    const invalidWorkloadToken='should-not-be-present';
+    const invalid=spawnSync(process.execPath,[agent],{env:{...env,WORKLOAD_TOKEN:invalidWorkloadToken},timeout:5000,encoding:'utf8'});
     assert.notEqual(invalid.status,0);
+    assert.match(invalid.stderr,/missing or invalid agent environment configuration/);
     assert.ok(!(invalid.stderr || '').includes(token));
+    assert.ok(!(invalid.stderr || '').includes(invalidWorkloadToken));
   } finally {if(child.exitCode===null && child.signalCode===null) {child.kill();await once(child,'exit').catch(()=>{});} await rm(temporary,{recursive:true,force:true});}
 });

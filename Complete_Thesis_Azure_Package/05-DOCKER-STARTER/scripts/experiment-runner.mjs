@@ -7,7 +7,7 @@ import {createGPT5MiniLiveAdapter} from './live-agent-trial.mjs';
 import {verifyImplementationManifest} from './implementation-manifest.mjs';
 import {analyzeTrialScope,classifyTrialScope} from './scenario-scope.mjs';
 
-export async function runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,arm='deterministic',mode='measured',modelEndpoint,getModelToken,maxPhaseSpendUsd=19,implementationSha256,rowFilter,concurrency=1,laneFor=laneByDeployment,networkCapabilities={},allowRepeatedCellsWithinBlock=false}) {
+export async function runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,arm='deterministic',mode='measured',modelEndpoint,getModelToken,maxPhaseSpendUsd=19,implementationSha256,rowFilter,concurrency=1,laneFor=laneByDeployment,networkCapabilities={},sessionCapabilities={},allowRepeatedCellsWithinBlock=false}) {
   if(!['deterministic','gpt5mini_live'].includes(arm)) throw new Error('invalid experiment arm');
   if(!['measured','non_counted_pilot'].includes(mode) || (mode==='non_counted_pilot' && arm!=='deterministic')) throw new Error('invalid run mode for experiment arm');
   if(typeof verifier!=='function' || !evidenceStore || typeof evidenceStore.claim!=='function' || typeof evidenceStore.save!=='function')
@@ -31,7 +31,7 @@ export async function runExperiment({planBytes,planSha256,routes,gates,verifier,
     if(rows.length!==rowFilter.size) throw new Error('rowFilter contains run IDs that are not in the frozen schedule');
     if(!rows.length) throw new Error('rowFilter selected no scheduled trials');
   }
-  const scope=analyzeTrialScope(rows,{networkCapabilities});
+  const scope=analyzeTrialScope(rows,{networkCapabilities,sessionCapabilities});
   if(scope.unsupported) {
     const details=Object.entries(scope.unsupportedByRoute).map(([route,count])=>`  ${route}: ${count} row(s)`).join('\n');
     throw new Error(`run scope includes unsupported trial cells; no trials were claimed or executed:\n${details}`);
@@ -45,7 +45,7 @@ export async function runExperiment({planBytes,planSha256,routes,gates,verifier,
   // an automatic relaunch with a fresh counter; manual reconciliation is required.
   if(arm==='gpt5mini_live') await evidenceStore.claim('phase-gpt5mini-live');
   const runOne=async trial=>{
-    const disposition=classifyTrialScope(trial,{networkCapabilities});
+    const disposition=classifyTrialScope(trial,{networkCapabilities,sessionCapabilities});
     if(disposition.status==='not_applicable') {
       const startedAt=new Date().toISOString();
       await evidenceStore.claim(trial.runId);

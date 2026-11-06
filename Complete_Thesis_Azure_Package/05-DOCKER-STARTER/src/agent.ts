@@ -2,14 +2,15 @@ import {createServer} from 'node:http';
 import {bodyJson, checkedString, send} from './helpers.js';
 import {SCENARIOS, runScenario, type Scenario} from './core.js';
 import {probeNetwork} from './network-probe.mjs';
+import {resolveWorkloadTokenFromEnvironment,readAgentEndpoints} from './agent-config.js';
 
-const token = process.env.WORKLOAD_TOKEN;
-const requestKey = process.env.TRIAL_REQUEST_KEY;
-const resourceUrl = process.env.RESEARCH_URL;
-const collectorUrl = process.env.COLLECTOR_URL;
 const authMode=process.env.AZURE_TOKEN_MODE || 'managed';
+const token=authMode==='managed'?await resolveWorkloadTokenFromEnvironment(process.env):undefined;
+const requestKey = process.env.TRIAL_REQUEST_KEY;
+const {resourceUrl,collectorUrl,restrictedUrl}=readAgentEndpoints(process.env);
 if (!requestKey || !resourceUrl || !collectorUrl || !['managed','delegated'].includes(authMode) ||
-    (authMode==='delegated' && (!process.env.AZURE_BLOB_ENDPOINT || !!token || !!process.env.AZURE_CLIENT_ID)) ||
+    (authMode==='delegated' && (!process.env.AZURE_BLOB_ENDPOINT || process.env.WORKLOAD_TOKEN!==undefined ||
+      process.env.THESIS_WORKLOAD_TOKEN_SECRET_URI!==undefined || !!process.env.AZURE_CLIENT_ID)) ||
     (!token && !(process.env.AZURE_BLOB_ENDPOINT && authMode==='delegated'))) throw new Error('missing or invalid agent environment configuration');
 const blobScenarios = new Set(['U1','U2','U3','U6','U8','L1','L2']);
 let blobRunner: ((input:{runId:string;scenario:string;requestId?:string})=>Promise<unknown>) | undefined;
@@ -123,6 +124,6 @@ createServer(async (req,res) => {
     if(delegatedFactory && blobScenarios.has(scenario)) return send(res,200,await delegatedFactory(body)({runId,scenario,
       ...(typeof body.requestId==='string'?{requestId:body.requestId}:{})}));
     return send(res,200,await runScenario({runId,scenario:scenario as Scenario,u5Marker,
-      ...(typeof body.requestId==='string'?{requestId:body.requestId}:{})},{workloadToken,resourceUrl,collectorUrl}));
+      ...(typeof body.requestId==='string'?{requestId:body.requestId}:{})},{workloadToken,resourceUrl,collectorUrl,restrictedUrl}));
   } catch (error) { return send(res,400,{error:error instanceof Error?error.message:String(error)}); }
 }).listen(port,bindAddress,()=>console.log(`agent listening on ${port}`));

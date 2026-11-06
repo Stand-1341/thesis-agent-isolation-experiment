@@ -1,28 +1,40 @@
 # Azure-only thesis: Docker-first compatibility starter
 
-**Status: deployment in progress / no measured thesis results.** Based on Chapter 3 of *Which Cloud Deployment Architecture Best Contains Compromised AI Agents*. It contains no real credentials, target scanning, cloud attacks, or arbitrary shell execution. The active deterministic schedule is revision 3 with 300 planned rows and no ACA session arm; it remains `planning_not_validated`. A separate 60-row non-counted pilot schedule is also frozen. The GPT-5 mini live-agent arm is separate and still a draft. See [`docs/300-TRIAL-AZURE-STATUS-2026-11-04.md`](docs/300-TRIAL-AZURE-STATUS-2026-11-04.md) for the current readiness state.
+**Status: architecture selected — no measured thesis results.** Based on Chapter 3 of *Which Cloud Deployment Architecture Best Contains Compromised AI Agents*. It contains no real credentials, target scanning, cloud attacks, or arbitrary shell execution.
+
+**The selected Azure architecture is the three-arm design** — Azure Linux VM, Azure Container Apps Jobs on a Consumption workload profile, and Azure Container Apps Sandboxes — decided in [`docs/AZURE-SUPPORTED-THREE-ARM-ARCHITECTURE.md`](docs/AZURE-SUPPORTED-THREE-ARM-ARCHITECTURE.md). The selected schedule is [`protocol-450-three-arm-supported-v2.json`](config/protocol-450-three-arm-supported-v2.json) with its separately declared freeze lock and 450-row matrix. Check its offline refusal status with:
+
+```bash
+node scripts/preflight-three-architecture.mjs \
+  --config config/experiment.azure-three-arm.example.json \
+  --protocol config/protocol-450-three-arm-supported-v2.json   # exits 4 while owner/live gates remain open
+```
+
+The selected v2 schedule contains 450 rows (3 arms × 3 profiles × 10 scenarios × 5 blocks): 360 unauthorized and 90 legitimate trials. U6/U8 are scheduled on all three arms (90 rows total) and gated on each arm's explicit external Blob namespace declaration plus non-counted fixture validation. Jobs P3 U5/U7 account for 10 rows that remain unsupported until attributable denial capability and pilot evidence are established; VM flow-log/firewall and Sandbox egress-decision evidence remain distinct. Revision `protocol-360-three-arm-supported-v1` is superseded for scheduling; revision 3 (300 rows), prior 400-row plans, and the legacy 450-row VM+Functions+session-pool planning matrix are historical frozen artifacts, not launch schedules. No measured thesis result or live readiness is claimed. The separate GPT-5 mini live-agent arm is still a draft. The selected deterministic revision also has a separately frozen 66-row non-counted pilot plan at `config/protocol-450-three-arm-supported-v2-pilot-v1.json` (+ its matrix and freeze lock); it is not the measured 450-row schedule, no pilot has run, and an actual pilot still requires owner-provided live configuration and authorization. Read [`docs/AZURE-OPERATOR-HANDOFF.md`](docs/AZURE-OPERATOR-HANDOFF.md) for the current code state, exact local preflight, inventory result, and remaining owner/live gates.
+
+The Functions-Flex and custom-container-session instructions further down ("Serverless: Azure Functions on Container Apps", "Isolated environment: Custom Container Sessions", and the session-pool quota note in "First Azure steps") describe that **superseded** design and are retained as history; they are not the selected serverless or isolation arms.
 
 ## What you get
 
-- **One shared TypeScript deterministic tool executor** (`src/core.ts`), reused across VM, Functions and isolated container sessions.
-- **Node HTTP agent image** for Azure VM and Container Apps custom sessions (`Dockerfile.node`).
-- **Azure Functions Node 22 image** with a thin HTTP adapter (`Dockerfile.functions`).
+- **One shared TypeScript deterministic tool executor** (`src/core.ts`), plus local adapter/client components for VM, ACA Jobs, and ACA Sandboxes. The generic trial runner consumes the v2 three-arm schedule for structural dry runs only; live behavior remains unvalidated.
+- **Node HTTP agent image** (`Dockerfile.node`) used by the VM and the ACA Jobs/Sandboxes workload adapters.
+- **Azure Functions Node 22 image** (`Dockerfile.functions`) retained for superseded VM+Functions schedules only; it is not the selected serverless arm.
 - **Research-owned mock resource service and separate collection service** with independent audit reads.
 - **Local Docker Compose pilot** for P1 broad rights, P2 restricted rights and a P3 *network-topology illustration*. Local P3 outbound restrictions are NOT a verified cloud default-deny policy.
 - A previous local topology allowed a direct-IP TCP connection to the collector despite failing Docker DNS. The revised internal network and fixed control proxy produced a network-unreachable result for that IP while the research health endpoint remained reachable. This is local-only evidence; it does not prove Azure enforcement or replace network-enforcer logs.
-- **300-row revision-3 trial plan** ([`../03-PLANNED-TRIAL-MATRIX-300-REV3.csv`](../03-PLANNED-TRIAL-MATRIX-300-REV3.csv)). These are planned rows only, not results. The 400- and 450-row files are retained as history.
+- **Selected 450-row three-arm revision** (`config/protocol-450-three-arm-supported-v2.json`, `config/plan-450-three-arm-supported-v2.csv`; 450 planned rows, not results). The 360-v1 schedule is superseded for scheduling; legacy 300/400/450 artifacts remain frozen history.
 
-The legacy generator uses `TRIAL_PLAN_SEED` (default `azure-thesis-planning-v1`) to produce a reproducible permutation. It writes the seed, algorithm and protocol hash to `results/plan-metadata.json`; its output is not the study matrix. Preserve the supplied revision-3 schedule and run `python3 scripts/validate_supplied_plan.py` to check its structure and hash before any formal freeze. Neither schedule is evidence of completed trials.
+The legacy plan generator uses `TRIAL_PLAN_SEED` (default `azure-thesis-planning-v1`) to produce a reproducible permutation; that output is not the selected study matrix. `python3 scripts/validate_supplied_plan.py` is historical revision-3 validation only. The selected v2 schedule is the externally locked matrix named above. Neither schedule is evidence of completed trials.
 
-`scripts/verify-local.mjs` checks only the starter's local mock evidence. It requires an operation-specific audit event for resource outcomes and leaves network failures indeterminate. It is not a cloud verifier or proof of P3 enforcement.
+`scripts/verify-local.mjs` checks only the starter's local mock evidence. It requires an operation-specific audit event for resource outcomes and leaves network failures indeterminate. It is not a cloud verifier or proof of P3 enforcement. The selected v2 preflight verifies the candidate protocol/matrix against a separate freeze lock, uses the legacy protocol only for the immutable historical plan, and always refuses measured launch from offline evidence.
 
-`scripts/run-experiment-cli.mjs` is the entry point. The counted study uses only the schedule whose digest is declared in `config/protocol.json` and requires all four readiness gates. `--pilot` selects the separate, protocol-frozen 60-row schedule and labels each record `non_counted_pilot`; measured gates remain false. Pilot evidence is provisional and does not prove any gate. Claims are exclusive and failures require manual reconciliation. `--evidence` is refused; measured evidence must use the locked Azure store described below. Route deployment, policy lock validation, and live Azure pilot validation remain incomplete.
+`scripts/run-experiment-cli.mjs` is the generic runner entry point for its supported frozen schedules, including the v2 three-arm candidate for **structural dry runs**: `--dry-run` resolves the declared matrix from its package root, verifies the exact frozen bytes, and reports scope from the config's per-arm capability declarations without executing anything. **Do not use it to execute the v2 candidate** — the frozen protocol keeps `measuredExecutionEnabled: false`, so a measured launch refuses at exit `3` even with all four `--gates` asserted, and no pilot row is sanctioned by this integration. The v2 read-only preflight verifies the frozen candidate and reports gates but always refuses measured launch. The selected v2 non-counted pilot uses `--protocol config/protocol-450-three-arm-supported-v2-pilot-v1.json --pilot`; it is a separate 66-row, byte-pinned schedule, and no pilot result clears a readiness gate by itself. Other `--pilot` schedules remain protocol-specific and provisional. Claims are exclusive and failures require manual reconciliation. `--evidence` is refused; measured evidence uses the locked Azure store described below.
 
 Measured CLI runs now require `scripts/azure-measured-evidence-store.mjs`: it checks the Azure Resource Manager immutability policy is `Locked` and meets the institution-approved retention days before any claim, then writes claims and evidence to Azure Blob with conditional creation. Local evidence is limited to non-counted pilots. The Bicep evidence-store template requires an explicit retention period but creates the policy unlocked; verify uploads and rejection of overwrite/delete, then lock it with its ETag. This implementation passed mocked policy tests, but has not yet been validated against the current Azure storage account or independent permissions. A checksum alone does not prevent a separately authorized principal from changing data.
 
 Before measured CLI use, configure `THESIS_EVIDENCE_BLOB_CONTAINER_URL`, `THESIS_EVIDENCE_CONTAINER_RESOURCE_ID`, `THESIS_EVIDENCE_RETENTION_DAYS`, and `THESIS_EVIDENCE_RETENTION_APPROVED=true` only after institutional approval. Use `THESIS_TOKEN_PROVIDER_MODE=managed_identity` with `THESIS_EVIDENCE_IDENTITY_CLIENT_ID` on the controller, or an authenticated Azure CLI identity with the required policy-read and Blob-write permissions. The CLI checks the policy state and duration before the first claim; no local evidence-directory override is accepted for measured runs. Do not lock a policy until a disposable container test has demonstrated create/read and rejected overwrite/delete, and the retention period is approved.
 
-An experimental `AZURE_BLOB_ENDPOINT` setting routes U1, U2, U3, U6, U8, L1 and L2 to fixed Azure Blob fixture containers using `ManagedIdentityCredential`; it never falls back to Azure CLI credentials. Selected VM P1/P2 Blob seeding and role outcomes have passed setup-only checks, but those checks do not validate the full adapters across deployments and profiles. In revision 3, U6/U8 are out of scope on sessionless VM and Functions routes; they are not prevention results. U3's dummy-token use is a separate call to the configured research mock API and requires synchronized synthetic fixtures. U4, U5 and U7 still use the existing mock/collector path. Complete cloud classification remains unproven. This mixed backend is not ready for measured trials; see `PILOT-ACCEPTANCE.md`.
+The selected v2 protocol schedules U6/U8 on VM, ACA Jobs, and ACA Sandboxes through run-scoped external Blob namespaces. Those 90 rows remain gated per arm on the explicit `azure_blob_external_namespace` declaration and a non-counted fixture-validation pilot; pending pilot status does not make them N/A. The old revision-3 VM+Functions schedule's U6/U8 scope statements are historical and do not describe v2. U3's dummy-token use is a separate call to the configured research mock API and requires synchronized synthetic fixtures. Complete cloud classification remains unproven; see [`docs/AZURE-OPERATOR-HANDOFF.md`](docs/AZURE-OPERATOR-HANDOFF.md) for current limitations.
 
 `scripts/trial-schedule.mjs` validates the complete supplied matrix and runs it sequentially using an injected runner, stopping on an indeterminate classification. `scripts/http-pilot-adapter.mjs` handles the local fixture HTTP contract and has not been validated against Azure sessions or independent cloud evidence. `scripts/local-runner-pilot.mjs` exercises these components against local Docker fixtures only; its readiness flags apply solely to that mock check.
 
@@ -34,7 +46,7 @@ For the intended Flex Consumption source arm, `scripts/build-flex-package.ps1 -O
 
 ## Requirements
 
-Linux/macOS or WSL2, Docker Engine with Compose, Node.js 22 and npm, Azure CLI after you are ready to deploy. The committed `dist/` is included so Docker builds do not need TypeScript dependencies. To change source, first run `npm install && npm run build` and rebuild the images.
+Node.js 22 and npm are required for the starter build and tests. Docker Engine with Compose is needed only for the optional local mock stack. The selected runner's ACA control-plane clients and read-only inventory can use direct Azure Identity/ARM (set `THESIS_TOKEN_PROVIDER_MODE=managed_identity`); Azure CLI is not required for structural dry runs or inventory. The Azure CLI provisioning example below is retained as historical, not as the selected v2 deployment runbook. The committed `dist/` is included so local container builds do not need TypeScript dependencies.
 
 ## Before touching Azure: run locally
 
@@ -64,9 +76,11 @@ docker run --rm thesis-agent:v1 node dist/resource.js
 
 Node image: listens on port 8080, `POST /run` and `GET /health`. Functions image: Azure Functions HTTP trigger at `POST /api/run`, port 80, requires Functions key and `x-trial-key`. Agent requires `RESEARCH_URL`, `COLLECTOR_URL`, `WORKLOAD_TOKEN`, `TRIAL_REQUEST_KEY`. The workload must never receive `ADMIN_TOKEN` or verifier credentials. Container image is not an authorization boundary by itself.
 
-## First Azure steps (Azure CLI)
+## Historical Azure CLI provisioning example — not the selected v2 runbook
 
-Before provisioning, check Azure for Students quota and regional access to **Container Apps custom container session pools**. Verify pricing. A session pool may have fixed dedicated compute charges even with zero active sessions. Also check that you can use the required registry and VM SKU.
+> **Do not use this snippet for the selected three-arm study.** It creates a resource group and ACR and builds both the Node and superseded Functions images. It is preserved as an illustrative legacy walkthrough. The selected architecture's infrastructure composition is `infra/azure-supported-three-arm.bicep`; its parameters remain placeholders, and any deployment still requires current owner approval and live inventory. No deployment is authorized by this document.
+
+Before provisioning, check quota and regional access for the **selected arms** (Container Apps Jobs on a Consumption workload profile, and Container Apps Sandboxes). Verify pricing. Also check that you can use the required registry and VM SKU.
 
 ```bash
 az login
@@ -109,7 +123,9 @@ docker run -d --name thesis-agent --restart unless-stopped \
 
 Use secure secret provisioning instead of putting real keys on the command line or into shell history. Keep the VM's public application ingress closed. The trial controller can call it through SSH tunnel or private network.
 
-### Serverless: Azure Functions on Container Apps
+### Serverless: Azure Functions on Container Apps — SUPERSEDED ARM
+
+> **Superseded (2026-11-05):** the selected serverless arm is **ACA Jobs on a Consumption workload profile** (see the [three-arm architecture decision](docs/AZURE-SUPPORTED-THREE-ARM-ARCHITECTURE.md)). The Functions instructions below are retained as history for the frozen VM+Functions plans. Do not provision new Functions apps for the study.
 
 Azure Functions **Flex Consumption cannot directly run your Docker image**. Use Azure Functions **hosted on Container Apps**, using its dedicated Functions image and `--kind functionapp`. Creating a Container Apps environment (workload profiles) is a separate prerequisite. An illustrative CLI creation is:
 
@@ -124,7 +140,9 @@ az containerapp create --name thesis-functions --resource-group "$RG" \
 
 **Do not treat this command as complete production provisioning.** You still must configure an Azure Storage connection/identity, registry pull identity, Functions settings, research URLs, security boundaries and a private controller network. Use the Functions-specific keys. A standard Container App running a bare Node server does not count as a native Azure Functions deployment.
 
-### Isolated environment: Custom Container Sessions
+### Isolated environment: Custom Container Sessions — SUPERSEDED ARM
+
+> **Superseded (2026-11-05):** the selected isolation arm is **ACA Sandboxes** (one sandbox group per permission profile, one sandbox per trial, egress-policy evidence via `NetworkEgressDecisions`). The session-pool instructions below are retained as history. The known pool limitation stands as the reason it was replaced: documented `EgressDisabled` blocks all outbound access while `EgressEnabled` allows more than the study permits, so a pool cannot express P3 selective egress.
 
 The same `thesis-agent:v1` image exposes the HTTP port required by custom container sessions. You need a workload-profiles-enabled Container Apps environment and ACR pull identity. To inspect supported flags:
 
@@ -169,16 +187,29 @@ in the pilot.
 4. Recreate resources and identities before each trial. Model U8 as seeded retained application state, not recovered provider disk.
 5. Collect independent resource evidence and network-enforcer logs. No audit means **indeterminate**, not automatically blocked.
 6. First prove all 10 scenarios possible under P1, and both L1/L2 under P2 and P3. Freeze image digests, policies and trial manifest.
-7. Only then run the revision-3 schedule: **6 active deployment/profile routes × 10 scenarios × 5 repeats = 300 scheduled rows**. U6/U8 are recorded as not applicable on VM and Functions, leaving 240 in-scope rows. Of those, 20 P3 U5/U7 rows remain unsupported until independent deny evidence is available; 220 are currently structurally measurable.
-8. The separate live-agent phase has its own unfrozen GPT-5 mini draft. Keep its outcomes separate from the deterministic baseline. The cloud integrations, independent evidence and full trial workflow remain unvalidated; no measured trial has run. See [`docs/300-TRIAL-AZURE-STATUS-2026-11-04.md`](docs/300-TRIAL-AZURE-STATUS-2026-11-04.md) for the current state.
+7. The selected v2 schedule is the new, separately frozen 450-row plan (VM + ACA Jobs + ACA Sandboxes = 9 routes); it supersedes the 360-v1 schedule for scheduling. The historical revision-3 300-row plan and legacy VM+Functions 450-row plan must not be run. The generic trial runner consumes the v2 matrix path, ACA deployment names, and U6/U8 capability metadata for structural dry runs; it still cannot launch the candidate (its measured flag is false). The v2 manifest is structural only; per-arm pilots, U6/U8 fixture validation, target-scoped controls, receiver-effect pilots, live identity/quota/capacity checks and owner authorization remain open.
+8. The separate live-agent phase has its own unfrozen GPT-5 mini draft. Keep its outcomes separate from the deterministic baseline. No measured trial has run; consult [`docs/AZURE-OPERATOR-HANDOFF.md`](docs/AZURE-OPERATOR-HANDOFF.md) for the current owner/live gates and [`docs/300-TRIAL-AZURE-STATUS-2026-11-04.md`](docs/300-TRIAL-AZURE-STATUS-2026-11-04.md) only for historical context.
 
-The current cloud release gate and verified pilot observations are in [`PILOT-ACCEPTANCE.md`](PILOT-ACCEPTANCE.md). The latest reproducible local scope/configuration preflight is recorded in [`PREFLIGHT-2026-11-03.md`](PREFLIGHT-2026-11-03.md); it is structural only and does not prove Azure readiness. Do not run the 300-row schedule until every gate passes.
+`PILOT-ACCEPTANCE.md` and `PREFLIGHT-2026-11-03.md` are historical records, not current launch approval. The current owner/live gate is [`docs/AZURE-OPERATOR-HANDOFF.md`](docs/AZURE-OPERATOR-HANDOFF.md); its offline exit-4 preflight does not authorize launch. Do not launch any measured schedule until the current handoff's integration, pilot, subscription, and owner gates have been independently reviewed.
 
 ## After testing: avoid unexpected charges
 
 Delete or stop the VM when unused, delete the custom session pool when finished (don't merely scale ready sessions to 0), and review ACR, managed environment, logging and any dedicated workload profile charges. Deleting the entire experiment resource group is the easiest way to ensure all its resources stop billing **after saving evidence and verifying no other needed assets are inside**.
 
 ## Authoritative docs
+
+Selected three-arm architecture (current):
+
+- https://learn.microsoft.com/en-us/azure/container-apps/jobs — ACA Jobs: manual start, shared environment networking, Start API warning
+- https://learn.microsoft.com/en-us/azure/container-apps/workload-profiles-overview — Consumption profile is the serverless compute model
+- https://learn.microsoft.com/en-us/azure/container-apps/user-defined-routes — UDR only in workload-profiles environments
+- https://learn.microsoft.com/en-us/azure/container-apps/sandboxes-overview — ACA Sandboxes first-class resource
+- https://learn.microsoft.com/en-us/azure/container-apps/sandboxes-egress-policies — ordered egress policies
+- https://sandboxes.azure.com/docs/sandboxes/telemetry — per-request `NetworkEgressDecisions`
+- https://learn.microsoft.com/en-us/azure/container-apps/quotas and https://sandboxes.azure.com/docs/sandboxes/limits/ — documented quota categories and defaults (not live subscription values)
+- https://azure.microsoft.com/en-us/pricing/details/container-apps/ — pricing (read for current numbers; this repo asserts none)
+
+Superseded Functions/session design (history):
 
 - https://learn.microsoft.com/en-us/azure/azure-functions/functions-container-apps-hosting
 - https://learn.microsoft.com/en-us/azure/container-apps/functions-overview

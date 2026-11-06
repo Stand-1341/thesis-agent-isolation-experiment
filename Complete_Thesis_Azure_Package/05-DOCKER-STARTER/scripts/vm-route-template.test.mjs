@@ -13,14 +13,14 @@ test('VM route uses a dedicated profile UAI and preserves the separate host iden
   assert.match(template,/networkIsolationValidated: 'false'/);
 });
 
-test('VM route requires explicit controller/operator CIDRs and denies other ingress',()=>{
+test('VM route allows HTTPS only from controller CIDRs and denies all other ingress',()=>{
   assert.match(template,/param subnetId string/);
   assert.match(template,/param controllerSourcePrefixes array/);
-  assert.match(template,/param operatorSourcePrefixes array/);
   assert.match(template,/sourceAddressPrefixes: controllerSourcePrefixes/);
   assert.match(template,/name: 'controller-https'/);
-  assert.match(template,/name: 'operator-ssh'/);
   assert.match(template,/name: 'deny-other-inbound'/);
+  assert.doesNotMatch(template,/operatorSourcePrefixes|operator-ssh/);
+  assert.doesNotMatch(template,/destinationPortRange:\s*'22'/);
   assert.match(template,/dedicated VM subnet/);
   assert.match(template,/does not provision/);
   assert.match(template,/P3 egress enforcement/);

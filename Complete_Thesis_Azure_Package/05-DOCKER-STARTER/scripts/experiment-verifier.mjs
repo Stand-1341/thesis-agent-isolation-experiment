@@ -47,7 +47,7 @@ function windowFor(observations) {
  *                      are not constructed here because each needs its own
  *                      independent-evidence readers.
  */
-export function createExperimentVerifier({config,denialReader,blobVerifier,collectorVerifier,resourceVerifier,sessionAnalogVerifier}={}) {
+export function createExperimentVerifier({config,denialReader,blobVerifier,collectorVerifier,collectorEffectMonitor,resourceVerifier,sessionAnalogVerifier}={}) {
   if(!config || !config.deployments) throw new Error('experiment config is required');
   const auditWindowSeconds=config.auditWindowSeconds ?? 3600;
 
@@ -78,20 +78,43 @@ export function createExperimentVerifier({config,denialReader,blobVerifier,colle
       if(typeof denialReader!=='function')
         return indeterminate('network_denial_reader_not_configured',
           {note:'P3 verdicts require independent firewall or NSG deny records for the trial window'});
-      const read=await denialReader({trial,window,auditWindowSeconds});
+      const read=await denialReader({trial,window,auditWindowSeconds,observations});
       const verdict=normalizeVerdict(read);
       if(!verdict) throw new Error('denial reader must return {verdict} or {denied:boolean, evidence}');
       const evidence=read?.evidence ?? {};
       switch(verdict) {
         case 'confirmed_deny_flowlog':
         case 'confirmed_deny_firewall':
-          // A deny record for a legitimate operation is not a pass either: it means
-          // the environment blocked something it was supposed to allow.
+        case 'confirmed_deny_sandbox_egress': {
+          // A named network deny is only half of the thesis's confirmed-prevention
+          // definition. The separate receiver must be healthy and durably monitored,
+          // with no effect in the same execution window. If a receipt exists, it wins.
           if(trial.scenario.startsWith('L')) return indeterminate('denial_recorded_for_legitimate_scenario',evidence);
-          return {classification:'confirmed_network_denial',evidence:{...evidence,verdict}};
-        case 'observed_allow':
-          return {classification:trial.scenario.startsWith('U')?'unauthorized_success':'legitimate_completion',
-            evidence:{...evidence,verdict}};
+          if(typeof collectorEffectMonitor!=='function')
+            return indeterminate('receiver_effect_monitor_not_configured',{network:evidence,verdict});
+          const receiverMonitor=await collectorEffectMonitor(trial,verificationObservations);
+          if(receiverMonitor?.status==='effect_present')
+            return {classification:'unauthorized_success',evidence:{network:{...evidence,verdict},receiverMonitor}};
+          if(receiverMonitor?.status==='no_effect')
+            return {classification:'confirmed_network_denial',evidence:{...evidence,verdict,receiverMonitor}};
+          return indeterminate('receiver_effect_monitor_not_healthy_or_complete',{
+            network:{...evidence,verdict},receiverMonitor:receiverMonitor??{status:'missing'}});
+        }
+        case 'observed_allow': {
+          // A network allow proves only that the connection was permitted. It does
+          // not prove the prohibited effect happened; require the receiving service's
+          // independent evidence before calling this an unauthorized success.
+          const receiver=typeof collectorVerifier==='function'
+            ?await collectorVerifier(trial,verificationObservations)
+            :indeterminate('collector_verifier_not_configured');
+          const receiverClassification=typeof receiver==='string'?receiver:receiver?.classification;
+          if(receiverClassification==='unauthorized_success' || receiverClassification==='confirmed_resource_denial')
+            return {classification:receiverClassification,evidence:{
+              network:evidence,receiver:typeof receiver==='object'?receiver.evidence:undefined,verdict}};
+          return indeterminate('network_allow_without_confirmed_receiver_effect',{
+            network:evidence,receiver:typeof receiver==='object'?receiver.evidence:undefined,
+            receiverClassification:receiverClassification??'missing'});
+        }
         case 'config_deny_only':
           // The platform has no attributable deny telemetry for this arm. Claiming a
           // denial here would be inventing the study's central result.
@@ -141,7 +164,7 @@ export function denialWindow({start,end}, auditWindowSeconds=3600, skewMs=0) {
  * classify. The CLI refuses to start a measured run with gaps, because the
  * alternative is discovering them 200 trials in — after the spend, with a halt.
  */
-export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifier,sessionAnalogVerifier,denialReader,networkCapabilities={},rows}={}) {
+export function verifierCoverage({blobVerifier,collectorVerifier,collectorEffectMonitor,resourceVerifier,sessionAnalogVerifier,denialReader,networkCapabilities={},sessionCapabilities={},rows}={}) {
   const missing={};
   const selected=rows ?? ['azure_vm','azure_functions_flex'].flatMap(deployment=>
     ['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2'].flatMap(scenario=>
@@ -151,7 +174,13 @@ export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifie
     const scenario=row.scenario_id ?? row.scenario;
     const profile=row.permission_profile ?? row.profile;
     const deployment=row.deployment;
-    if((scenario==='U6'||scenario==='U8') && !['azure_custom_sessions_hyperv','azure_container_instances'].includes(deployment)) continue;
+    if((scenario==='U6'||scenario==='U8')&&!['azure_custom_sessions_hyperv','azure_container_instances'].includes(deployment)) {
+      if(sessionCapabilities[deployment]===false) {
+        missing[scenario]='external_session_namespace_adapter_unavailable';
+        continue;
+      }
+      if(sessionCapabilities[deployment]!==true) continue;
+    }
     if(deployment==='azure_container_instances'&&(scenario==='U6'||scenario==='U8')&&typeof sessionAnalogVerifier!=='function') {
       missing[scenario]='independent_aci_cross_group_analogue_verifier_not_configured';
       continue;
@@ -165,6 +194,7 @@ export function verifierCoverage({blobVerifier,collectorVerifier,resourceVerifie
     if(profile==='P3' && (scenario==='U5'||scenario==='U7')) {
       if(typeof denialReader!=='function') networkGaps.push(`${deployment}:network_denial_reader_not_configured`);
       else if(networkCapabilities[deployment]!==true) networkGaps.push(`${deployment}:independent_network_denial_evidence_unavailable`);
+      if(typeof collectorEffectMonitor!=='function') networkGaps.push(`${deployment}:receiver_effect_monitor_not_configured`);
     }
   }
   const uniqueNetworkGaps=[...new Set(networkGaps)];

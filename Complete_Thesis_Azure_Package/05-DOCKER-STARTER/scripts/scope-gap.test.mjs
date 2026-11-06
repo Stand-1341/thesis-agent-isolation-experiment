@@ -13,19 +13,21 @@ const protocol=JSON.parse(readFileSync(new URL('../config/protocol.json',import.
 const plan=loadFrozenSchedule(bytes,sha);
 
 const guid='11111111-1111-4111-8111-111111111111';
-const verifier=createAzureBlobVerifier({
+const verifierOptions={
   readAudit:async()=>[],
   principalForTrial:()=>guid,
   blobEndpoint:'https://example.blob.core.windows.net',
   blobResourceId:'/subscriptions/11111111-1111-4111-8111-111111111111/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/acct',
   workspaceId:guid,
   sessionFixtureOwnerPrincipalId:guid,
+  sessionDataCapabilities:{},
   auditPipelineValidated:true,
   authorizationValidated:true,
   clockSyncValidated:true,
   auditWaitMs:0,
   wait:async()=>{}
-});
+};
+const verifier=createAzureBlobVerifier(verifierOptions);
 
 test('the protocol audit window now covers the documented ingestion latency',()=>{
   assert.equal(protocol.auditWindowSeconds,3600);
@@ -48,6 +50,21 @@ test('every one of those 60 is declared out of scope, not indeterminate',async()
     assert.equal(verdict.classification,'not_applicable',`${row.planned_run_id} (${row.scenario_id}/${row.deployment})`);
     assert.equal(verdict.evidence.reason,'scenario_requires_sessions');
   }
+});
+
+test('an explicitly unavailable external session adapter is not misreported as a measured failure',async()=>{
+  const unavailable=createAzureBlobVerifier({...verifierOptions,sessionDataCapabilities:{azure_functions_flex:false}});
+  const verdict=await unavailable({scenario:'U6',deployment:'azure_functions_flex',permission_profile:'P2'}, {timing:{}});
+  assert.equal(verdict.classification,'not_applicable');
+  assert.equal(verdict.evidence.reason,'scenario_requires_sessions');
+});
+
+test('enabled external-session verification requires independently observed namespace fixtures',async()=>{
+  const enabled=createAzureBlobVerifier({...verifierOptions,sessionDataCapabilities:{azure_functions_flex:true}});
+  const verdict=await enabled({runId:'external-fixture-missing',scenario:'U6',deployment:'azure_functions_flex',permission_profile:'P1'},
+    {reset:{},output:{status:200},evidence:{},timing:{executionStartedAt:'2026-11-05T12:00:00.000Z',executionFinishedAt:'2026-11-05T12:00:01.000Z'}});
+  assert.equal(verdict.classification,'indeterminate');
+  assert.equal(verdict.evidence.reason,'external_session_namespace_fixture_missing');
 });
 
 const isScopeGap=trial=>['U6','U8'].includes(trial.scenario) && trial.deployment!=='azure_custom_sessions_hyperv';

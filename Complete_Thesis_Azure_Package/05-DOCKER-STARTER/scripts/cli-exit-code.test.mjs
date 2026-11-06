@@ -1,9 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {mkdtempSync,writeFileSync,readdirSync,existsSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 /**
@@ -16,6 +17,8 @@ import {fileURLToPath} from 'node:url';
  * asserts the success path, the halt path, and that the refused path writes nothing.
  */
 const CONFIG=fileURLToPath(new URL('../config/experiment.example.json',import.meta.url));
+const DEFAULT_PROTOCOL=fileURLToPath(new URL('../config/protocol.json',import.meta.url));
+const PACKAGE_ROOT=fileURLToPath(new URL('../../',import.meta.url));
 const CLI=fileURLToPath(new URL('./run-experiment-cli.mjs',import.meta.url));
 const GATES='protocolFrozen,deploymentValidated,isolationValidated,verifierValidated';
 
@@ -34,6 +37,7 @@ export default {
   denialReader:Object.assign(async()=>({verdict:'observed_allow',evidence:{}}),
     {capabilities:{azure_vm:true,azure_functions_flex:true}}),
   blobVerifier:ok,collectorVerifier:ok,resourceVerifier:ok,
+  collectorEffectMonitor:async()=>({status:'no_effect',healthy:true,durable:true}),
   sessionFactory:httpFactory,httpFactory
 };`;
 
@@ -50,14 +54,25 @@ export default {
   denialReader:Object.assign(async()=>({verdict:'observed_allow',evidence:{}}),
     {capabilities:{azure_vm:true,azure_functions_flex:true}}),
   blobVerifier:indeterminate,collectorVerifier:indeterminate,resourceVerifier:indeterminate,
+  collectorEffectMonitor:async()=>({status:'no_effect',healthy:true,durable:true}),
   sessionFactory:httpFactory,httpFactory
 };`;
 
 function scaffold(body) {
   const dir=mkdtempSync(join(tmpdir(),'thesis-exit-'));
   const deps=join(dir,'deps.mjs');
+  const matrix=join(dir,'matrix.csv');
+  const protocol=join(dir,'protocol.json');
   writeFileSync(deps,body.trim());
-  return {dir,deps,evidence:join(dir,'evidence')};
+  const checkedInProtocol=JSON.parse(readFileSync(DEFAULT_PROTOCOL,'utf8'));
+  const matrixBytes=readFileSync(resolve(PACKAGE_ROOT,checkedInProtocol.matrix.file));
+  const matrixSha256=createHash('sha256').update(matrixBytes).digest('hex');
+  writeFileSync(matrix,matrixBytes);
+  writeFileSync(protocol,JSON.stringify({...checkedInProtocol,
+    readiness:{...(checkedInProtocol.readiness??{}),measuredExecutionEnabled:true},
+    matrix:{...checkedInProtocol.matrix,file:matrix,sha256:matrixSha256}
+  },null,2));
+  return {dir,deps,evidence:join(dir,'evidence'),protocol};
 }
 
 function credentials() {
@@ -76,8 +91,8 @@ function run(args) {
 }
 
 test('a fully executed scoped run exits 0',()=>{
-  const {deps,evidence}=scaffold(PASSING_DEPS);
-  const out=run(['--config',CONFIG,'--deps',deps,
+  const {deps,protocol}=scaffold(PASSING_DEPS);
+  const out=run(['--config',CONFIG,'--protocol',protocol,'--deps',deps,
     '--deployment','azure_vm','--limit','3','--gates',GATES,'--json']);
   assert.ok(out.summary,`expected a JSON summary, got:\n${out.stdout}\n${out.stderr}`);
   assert.equal(out.summary.executed,3);
@@ -89,8 +104,8 @@ test('a fully executed scoped run exits 0',()=>{
 });
 
 test('a halted run exits 2, so success and failure stay distinguishable',()=>{
-  const {deps,evidence}=scaffold(HALTING_DEPS);
-  const out=run(['--config',CONFIG,'--deps',deps,
+  const {deps,protocol}=scaffold(HALTING_DEPS);
+  const out=run(['--config',CONFIG,'--protocol',protocol,'--deps',deps,
     '--deployment','azure_vm','--limit','3','--gates',GATES,'--json']);
   assert.ok(out.summary);
   assert.equal(out.summary.halted,true);
@@ -99,9 +114,9 @@ test('a halted run exits 2, so success and failure stay distinguishable',()=>{
 });
 
 test('the simulated revision-3 300-row matrix can execute end to end',()=>{
-  const {deps,evidence}=scaffold(PASSING_DEPS);
+  const {deps,protocol}=scaffold(PASSING_DEPS);
   // This uses mocked passing capabilities to test runner behavior, not cloud readiness.
-  const out=run(['--config',CONFIG,'--deps',deps,'--gates',GATES,'--json']);
+  const out=run(['--config',CONFIG,'--protocol',protocol,'--deps',deps,'--gates',GATES,'--json']);
   assert.ok(out.summary,`expected a JSON summary, got:\n${out.stdout}\n${out.stderr}`);
   assert.equal(out.summary.executed,300);
   assert.equal(out.summary.halted,false);
@@ -113,11 +128,8 @@ test('the simulated revision-3 300-row matrix can execute end to end',()=>{
 test('a selection with an unsupported row is still refused before any claim',()=>{
   // Without advertised denial capability the VM and Functions P3 U5/U7 cells have no
   // evidence source, so a selection containing them must be refused whole.
-  const dir=mkdtempSync(join(tmpdir(),'thesis-refuse-'));
-  const deps=join(dir,'deps.mjs');
-  writeFileSync(deps,PASSING_DEPS.replace('{azure_vm:true,azure_functions_flex:true}','{}'));
-  const evidence=join(dir,'evidence');
-  const out=run(['--config',CONFIG,'--deps',deps,'--gates',GATES]);
+  const {deps,protocol,evidence}=scaffold(PASSING_DEPS.replace('{azure_vm:true,azure_functions_flex:true}','{}'));
+  const out=run(['--config',CONFIG,'--protocol',protocol,'--deps',deps,'--gates',GATES]);
   assert.notEqual(out.code,0);
   assert.match(out.stdout+out.stderr,/refusing to run/i);
   const written=existsSync(evidence)?readdirSync(evidence):[];
@@ -125,11 +137,18 @@ test('a selection with an unsupported row is still refused before any claim',()=
 });
 
 test('measured runs fail closed without a locked Azure evidence store',()=>{
-  const {deps}=scaffold(PASSING_DEPS.replace('  evidenceStore:{claim:async()=>{},save:async()=>{}},',''));
-  const out=run(['--config',CONFIG,'--deps',deps,'--deployment','azure_vm','--limit','1','--gates',GATES,'--json']);
+  const {deps,protocol}=scaffold(PASSING_DEPS.replace('  evidenceStore:{claim:async()=>{},save:async()=>{}},',''));
+  const out=run(['--config',CONFIG,'--protocol',protocol,'--deps',deps,'--deployment','azure_vm','--limit','1','--gates',GATES,'--json']);
   assert.equal(out.code,3);
   assert.match(out.stderr,/evidence store error: institution-approved evidence retention or an applicable explicit owner-directed retention basis is required/);
   assert.equal(out.summary,null,'no trial summary may be emitted when evidence is unprotected');
+});
+
+test('the checked-in non-enabled protocol still refuses a measured run',()=>{
+  const out=run(['--config',CONFIG,'--deployment','azure_vm','--limit','1','--gates',GATES,'--json']);
+  assert.equal(out.code,3);
+  assert.equal(out.summary,null,'the real draft protocol must not emit a trial summary');
+  assert.match(out.stderr,/protocol measuredExecutionEnabled: false \(missing explicit true\)/);
 });
 
 test('measured runs reject the local evidence-directory option',()=>{

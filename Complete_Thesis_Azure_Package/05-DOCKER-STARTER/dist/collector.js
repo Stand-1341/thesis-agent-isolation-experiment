@@ -38,6 +38,11 @@ createServer((req, res) => {
                 return send(res, 503, { error: 'collector journal unavailable' });
             if (path === '/health' && req.method === 'GET')
                 return send(res, 200, { ready: true });
+            if (path === '/admin/monitor' && req.method === 'GET') {
+                if (!admin && (!verifierToken || req.headers['x-verifier-token'] !== verifierToken))
+                    return send(res, 403, { error: 'monitor reader only' });
+                return send(res, 200, { ready: !journalFailed, journalEnabled: !!journal, journalHealthy: !!journal && !journalFailed, observedAt: new Date().toISOString() });
+            }
             if (path === '/admin/reset' && req.method === 'POST') {
                 if (!admin)
                     return send(res, 403, { error: 'admin only' });

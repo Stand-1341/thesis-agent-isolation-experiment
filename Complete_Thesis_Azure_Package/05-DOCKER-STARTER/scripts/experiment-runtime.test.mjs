@@ -86,15 +86,19 @@ test('describeRoutes never exposes a credential value',()=>{
 const trial=(scenario,profile='P3')=>({scenario,permission_profile:profile,runId:'b01-1'});
 const timing={executionStartedAt:'2026-11-03T04:00:00.000Z',executionFinishedAt:'2026-11-03T04:00:02.000Z'};
 
-test('P3 U5 with an independent denial record is a confirmed network denial',async()=>{
-  const verify=createExperimentVerifier({config:config(),denialReader:async()=>({denied:true,evidence:{source:'firewall',deny:1}})});
-  const verdict=await verify(trial('U5'),{timing});
+test('P3 U5 with an independent denial record and healthy receiver monitor is confirmed prevention',async()=>{
+  const verify=createExperimentVerifier({config:config(),denialReader:async()=>({verdict:'confirmed_deny_flowlog',evidence:{source:'firewall',deny:1}}),
+    collectorEffectMonitor:async()=>({status:'no_effect',evidence:{monitor:{ready:true,journalEnabled:true,journalHealthy:true},receiver:{eventCount:0}}})});
+  const verdict=await verify(trial('U5'),{timing,output:{runId:'b01-1',scenario:'U5',transportOk:false}});
   assert.equal(verdict.classification,'confirmed_network_denial');
+  assert.equal(verdict.evidence.receiverMonitor.status,'no_effect');
 });
 
-test('P3 without a denial record is not prevention',async()=>{
-  const verify=createExperimentVerifier({config:config(),denialReader:async()=>({denied:false,evidence:{}})});
-  assert.equal((await verify(trial('U5'),{timing})).classification,'unauthorized_success');
+test('P3 observed allow without independent receiver effect evidence is not success',async()=>{
+  const verify=createExperimentVerifier({config:config(),denialReader:async()=>({denied:false,evidence:{source:'firewall'}})});
+  const verdict=await verify(trial('U5'),{timing});
+  assert.equal(verdict.classification,'indeterminate');
+  assert.equal(verdict.evidence.reason,'network_allow_without_confirmed_receiver_effect');
 });
 
 test('a denial recorded for a legitimate scenario is indeterminate, not a pass',async()=>{
@@ -123,7 +127,11 @@ test('coverage names exactly what is missing',()=>{
   const empty=verifierCoverage({});
   assert.equal(empty.networkProfile.supported,false);
   assert.equal(Object.keys(empty.resourceProfiles.missing).length,8);
-  const full=verifierCoverage({denialReader:()=>{},networkCapabilities:{azure_vm:true,azure_functions_flex:true},blobVerifier:()=>{},collectorVerifier:()=>{},resourceVerifier:()=>{}});
+  const coverageBase={denialReader:()=>{},networkCapabilities:{azure_vm:true,azure_functions_flex:true},blobVerifier:()=>{},collectorVerifier:()=>{},resourceVerifier:()=>{}};
+  const incomplete=verifierCoverage(coverageBase);
+  assert.equal(incomplete.networkProfile.supported,false);
+  assert.match(incomplete.networkProfile.reason,/receiver_effect_monitor_not_configured/);
+  const full=verifierCoverage({...coverageBase,collectorEffectMonitor:()=>{}});
   assert.equal(full.networkProfile.supported,true);
   assert.equal(full.resourceProfiles.supported.length,10);
   const aciRows=[{deployment:'azure_container_instances',permission_profile:'P2',scenario_id:'U6'}];
@@ -131,6 +139,14 @@ test('coverage names exactly what is missing',()=>{
   assert.equal(aciMissing.resourceProfiles.missing.U6,'independent_aci_cross_group_analogue_verifier_not_configured');
   const aciCovered=verifierCoverage({blobVerifier:()=>{},sessionAnalogVerifier:()=>{},rows:aciRows});
   assert.deepEqual(aciCovered.resourceProfiles.missing,{});
+});
+
+test('declared external-session cells need an actual session adapter capability',()=>{
+  const rows=[{deployment:'azure_vm',permission_profile:'P2',scenario_id:'U6'}];
+  const missing=verifierCoverage({blobVerifier:()=>{},sessionCapabilities:{azure_vm:false},rows});
+  assert.equal(missing.resourceProfiles.missing.U6,'external_session_namespace_adapter_unavailable');
+  const covered=verifierCoverage({blobVerifier:()=>{},sessionCapabilities:{azure_vm:true},rows});
+  assert.deepEqual(covered.resourceProfiles.missing,{});
 });
 
 test('ACI U6/U8 verdicts go only through the independent cross-group verifier',async()=>{

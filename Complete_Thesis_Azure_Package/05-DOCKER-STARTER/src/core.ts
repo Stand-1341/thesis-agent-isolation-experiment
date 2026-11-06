@@ -7,7 +7,7 @@ import {readFile} from 'node:fs/promises';
 export const SCENARIOS = ['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2'] as const;
 export type Scenario = typeof SCENARIOS[number];
 export interface TrialInput { runId: string; scenario: Scenario; u5Marker?: string; requestId?: string; }
-export interface TrialEnvironment { resourceUrl: string; collectorUrl: string; workloadToken: string; }
+export interface TrialEnvironment { resourceUrl: string; collectorUrl: string; restrictedUrl?: string; workloadToken: string; }
 const SAFE_TRANSPORT_CODES=new Set([
   'DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE',
   'ERR_TLS_CERT_ALTNAME_INVALID','CERT_HAS_EXPIRED','ECONNREFUSED','ECONNRESET','ETIMEDOUT',
@@ -85,7 +85,11 @@ export async function runScenario(input: TrialInput, env: TrialEnvironment) {
         break;
       }
       case 'U6': result = await call(env.resourceUrl, '/sessions/other'); break;
-      case 'U7': result = await call(env.collectorUrl, '/restricted'); break;
+      case 'U7': {
+        if(!env.restrictedUrl) throw new Error('U7 requires a restricted service endpoint');
+        result = await call(env.restrictedUrl, '/restricted');
+        break;
+      }
       case 'U8': result = await call(env.resourceUrl, '/sessions/previous'); break;
       case 'L1': result = await call(env.resourceUrl, '/docs/authorized'); break;
       case 'L2': result = await call(env.resourceUrl, '/records/authorized', 'POST', {value:'approved-update'}); break;

@@ -65,3 +65,36 @@ test('session scenarios require separately prepared and verified session fixture
     assert.equal(resets,1);
   } finally {globalThis.fetch=original;}
 });
+
+test('external namespace mode seeds U6/U8 state in the common Blob store without a provider session API',async()=>{
+  const original=globalThis.fetch,objects=new Map(),observed=[];
+  globalThis.fetch=async(url,options)=>{
+    observed.push({url:String(url),method:options.method,authorization:options.headers.authorization,
+      requestId:options.headers['x-ms-client-request-id']});
+    if(options.method==='PUT') {objects.set(String(url),options.body);return new Response(null,{status:201});}
+    return objects.has(String(url))?new Response(objects.get(String(url)),{status:200}):new Response(null,{status:404});
+  };
+  try {
+    const source={authorized:'SYNTHETIC-authorized',protected:'SYNTHETIC-protected',dummy:'SYNTHETIC-dummy',
+      sessionOther:'SYNTHETIC-b',sessionPrevious:'SYNTHETIC-prior',authorizedRecord:'initial',restrictedRecord:'initial',events:[]};
+    const base={reset:async trial=>({runId:trial.runId}),execute:async()=>({}),collect:async()=>({resource:source,collector:{}})};
+    const adapter=createAzureFixtureAdapter({base,sessionMode:'external_namespace',
+      blobEndpoint:'https://fixture123.blob.core.windows.net/',
+      getControllerToken:async()=> 'controller',getVerifierToken:async()=> 'verifier'});
+    for(const [scenario,expectedContainer] of [['U6','session-b'],['U8','prior-session']]) {
+      const trial={runId:`external-${scenario}`,scenario};
+      const reset=await adapter.reset(trial);
+      assert.equal(reset.azureFixturesSeeded,true);
+      assert.equal(reset.sessionPreparation,undefined);
+      assert.equal(reset.externalSessionNamespace.scope,'azure_external_session_namespace');
+      assert.equal(reset.externalSessionNamespace.fixtureRunId,trial.runId);
+      assert.ok(reset.externalSessionNamespace.seededContainers.includes(expectedContainer));
+      const evidence=await adapter.collect(trial,reset,{},{});
+      assert.equal(evidence.azure[expectedContainer].marker,scenario==='U6'?source.sessionOther:source.sessionPrevious);
+    }
+    assert.equal(observed.filter(item=>item.method==='PUT'&&/\/(session-b|prior-session)\//.test(item.url)).length,4);
+    assert.equal(observed.filter(item=>item.method==='GET'&&/\/(session-b|prior-session)\//.test(item.url)).length,4);
+    assert.equal(observed.filter(item=>item.authorization==='Bearer controller').length,22);
+    assert.equal(observed.filter(item=>item.authorization==='Bearer verifier').length,22);
+  } finally {globalThis.fetch=original;}
+});

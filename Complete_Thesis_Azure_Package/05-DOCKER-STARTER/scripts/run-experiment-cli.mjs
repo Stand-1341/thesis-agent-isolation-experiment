@@ -25,6 +25,7 @@ import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
 import {runExperiment} from './experiment-runner.mjs';
 import {loadFrozenSchedule} from './trial-schedule.mjs';
 import {analyzeTrialScope} from './scenario-scope.mjs';
+import {freezeLockPathFor,THREE_ARM_DEPLOYMENTS,validateFrozenPilotProtocol,validateSelectedProtocol} from './preflight-three-architecture.mjs';
 
 const EXIT={complete:0,partial:2,gates:3,config:4,usage:5};
 
@@ -32,7 +33,7 @@ const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
 
   --config <file>        deployment configuration (no secrets; see experiment-config.mjs)
   --protocol <json>      protocol file selecting the matrix (defaults to config/protocol.json)
-  --pilot                run the separate frozen 60-row non-counted pilot schedule
+  --pilot                run the protocol's separately frozen non-counted pilot schedule
   --pilot-retry          run the versioned non-counted Functions P1 retry schedule
   --pilot-evidence <dir> isolated evidence directory for --pilot (default: results/non-counted-pilot)
   --limit <n>            limit a run to an initial subset (with --pilot this is non-counted)
@@ -135,20 +136,9 @@ function gatesFrom(values) {
 
 const abilityUnknown=source=>source!=='deps.denialReader';
 
-/**
- * Ordinary dry-runs remain non-counted dependency construction. The guarded
- * measured launcher passes all four reviewed gates to its dry-run so the
- * dependency factory applies the same verifier assertions as the measured path.
- */
+/** Dry-runs may inspect capabilities, but never request measured dependency construction. */
 export function dependencyModeFor(options={}) {
-  if(options.pilot) return 'non_counted_pilot';
-  if(options.dryRun) {
-    const values=options.gates??[];
-    const supplied=new Set(values);
-    return values.length===GATE_NAMES.length&&supplied.size===GATE_NAMES.length&&
-      GATE_NAMES.every(name=>supplied.has(name))?'measured':'non_counted_pilot';
-  }
-  return 'measured';
+  return options.pilot||options.dryRun?'non_counted_pilot':'measured';
 }
 
 /** The frozen digest, as declared by the protocol rather than derived from the file. */
@@ -158,9 +148,39 @@ async function readDeclaredMatrix(protocolPath,schedule='measured') {
     const protocol=JSON.parse(text);
     const matrix=schedule==='retry'?protocol.pilotRetryPlan:schedule==='standard'?protocol.pilotPlan:protocol.matrix;
     if(!matrix || typeof matrix.sha256!=='string' || !/^[0-9a-f]{64}$/.test(matrix.sha256)) return null;
-    return {...matrix,protocolRevision:protocol.revision,ownerDirection:protocol.ownerDirection,
-      measuredExecutionEnabled:protocol.readiness?.measuredExecutionEnabled ?? protocol.runner?.measuredExecutionEnabled};
+    const sessionDataCapabilities=protocol.sessionDataCapabilities??{};
+    if(!sessionDataCapabilities||typeof sessionDataCapabilities!=='object'||Array.isArray(sessionDataCapabilities)||
+      Object.values(sessionDataCapabilities).some(value=>value!==true)) return null;
+    // The frozen three-arm v2 revision declares the per-arm U6/U8 schedule here
+    // instead of in the legacy flat sessionDataCapabilities map.
+    const scheduledOn=protocol.u6U8Operationalization?.scheduledOn;
+    if(scheduledOn!==undefined&&(!Array.isArray(scheduledOn)||scheduledOn.some(name=>typeof name!=='string'||!name))) return null;
+    return {...matrix,protocolRevision:protocol.revision,ownerDirection:protocol.ownerDirection,protocolBytes:Buffer.from(text,'utf8'),
+      measuredExecutionEnabled:protocol.readiness?.measuredExecutionEnabled ?? protocol.runner?.measuredExecutionEnabled,
+      sessionDataCapabilities,...(scheduledOn===undefined?{}:{u6U8ScheduledOn:[...scheduledOn]})};
   } catch (error) { return null; }
+}
+
+/**
+ * Session capability follows the config's explicit per-deployment declaration:
+ * an arm whose deployment sets sessionDataStore to azure_blob_external_namespace
+ * realizes U6/U8 as run-scoped external Blob container namespaces, so its
+ * scheduled U6/U8 rows are measurable-but-fixture-gated, never silently
+ * not applicable. A scheduled arm without the declaration stays not_applicable
+ * (scenario_requires_sessions). Legacy protocols that enumerate
+ * sessionDataCapabilities keep their original deps-advertised semantics.
+ */
+export function sessionCapabilitiesFor(declared,configShape,available={}) {
+  const capabilities={};
+  for(const deployment of Object.keys(declared?.sessionDataCapabilities??{}))
+    capabilities[deployment]=available[deployment]===true;
+  for(const deployment of declared?.u6U8ScheduledOn??[]) {
+    const store=configShape?.deployments?.[deployment]?.sessionDataStore;
+    if(store==='azure_blob_external_namespace') capabilities[deployment]=true;
+    else if(store!==undefined) capabilities[deployment]=false;
+    // No declaration: leave the arm unset so scope reports it not_applicable.
+  }
+  return capabilities;
 }
 
 /**
@@ -169,7 +189,7 @@ async function readDeclaredMatrix(protocolPath,schedule='measured') {
  * imports the module when one is supplied and reports why it could not when it can't.
  */
 async function resolveNetworkCapabilities(options,configShape,routeKeys) {
-  if(!options.deps) return {capabilities:{},source:'no --deps supplied'};
+  if(!options.deps) return {capabilities:{},sessionCapabilities:{},source:'no --deps supplied'};
   try {
     const module=await import(pathToFileURL(resolve(options.deps)).href);
     const exported=module.default ?? module;
@@ -178,11 +198,12 @@ async function resolveNetworkCapabilities(options,configShape,routeKeys) {
       // It is never an executed pilot and must not require the measured gates.
       mode:dependencyModeFor(options),routeKeys}):exported;
     const capabilities=deps?.denialReader?.capabilities;
+    const sessionCapabilities=deps?.sessionCapabilities??{};
     if(!capabilities || typeof capabilities!=='object')
-      return {capabilities:{},source:'deps.denialReader advertises no capabilities',deps};
-    return {capabilities,source:'deps.denialReader',deps};
+      return {capabilities:{},sessionCapabilities,source:'deps.denialReader advertises no capabilities',deps};
+    return {capabilities,sessionCapabilities,source:'deps.denialReader',deps};
   } catch (error) {
-    return {capabilities:{},source:`unavailable (${String(error?.message ?? error).split('\n')[0]})`};
+    return {capabilities:{},sessionCapabilities:{},source:`unavailable (${String(error?.message ?? error).split('\n')[0]})`};
   }
 }
 
@@ -215,17 +236,41 @@ async function main(argv) {
   const protocolPath=resolve(options.protocol??defaultProtocol);
   const declared=await readDeclaredMatrix(protocolPath,options.pilotSchedule??'measured');
   if(!declared) { process.stderr.write('protocol error: schedule metadata is missing or invalid\n'); return EXIT.config; }
-  if(!options.pilot && !options.dryRun && declared.measuredExecutionEnabled===false) {
-    process.stderr.write('protocol is marked measuredExecutionEnabled=false; this draft is structural-preflight only\n');
-    return EXIT.gates;
+  if(declared.protocolRevision==='three-arm-supported-450-v2-pilot-v1'&&!options.pilot) {
+    process.stderr.write('protocol error: the three-arm v2 pilot protocol requires --pilot and cannot select a measured schedule\n');
+    return EXIT.config;
   }
-  // Matrix filenames are rooted at the package directory above 05-DOCKER-STARTER,
-  // matching the existing protocol files and the supplied 400-row draft.
-  const packageRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..','..');
-  const matrixPath=resolve(packageRoot,declared.file);
-  let matrix,rows;
+  if(!options.pilot && !options.dryRun) {
+    const requestedGates=gatesFrom(options.gates);
+    if(declared.measuredExecutionEnabled!==true || !Object.values(requestedGates).every(Boolean)) {
+      process.stderr.write('refusing to run: not all readiness gates are asserted\n'+
+        `${GATE_NAMES.map(name=>`  ${name}: ${requestedGates[name]}`).join('\n')}\n`+
+        `protocol measuredExecutionEnabled: ${declared.measuredExecutionEnabled===true?'true':'false (missing explicit true)'}\n`+
+        'Every gate must be established independently before a measured run.\n');
+      return EXIT.gates;
+    }
+  }
+  // Matrix filenames are rooted either at the package directory above
+  // 05-DOCKER-STARTER (the original 03-*.csv plans) or at 05-DOCKER-STARTER
+  // itself (the config/plan-*.csv three-arm revisions). Both roots are fixed
+  // relative to this script, and the declared digest below still authenticates
+  // the exact bytes, so resolving through either root fails closed on any
+  // substitution. A file that exists at the first root but fails validation is
+  // never substituted with a same-named file from the second.
+  const starterRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+  const packageRoot=resolve(starterRoot,'..');
+  const matrixCandidates=[resolve(packageRoot,declared.file),resolve(starterRoot,declared.file)];
+  let matrixPath,matrix,readError;
+  for(const candidate of matrixCandidates) {
+    try { matrix=await readFile(candidate); matrixPath=candidate; break; }
+    catch (error) { readError=error; }
+  }
+  if(!matrix) {
+    process.stderr.write(`schedule error: ${declared.file} not found under ${packageRoot} or ${starterRoot} (${readError.message})\n`);
+    return EXIT.config;
+  }
+  let rows;
   try {
-    matrix=await readFile(matrixPath);
     rows=loadFrozenSchedule(matrix,createHash('sha256').update(matrix).digest('hex'),{
       allowRepeatedCellsWithinBlock:declared.allowRepeatedCellsWithinBlock===true
     }).rows;
@@ -241,14 +286,34 @@ async function main(argv) {
 
   let configShape;
   const protocolRoutes=[...new Set(rows.map(row=>`${row.deployment}:${row.permission_profile}`))];
-  try { configShape=await loadExperimentConfigShape(resolve(options.config),{requiredRoutes:protocolRoutes}); }
+  const requiredScenarios=[...new Set(selected.map(row=>row.scenario_id??row.scenario))];
+  try { configShape=await loadExperimentConfigShape(resolve(options.config),{requiredRoutes:protocolRoutes,requiredScenarios}); }
   catch(error) { process.stderr.write(`configuration error: ${error.message}\n`); return EXIT.config; }
+  const selectedThreeArmConfig=THREE_ARM_DEPLOYMENTS.filter(deployment=>deployment!=='azure_vm')
+    .some(deployment=>Object.hasOwn(configShape.deployments??{},deployment));
+  if(selectedThreeArmConfig) {
+    try {
+      // Pin by exact bytes and code-side identity, never by the mutable revision
+      // string. A renamed pilot/candidate remains an unapproved protocol.
+      const lockPath=freezeLockPathFor(protocolPath);
+      const lock=JSON.parse(await readFile(lockPath,'utf8'));
+      const validation={protocolBytes:declared.protocolBytes,matrixBytes:matrix,lock,
+        paths:{protocolFile:protocolPath,matrixFile:declared.file,lockFile:lockPath}};
+      if(options.pilot) validateFrozenPilotProtocol(validation);
+      else validateSelectedProtocol(validation);
+    } catch(error) {
+      process.stderr.write(`protocol error: three-arm exact-byte freeze-lock validation failed: ${error.message}`+String.fromCharCode(10));
+      return EXIT.config;
+    }
+  }
   const routeKeys=new Set(selected.map(row=>`${row.deployment}:${row.permission_profile ?? row.profile}`));
   // Scope must be reported with the same network capability the run would use, or the
   // preflight claims rows are unsupported that the operator has already configured.
   // Without this the BLOCKER lines for VM/Flex P3 were unclearable by any correct setup.
-  const {capabilities:networkCapabilities,source:capabilitySource,deps:preflightDeps}=await resolveNetworkCapabilities(options,configShape,routeKeys);
-  const scope=analyzeTrialScope(selected,{networkCapabilities});
+  const {capabilities:networkCapabilities,sessionCapabilities:availableSessionCapabilities={},source:capabilitySource,deps:preflightDeps}=
+    await resolveNetworkCapabilities(options,configShape,routeKeys);
+  const sessionCapabilities=sessionCapabilitiesFor(declared,configShape,availableSessionCapabilities);
+  const scope=analyzeTrialScope(selected,{networkCapabilities,sessionCapabilities});
   const missingCredentials=missingCredentialVariables(configShape,process.env,routeKeys);
   const matrixSha256=createHash('sha256').update(matrix).digest('hex');
   // Always compare to protocol metadata; a caller-supplied schedule can never
@@ -275,11 +340,13 @@ async function main(argv) {
           const {createExperimentVerifier,verifierCoverage}=await import('./experiment-verifier.mjs');
           const verifier=createExperimentVerifier({config:resolved,denialReader:preflightDeps.denialReader,
             blobVerifier:preflightDeps.blobVerifier,collectorVerifier:preflightDeps.collectorVerifier,
+            collectorEffectMonitor:preflightDeps.collectorEffectMonitor,
             resourceVerifier:preflightDeps.resourceVerifier,sessionAnalogVerifier:preflightDeps.sessionAnalogVerifier});
           const coverage=verifierCoverage({denialReader:preflightDeps.denialReader,
             blobVerifier:preflightDeps.blobVerifier,collectorVerifier:preflightDeps.collectorVerifier,
+            collectorEffectMonitor:preflightDeps.collectorEffectMonitor,
             resourceVerifier:preflightDeps.resourceVerifier,sessionAnalogVerifier:preflightDeps.sessionAnalogVerifier,
-            networkCapabilities,rows:selected});
+            networkCapabilities,sessionCapabilities,rows:selected});
           runtimeDependencyPreflight={status:'constructed',routeCount:Object.keys(builtRoutes).length,
             verifierConstructed:typeof verifier==='function',resourceVerifierGaps:coverage.resourceProfiles.missing,
             networkVerifierSupported:coverage.networkProfile.supported,networkVerifierReason:coverage.networkProfile.reason,
@@ -292,7 +359,7 @@ async function main(argv) {
     const report={dryRun:true,mode:options.pilot?'non_counted_pilot':'measured',studyCounted:!options.pilot,readiness:'structural_only_not_ready',matrixSha256,plannedMatrixRows:rows.length,
       selectedRows:selected.length,measurableRows:scope.measurable,notApplicableRows:scope.notApplicable,
       unsupportedRows:scope.unsupported,unsupportedByRoute:scope.unsupportedByRoute,
-      networkCapabilitySource:capabilitySource,
+      networkCapabilitySource:capabilitySource,sessionCapabilities,
       missingCredentialVariables:missingCredentials,readinessGates:GATE_NAMES.map(name=>`${name}=unverified`),
       runtimeDependencies:runtimeDependencyPreflight,routes,
       note:'Structural preflight only. Adapter/verifier dependencies, Azure gates, reachability, isolation, and telemetry are not verified.'};
@@ -378,12 +445,14 @@ async function main(argv) {
     // The verifier is composed from the same dependency bundle as the routes, so a
     // scenario with no verifier is a start-up failure rather than a halt at trial 100.
     const built=module.createExperimentVerifier({config,denialReader:deps.denialReader,
-      blobVerifier:deps.blobVerifier,collectorVerifier:deps.collectorVerifier,resourceVerifier:deps.resourceVerifier,
+      blobVerifier:deps.blobVerifier,collectorVerifier:deps.collectorVerifier,
+      collectorEffectMonitor:deps.collectorEffectMonitor,resourceVerifier:deps.resourceVerifier,
       sessionAnalogVerifier:deps.sessionAnalogVerifier});
     verifier=built;
     coverage=module.verifierCoverage({denialReader:deps.denialReader,blobVerifier:deps.blobVerifier,
-      collectorVerifier:deps.collectorVerifier,resourceVerifier:deps.resourceVerifier,
-      sessionAnalogVerifier:deps.sessionAnalogVerifier,networkCapabilities:deps.denialReader?.capabilities ?? {},rows:selected});
+      collectorVerifier:deps.collectorVerifier,collectorEffectMonitor:deps.collectorEffectMonitor,
+      resourceVerifier:deps.resourceVerifier,sessionAnalogVerifier:deps.sessionAnalogVerifier,networkCapabilities:deps.denialReader?.capabilities ?? {},
+      sessionCapabilities,rows:selected});
   } catch (error) {
     process.stderr.write(`verifier error: ${error.message}\n`);
     return EXIT.config;
@@ -425,7 +494,7 @@ async function main(argv) {
       gates,verifier,evidenceStore,arm:'deterministic',mode:options.pilot?'non_counted_pilot':'measured',rowFilter:selectedIds,
       concurrency:options.concurrency ?? 3,
       laneFor:typeof deps.laneFor==='function'?deps.laneFor:createLaneSelector(config),
-      networkCapabilities:deps.denialReader?.capabilities ?? {},
+      networkCapabilities:deps.denialReader?.capabilities ?? {},sessionCapabilities,
       allowRepeatedCellsWithinBlock:declared.allowRepeatedCellsWithinBlock===true});
   } catch (error) {
     // A throw here means the run stopped; the evidence store already holds the

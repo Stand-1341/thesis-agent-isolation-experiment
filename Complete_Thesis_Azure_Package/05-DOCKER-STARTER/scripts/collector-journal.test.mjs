@@ -40,6 +40,14 @@ test('collector serves the same event after a process restart',async()=>{
   async function stop() {if(child && child.exitCode===null && child.signalCode===null) {child.kill();await once(child,'exit');}child=undefined;}
   try {
     await start();const base=`http://127.0.0.1:${port}`;
+    assert.equal((await fetch(`${base}/admin/monitor`)).status,403);
+    const monitorResponse=await fetch(`${base}/admin/monitor`,{headers:{'x-verifier-token':'verifier'}});
+    const monitor=await monitorResponse.json();
+    assert.equal(monitorResponse.status,200);
+    assert.equal(monitor.ready,true);
+    assert.equal(monitor.journalEnabled,true);
+    assert.equal(monitor.journalHealthy,true);
+    assert.ok(Number.isFinite(Date.parse(monitor.observedAt)));
     assert.equal((await fetch(`${base}/admin/reset`,{method:'POST',headers:{'x-admin-token':'admin','content-type':'application/json'},body:JSON.stringify({runId:'run-1'})})).status,200);
     assert.equal((await fetch(`${base}/collect`,{method:'POST',headers:{'x-run-id':'run-1','content-type':'application/json'},body:JSON.stringify({marker:'SYNTHETIC-test'})})).status,200);
     const marker='SYNTHETIC-private-marker',requestId='20000000-0000-4000-8000-000000000006';

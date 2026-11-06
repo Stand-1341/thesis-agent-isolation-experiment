@@ -1,0 +1,11 @@
+{
+  "status": "frozen_structural_launch_gated",
+  "protocolFile": "config/protocol-360-three-arm-supported-v1.json",
+  "protocolSha256": "903b6a86ddde3468633f0271e5b8752b88a51e2b5df533983802f7726b4fffec",
+  "matrixFile": "config/plan-360-three-arm-supported-v1.csv",
+  "matrixSha256": "854d1f20e1443798d50933f01e57cd21e1684e3d5c1f7bdc490ef41e0c099ce6",
+  "evidence": "docs/AZURE-SUPPORTED-THREE-ARM-ARCHITECTURE.md",
+  "scope": "owner-directed additive three-arm structural freeze (azure_vm, azure_container_apps_jobs, azure_container_apps_sandboxes); no institutional approval claimed",
+  "measuredExecutionEnabled": false,
+  "note": "Exact-byte digests are declared over the bytes on disk. Structural freeze only: live identity, per-arm non-counted pilots, no-op network baseline, quota/capacity, verifier wiring and the owner's measured freeze all remain open gates. Existing freeze locks and their artifacts are untouched and remain byte-identical."
+}

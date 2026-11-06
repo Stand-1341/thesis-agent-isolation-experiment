@@ -44,6 +44,7 @@ export function buildRoutes(config, deps={}, {routeKeys}={}) {
       }
       routes[key]={principalObjectId:route.principalObjectId,adapter:createHttpPilotAdapter({
         agentUrl:route.agentUrl ?? deployment.agentUrl,resourceUrl:deployment.resourceUrl,collectorUrl:deployment.collectorUrl,
+        restrictedUrl:deployment.restrictedUrl,
         resourceAdminToken:route.credentials.resourceAdmin,collectorAdminToken:route.credentials.collectorAdmin,
         controllerToken:route.credentials.controller,
         ...(route.credentials.functionKey===undefined?{}:{functionKey:route.credentials.functionKey}),

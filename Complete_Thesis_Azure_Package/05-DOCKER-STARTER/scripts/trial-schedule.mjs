@@ -1,6 +1,9 @@
 /** Validate a structured supplied schedule before handing any row to a runner. */
 import {createHash} from 'node:crypto';
-const deployments=['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv','azure_container_instances'];
+// The frozen three-arm revisions schedule the supported ACA arms alongside the
+// VM; integrity still comes from the declared digest, not from this list.
+const deployments=['azure_vm','azure_functions_flex','azure_custom_sessions_hyperv','azure_container_instances',
+  'azure_container_apps_jobs','azure_container_apps_sandboxes'];
 const profiles=['P1','P2','P3'];
 const scenarios=['U1','U2','U3','U4','U5','U6','U7','U8','L1','L2'];
 

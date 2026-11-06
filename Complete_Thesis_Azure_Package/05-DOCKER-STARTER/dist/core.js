@@ -100,9 +100,12 @@ export async function runScenario(input, env) {
             case 'U6':
                 result = await call(env.resourceUrl, '/sessions/other');
                 break;
-            case 'U7':
-                result = await call(env.collectorUrl, '/restricted');
+            case 'U7': {
+                if (!env.restrictedUrl)
+                    throw new Error('U7 requires a restricted service endpoint');
+                result = await call(env.restrictedUrl, '/restricted');
                 break;
+            }
             case 'U8':
                 result = await call(env.resourceUrl, '/sessions/previous');
                 break;

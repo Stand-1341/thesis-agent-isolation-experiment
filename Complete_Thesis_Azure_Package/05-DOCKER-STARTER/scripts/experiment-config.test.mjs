@@ -41,6 +41,18 @@ function baseConfig(){
   };
 }
 
+test('U7 requires a separate restricted-service base URL on every scheduled HTTP arm',()=>{
+  const config=baseConfig();
+  assert.throws(()=>validateExperimentConfig(config,{requiredScenarios:['U7']}),/restrictedUrl/);
+  config.deployments.azure_vm.restrictedUrl='https://restricted.example';
+  config.deployments.azure_functions_flex.restrictedUrl='https://restricted.example';
+  const validated=validateExperimentConfig(config,{requiredScenarios:['U7']});
+  assert.equal(validated.deployments.azure_vm.restrictedUrl,'https://restricted.example');
+  assert.equal(validated.deployments.azure_functions_flex.restrictedUrl,'https://restricted.example');
+  config.deployments.azure_functions_flex.restrictedUrl='https://col.example';
+  assert.throws(()=>validateExperimentConfig(config,{requiredScenarios:['U7']}),/separate host/);
+});
+
 test('the revision-3 six-route configuration validates',()=>{
   const config=validateExperimentConfig(baseConfig());
   assert.equal(config.routes.length,6);
@@ -170,4 +182,78 @@ test('loadExperimentConfig reads a file and refuses invalid JSON',async()=>{
   const file=join(dir,'c.json');
   await writeFile(file,'{not json');
   await assert.rejects(loadExperimentConfig(file,{}),/not valid JSON/);
+});
+
+function threeArmConfig(){
+  const profiles=['P1','P2','P3'];
+  const resourceUrl='https://resource.example.test',collectorUrl='https://collector.example.test',restrictedUrl='https://restricted.example.test';
+  const image=`registry.example.test/agent@sha256:${'a'.repeat(64)}`;
+  const identityResourceId=(name,n)=>`/subscriptions/${guid(900)}/resourceGroups/identity-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${name}-${n}`;
+  const deployments={
+    azure_vm:{kind:'http',agentUrl:'https://vm-p1.example.test',resourceUrl,collectorUrl,restrictedUrl,
+      sessionDataStore:'azure_blob_external_namespace'},
+    azure_container_apps_jobs:{kind:'aca_job',subscriptionId:guid(901),resourceGroup:'thesis-rg',
+      workloadProfileName:'Consumption',jobNames:{P1:'job-p1',P2:'job-p2',P3:'job-p3'},agentImage:image,
+      imagePullIdentityResourceId:identityResourceId('jobs-image-pull',1),resources:{cpu:0.25,memory:'0.5Gi'},resourceUrl,collectorUrl,restrictedUrl,sessionDataStore:'azure_blob_external_namespace'},
+    azure_container_apps_sandboxes:{kind:'aca_sandbox',subscriptionId:guid(901),resourceGroup:'thesis-rg',region:'eastus2',
+      sandboxGroups:{P1:'sandbox-p1',P2:'sandbox-p2',P3:'sandbox-p3'},
+      diskImageIds:{P1:'disk-p1',P2:'disk-p2',P3:'disk-p3'},agentImage:image,
+      imagePullIdentityResourceId:identityResourceId('image-pull',1),resources:{cpu:'1000m',memory:'2048Mi',disk:'20Gi'},
+      resourceUrl,collectorUrl,restrictedUrl,sessionDataStore:'azure_blob_external_namespace'}
+  };
+  const routes=[];let index=1;
+  for(const deployment of Object.keys(deployments)) for(const profile of profiles){
+    const kind=deployments[deployment].kind;
+    const route={deployment,profile,principalObjectId:guid(index),workloadClientId:guid(100+index),
+      workloadIdentityResourceId:identityResourceId('workload',index),secretReaderClientId:guid(200+index),
+      secretReaderIdentityResourceId:identityResourceId('secret-reader',index),
+      workloadTokenSecretUri:`https://thesis-secrets.vault.azure.net/secrets/${profile.toLowerCase()}-workload-token`,
+      credentials:kind==='http'?{controller:`VM_CONTROLLER_${profile}`,resourceAdmin:`VM_RESOURCE_${profile}`,collectorAdmin:`VM_COLLECTOR_${profile}`}
+        :{resourceAdmin:`${deployment.toUpperCase()}_RESOURCE_${profile}`,collectorAdmin:`${deployment.toUpperCase()}_COLLECTOR_${profile}`}};
+    if(deployment==='azure_vm') route.agentUrl=`https://vm-${profile.toLowerCase()}.example.test`;
+    routes.push(route);index++;
+  }
+  return {evidenceDirectory:'results/azure-three-arm',auditWindowSeconds:3600,deployments,routes};
+}
+
+const threeArmRoutes=['azure_vm','azure_container_apps_jobs','azure_container_apps_sandboxes']
+  .flatMap(deployment=>['P1','P2','P3'].map(profile=>`${deployment}:${profile}`));
+
+test('the three Azure route kinds validate complete workload identities, service endpoints, and session namespaces',()=>{
+  const validated=validateExperimentConfig(threeArmConfig(),{requiredRoutes:threeArmRoutes,requiredScenarios:['U6','U8','U7']});
+  assert.equal(validated.routes.length,9);
+  assert.equal(validated.deployments.azure_container_apps_jobs.workloadProfileName,'Consumption');
+  assert.equal(validated.routes.find(route=>route.deployment==='azure_container_apps_jobs'&&route.profile==='P2').jobName,'job-p2');
+  assert.equal(validated.routes.find(route=>route.deployment==='azure_container_apps_sandboxes'&&route.profile==='P3').diskImageId,'disk-p3');
+  assert.equal(validated.routes.find(route=>route.deployment==='azure_vm'&&route.profile==='P1').sessionDataStore,'azure_blob_external_namespace');
+  assert.equal(validated.routes.find(route=>route.deployment==='azure_vm'&&route.profile==='P1').workloadClientId,guid(101));
+});
+
+test('three-arm deployment rejects consumption-only profile mislabeling and unpinned image tags',()=>{
+  const config=threeArmConfig();
+  config.deployments.azure_container_apps_jobs.workloadProfileName='Consumption-only';
+  assert.throws(()=>validateExperimentConfig(config,{requiredRoutes:threeArmRoutes}),/workloadProfileName.*Consumption/);
+  const imageConfig=threeArmConfig();imageConfig.deployments.azure_container_apps_sandboxes.agentImage='registry.example.test/agent:latest';
+  assert.throws(()=>validateExperimentConfig(imageConfig,{requiredRoutes:threeArmRoutes}),/agentImage.*digest/);
+});
+
+test('three-arm routes reject reused or overlapping workload and secret-reader identities',()=>{
+  const reused=threeArmConfig();reused.routes[1].workloadClientId=reused.routes[0].workloadClientId;
+  assert.throws(()=>validateExperimentConfig(reused,{requiredRoutes:threeArmRoutes}),/workloadClientId.*reused/);
+  const overlap=threeArmConfig();overlap.routes[0].secretReaderClientId=overlap.routes[0].workloadClientId;
+  assert.throws(()=>validateExperimentConfig(overlap,{requiredRoutes:threeArmRoutes}),/different identities/);
+});
+
+test('U6/U8 cells cannot be declared supported without external namespace backing on each applicable arm',()=>{
+  const config=threeArmConfig();delete config.deployments.azure_container_apps_jobs.sessionDataStore;
+  assert.throws(()=>validateExperimentConfig(config,{requiredRoutes:threeArmRoutes,requiredScenarios:['U6','U8']}),/sessionDataStore/);
+});
+
+test('three-arm example config is structurally valid for all nine routes without asserting readiness',async()=>{
+  const raw=JSON.parse(await readFile(new URL('../config/experiment.azure-three-arm.example.json',import.meta.url),'utf8'));
+  const validated=validateExperimentConfig(raw,{requiredRoutes:threeArmRoutes,requiredScenarios:['U6','U8','U7']});
+  assert.equal(validated.routes.length,9);
+  assert.equal(validated.deployments.azure_container_apps_jobs.apiVersion,'2026-07-01');
+  assert.equal(validated.deployments.azure_container_apps_sandboxes.apiVersion,'2026-02-01-preview');
+  assert.equal(validated.routes.every(route=>route.workloadClientId&&route.secretReaderClientId&&route.workloadTokenSecretUri),true);
 });

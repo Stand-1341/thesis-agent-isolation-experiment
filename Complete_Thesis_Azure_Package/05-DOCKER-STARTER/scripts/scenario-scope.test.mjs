@@ -43,3 +43,26 @@ test('scope summary separates measurable, not-applicable, and unsupported rows',
   assert.deepEqual({measurable:scope.measurable,notApplicable:scope.notApplicable,unsupported:scope.unsupported},
     {measurable:1,notApplicable:1,unsupported:1});
 });
+
+test('explicit external-session namespace support makes U6/U8 measurable on all Azure arms',()=>{
+  for(const deployment of ['azure_vm','azure_functions_flex','azure_aca_sandboxes']) {
+    for(const scenario of ['U6','U8']) {
+      assert.equal(classifyTrialScope(row(deployment,'P2',scenario),
+        {sessionCapabilities:{[deployment]:true}}).status,'measurable');
+    }
+  }
+});
+
+test('external-session support does not imply P3 network-denial evidence',()=>{
+  const scope=classifyTrialScope(row('azure_aca_sandboxes','P3','U5'),
+    {sessionCapabilities:{azure_aca_sandboxes:true}});
+  assert.equal(scope.status,'unsupported');
+  assert.equal(scope.reason,'independent_network_denial_evidence_unavailable');
+});
+
+test('a declared external-session capability that is unavailable is blocked, not silently N/A',()=>{
+  const scope=classifyTrialScope(row('azure_functions_flex','P2','U6'),
+    {sessionCapabilities:{azure_functions_flex:false}});
+  assert.equal(scope.status,'unsupported');
+  assert.equal(scope.reason,'external_session_namespace_adapter_unavailable');
+});
