@@ -91,10 +91,11 @@ test('identity failures are redacted and report only safe credential-source diag
     environmentCredentialConfigured:false,
     workloadIdentityConfigured:false,
     azureClientIdEnvironmentPresent:false,
+    deviceCodeAuthRequested:false,
     managedIdentityEndpointEnvironmentPresent:false,
     credentialErrorName:'CredentialUnavailableError',
     azureCliUsed:false,
-    nextStep:'Provide a complete Entra environment/workload identity, or run on a host with managed identity. Azure CLI is not used; source flags are presence-only.'
+    nextStep:'Provide a complete Entra environment/workload identity, set AZURE_DEVICE_CODE_AUTH=1 to sign in interactively as yourself, or run on a host with managed identity. Azure CLI is not used; source flags are presence-only.'
   });
 });
 
@@ -259,4 +260,79 @@ test('argument parser keeps subscription and region explicit and rejects unknown
     {subscriptionId:SUBSCRIPTION,region:'eastus',help:false});
   assert.equal(parseInventoryArgs(['--help']).help,true);
   assert.throws(()=>parseInventoryArgs(['--deploy']),/unknown argument/);
+});
+
+test('device code sign-in is never constructed unless it is explicitly requested',async()=>{
+  const constructed=[];
+  class EnvironmentCredential {async getToken(scope){return {token:`environment:${scope}`};}}
+  class WorkloadIdentityCredential {async getToken(scope){return {token:`workload:${scope}`};}}
+  class ManagedIdentityCredential {
+    constructor(){constructed.push('managed');}
+    async getToken(scope){return {token:`managed:${scope}`};}
+  }
+  class DeviceCodeCredential {
+    constructor(){constructed.push('device-code');}
+    async getToken(scope){return {token:`device:${scope}`};}
+  }
+  class ChainedTokenCredential {
+    constructor(...credentials){this.credentials=credentials;}
+    async getToken(scope){return await this.credentials[0].getToken(scope);}
+  }
+  const modules={EnvironmentCredential,WorkloadIdentityCredential,ManagedIdentityCredential,DeviceCodeCredential,ChainedTokenCredential};
+  const bare=await createAzureRestTokenProvider({env:{},credentialModules:modules});
+  assert.equal(await bare('scope'),'managed:scope');
+  assert.deepEqual(constructed,['managed']);
+  const withSecret=await createAzureRestTokenProvider({env:{AZURE_TENANT_ID:'t',AZURE_CLIENT_ID:'c',
+    AZURE_CLIENT_SECRET:'synthetic-secret'},credentialModules:modules});
+  assert.equal(await withSecret('scope'),'environment:scope');
+  assert.deepEqual(constructed,['managed','managed']);
+});
+
+test('device code sign-in requires an explicit opt-in and routes its notice to stderr only',async()=>{
+  const {fetchImpl}=fakeFetch(fakeClientFetch);
+  const prompted=[];let out='';let err='';
+  class DeviceCodeCredential {
+    constructor(options){this.userPromptCallback=options.userPromptCallback;}
+    async getToken(scope){
+      this.userPromptCallback({userCode:'ABCD-EFGH',verificationUri:'https://microsoft.com/devicelogin'});
+      return {token:`device:${scope}`,expiresOnTimestamp:Date.now()+60000};
+    }
+  }
+  class ManagedIdentityCredential {async getToken(){throw new CredentialUnavailableError('no managed identity');}}
+  class ChainedTokenCredential {
+    constructor(...credentials){this.credentials=credentials;}
+    async getToken(scope){return await this.credentials[0].getToken(scope);}
+  }
+  const result=await main({argv:[],env:{AZURE_DEVICE_CODE_AUTH:'1'},getToken:null,
+    credentialModules:{EnvironmentCredential:class {},WorkloadIdentityCredential:class {},
+      ManagedIdentityCredential,DeviceCodeCredential,ChainedTokenCredential},
+    fetchImpl,
+    stdout:{write:text=>{out+=text;}},stderr:{write:text=>{err+=text;}}});
+  assert.equal(result,2);
+  assert.equal(JSON.parse(out).status,'subscription_selection_required');
+  assert.match(err,/https:\/\/microsoft\.com\/devicelogin/);
+  assert.match(err,/ABCD-EFGH/);
+  assert.doesNotMatch(out,/microsoft\.com\/devicelogin|ABCD-EFGH/);
+  prompted.push(...err.split('\n'));
+});
+
+test('device code diagnostics report the request without claiming a token was acquired',async()=>{
+  let out='';
+  class ManagedIdentityCredential {async getToken(){throw new CredentialUnavailableError('no managed identity');}}
+  class DeviceCodeCredential {async getToken(){throw new AuthenticationError('user did not complete sign-in');}}
+  class ChainedTokenCredential {
+    constructor(...credentials){this.credentials=credentials;}
+    async getToken(scope){return await this.credentials[0].getToken(scope);}
+  }
+  const result=await main({argv:['--subscription',SUBSCRIPTION],env:{AZURE_DEVICE_CODE_AUTH:'1'},getToken:null,
+    credentialModules:{EnvironmentCredential:class {},WorkloadIdentityCredential:class {},
+      ManagedIdentityCredential,DeviceCodeCredential,ChainedTokenCredential},
+    fetchImpl:async()=>{throw new Error('ARM must not be queried without a token');},
+    stdout:{write:text=>{out+=text;}},stderr:{write:()=>{}}});
+  assert.equal(result,4);
+  const payload=JSON.parse(out);
+  assert.equal(payload.reason,'identity_unavailable');
+  assert.equal(payload.identityDiagnostics.deviceCodeAuthRequested,true);
+  assert.equal(payload.identityDiagnostics.environmentCredentialConfigured,false);
+  assert.doesNotMatch(out,/user did not complete sign-in/);
 });

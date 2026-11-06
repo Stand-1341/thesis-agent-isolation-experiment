@@ -20,13 +20,32 @@ Or pass `--subscription <GUID> --region <region>` directly. Values are not writt
 
 The command gets an ARM token using the Azure Identity library, in this order when configured:
 
-1. Workload identity (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_FEDERATED_TOKEN_FILE`)
-2. Environment credential (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and a client secret or certificate path)
-3. Managed identity (system-assigned, or user-assigned selected by `AZURE_CLIENT_ID`)
+1. Device code, **only** when `AZURE_DEVICE_CODE_AUTH=1` is explicitly set (see below)
+2. Workload identity (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_FEDERATED_TOKEN_FILE`)
+3. Environment credential (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and a client secret or certificate path)
+4. Managed identity (system-assigned, or user-assigned selected by `AZURE_CLIENT_ID`)
 
 Azure CLI credentials are deliberately not part of the chain. Prefer a read-only managed identity or workload identity. Never put a token, secret, certificate private key, or connection string in the JSON config or command arguments.
 
-On `identity_unavailable`, `identityDiagnostics` reports only source-input presence flags, the sanitized Azure Identity error class/code, and the next supported setup step. These flags do not prove that a configured credential can acquire a token or has the required RBAC; no token, secret, or credential path is returned.
+### Signing in as yourself without a secret
+
+The least-risk way to unblock a host that has no managed or workload identity is to authenticate interactively as your own user account. Set `AZURE_DEVICE_CODE_AUTH=1`:
+
+```sh
+AZURE_DEVICE_CODE_AUTH=1 AZURE_SUBSCRIPTION_ID=<subscription-guid> AZURE_REGION=eastus npm run azure:inventory
+```
+
+The command prints a verification URL and a one-time code to **stderr** and waits. Open the URL on any device, enter the code, and complete sign-in with the account that already holds the required read access. The access token is held in memory only; it is not written to disk, and no secret or app registration is created.
+
+Three properties of this path matter:
+
+- It uses the public sign-in client identity that the Azure Identity library ships with, so there is no application registration to create or maintain.
+- The permission set is whatever your user already has. That may be broader than a purpose-scoped read-only identity, so use it for inventory only and prefer a scoped identity for anything repeatable.
+- The instruction output is written to stderr specifically so the JSON on stdout stays parseable. Do not merge the streams with `2>&1` if you are piping into a JSON consumer.
+
+Device code is never attempted unless you set the variable; an unset environment keeps the non-interactive chain above unchanged.
+
+On `identity_unavailable`, `identityDiagnostics` reports only source-input presence flags (including `deviceCodeAuthRequested`), the sanitized Azure Identity error class/code, and the next supported setup step. These flags do not prove that a configured credential can acquire a token or has the required RBAC; no token, secret, or credential path is returned.
 
 The identity needs read access to the subscription resource inventory, provider-registration GETs for the selected resource-provider namespaces, and the selected providers' regional usage endpoints. An authorization failure is reported as an unavailable/partial read, not as an empty inventory or deleted resources.
 

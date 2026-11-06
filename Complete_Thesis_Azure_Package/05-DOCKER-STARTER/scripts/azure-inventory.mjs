@@ -27,12 +27,32 @@ export function parseInventoryArgs(argv=[]) {
   return result;
 }
 
-/** Build an Entra token provider from environment, workload identity, or managed identity only. */
-export async function createAzureRestTokenProvider({env=process.env,credentialModules}={}) {
+/** Human-readable device-code instructions. Neither the user code nor the URL is secret. */
+export function formatDeviceCodeNotice(info) {
+  const verificationUri=typeof info?.verificationUri==='string'&&info.verificationUri
+    ?info.verificationUri
+    :'https://microsoft.com/devicelogin';
+  const userCode=typeof info?.userCode==='string'?info.userCode:'(see prompt)';
+  return 'Azure device code sign-in required.\n'+
+    `  Open: ${verificationUri}\n`+
+    `  Enter code: ${userCode}\n`;
+}
+
+/** Build an Entra token provider from environment, workload identity, or managed identity only.
+ *  Device code sign-in is opt-in (AZURE_DEVICE_CODE_AUTH=1) because it requires a human at a browser. */
+export async function createAzureRestTokenProvider({env=process.env,credentialModules,onDeviceCode}={}) {
   const modules=credentialModules??await import('@azure/identity');
-  const {ChainedTokenCredential,EnvironmentCredential,WorkloadIdentityCredential,ManagedIdentityCredential}=modules;
+  const {ChainedTokenCredential,EnvironmentCredential,WorkloadIdentityCredential,ManagedIdentityCredential,DeviceCodeCredential}=modules;
   const credentials=[];
   const tenantId=env.AZURE_TENANT_ID,clientId=env.AZURE_CLIENT_ID;
+  const wantsDeviceCode=env.AZURE_DEVICE_CODE_AUTH==='1';
+  if(wantsDeviceCode) {
+    if(typeof DeviceCodeCredential!=='function')
+      throw new Error('Azure device code authentication is unavailable in this credential set');
+    credentials.push(new DeviceCodeCredential({
+      userPromptCallback:info=>{(onDeviceCode??(()=>{}))(info);}
+    }));
+  }
   if(tenantId&&clientId&&env.AZURE_FEDERATED_TOKEN_FILE)
     credentials.push(new WorkloadIdentityCredential({tenantId,clientId,tokenFilePath:env.AZURE_FEDERATED_TOKEN_FILE}));
   if(tenantId&&clientId&&(env.AZURE_CLIENT_SECRET||env.AZURE_CLIENT_CERTIFICATE_PATH))
@@ -60,10 +80,11 @@ function identityDiagnostics(env,error,{managedIdentityCredentialInChain}={}) {
     workloadIdentityConfigured:tenantAndClient&&present(env?.AZURE_FEDERATED_TOKEN_FILE),
     ...(typeof managedIdentityCredentialInChain==='boolean'?{managedIdentityCredentialInChain}:{}),
     azureClientIdEnvironmentPresent:present(env?.AZURE_CLIENT_ID),
+    deviceCodeAuthRequested:env?.AZURE_DEVICE_CODE_AUTH==='1',
     managedIdentityEndpointEnvironmentPresent:present(env?.IDENTITY_ENDPOINT)||
       present(env?.MSI_ENDPOINT)||present(env?.IMDS_ENDPOINT),
     azureCliUsed:false,
-    nextStep:'Provide a complete Entra environment/workload identity, or run on a host with managed identity. Azure CLI is not used; source flags are presence-only.'
+    nextStep:'Provide a complete Entra environment/workload identity, set AZURE_DEVICE_CODE_AUTH=1 to sign in interactively as yourself, or run on a host with managed identity. Azure CLI is not used; source flags are presence-only.'
   };
   for(const [field,value,sanitize] of [
     ['credentialErrorName',error?.identityErrorName,safeIdentityErrorName],
@@ -118,6 +139,7 @@ export async function collectAzureInventory({subscriptionId,region,getToken,fetc
 const USAGE='Read-only Azure inventory using Entra identity and direct ARM GET requests (no Azure CLI).\n'+
   'Usage: node scripts/azure-inventory.mjs [--subscription <GUID>] [--region <azure-region>]\n'+
   'Credentials: EnvironmentCredential, WorkloadIdentityCredential, or ManagedIdentityCredential.\n'+
+  'Set AZURE_DEVICE_CODE_AUTH=1 to sign in interactively as yourself; no secret or app registration is used.\n'+
   'If no subscription is supplied, the script lists visible subscriptions only.\n'+
   'With a subscription, it reads resource metadata, provider registration states, and (when a region is supplied) regional usage quotas.\n';
 
@@ -138,7 +160,8 @@ export async function main({argv=process.argv.slice(2),env=process.env,getToken,
   }
   const usesDefaultCredentialChain=getToken===undefined||getToken===null;
   try {
-    const tokenProvider=getToken??await createAzureRestTokenProvider({env,credentialModules});
+    const tokenProvider=getToken??await createAzureRestTokenProvider({env,credentialModules,
+      onDeviceCode:info=>{stderr.write(formatDeviceCodeNotice(info));}});
     const result=await collectAzureInventory({subscriptionId:selectedSubscription,region:selectedRegion,
       getToken:tokenProvider,fetchImpl,now});
     stdout.write(`${JSON.stringify(result)}\n`);
