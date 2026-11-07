@@ -19,7 +19,8 @@
     "run:aci-p1-pilot": "node scripts/run-aci-p1-pilot.mjs",
     "azure:inventory": "node scripts/azure-inventory.mjs",
     "sandbox:first-light": "node scripts/sandbox-first-light.mjs",
-    "render:parameters": "node scripts/render-parameters.mjs"
+    "render:parameters": "node scripts/render-parameters.mjs",
+    "run:synthetic": "node scripts/synthetic-pipeline-run.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
