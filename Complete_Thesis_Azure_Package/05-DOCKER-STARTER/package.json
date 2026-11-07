@@ -18,7 +18,8 @@
     "smoke:live": "node scripts/live-deployment-smoke.mjs",
     "run:aci-p1-pilot": "node scripts/run-aci-p1-pilot.mjs",
     "azure:inventory": "node scripts/azure-inventory.mjs",
-    "sandbox:first-light": "node scripts/sandbox-first-light.mjs"
+    "sandbox:first-light": "node scripts/sandbox-first-light.mjs",
+    "render:parameters": "node scripts/render-parameters.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

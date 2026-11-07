@@ -320,6 +320,57 @@ az acr repository show-manifests --name <unique-acr-name> --repository thesis-ag
 Never deploy the `.example.json` directly — it is a template with five placeholders and
 every optional component switched off.
 
+**Render it instead of editing it.** The renderer fills the placeholders, enforces the
+constraints that otherwise fail at deploy time or, worse, at request time, and refuses to
+emit a file that still contains a placeholder:
+
+```sh
+node scripts/render-parameters.mjs \
+  --region centralus \
+  --ssh-key ~/.ssh/id_ed25519.pub \
+  --vm-image-version <resolved version> \
+  --registry <acrname> \
+  --digest @sha256:<64-hex> \
+  --controller-ip <your-egress-ip>/32 \
+  --enable sandbox-groups
+```
+
+It writes `infra/azure-supported-three-arm.parameters.json` (gitignored). Exit `4` prints
+every blocking problem instead of guessing; fix and re-run until it exits `0`.
+
+It refuses, specifically:
+
+- a **tag** where a content digest is required (`v1` silently drifts; `@sha256:` does not)
+- a **documentation-range** controller IP (`203.0.113.x`, `198.51.100.x`) — that range
+  exists in examples precisely because it is not routable
+- any surviving `REPLACE`/`<...>` placeholder anywhere in the document
+- a CIDR or private IP that overlaps a **sandbox-reserved range** (`192.168.0.0/24`,
+  `100.65.0.0/23`) — this is the one that provisions cleanly and then cannot reach anything
+- `--enable fixtures` without `createRecordUpdateRole=true` or an existing
+  `recordUpdateRoleId`
+- `--enable vault-secret` without a `vaultName`
+- unknown `--enable` values, and image references missing a digest
+
+`--enable` takes a comma list from: `sandbox-groups`, `vm`, `p3-firewall`, `nsg`,
+`evidence-store`, `fixtures`, `registry-pe`, `registry-metadata`, `research-host`,
+`vault-secret`. Everything omitted stays off. Verify the result against the template:
+
+```sh
+python3 - <<'PY'
+import json,re
+src=open('infra/azure-supported-three-arm.bicep').read()
+decls={m.group(1):m.group(3) is not None
+       for m in re.finditer(r'^param\s+(\w+)\s+[\w\[\]?]+\s*(=[^\n]*)?$',src,re.M)}
+params=json.load(open('infra/azure-supported-three-arm.parameters.json'))['parameters']
+print('missing required:',[n for n,d in decls.items() if not d and n not in params] or 'none')
+print('extras:',[n for n in params if n not in decls] or 'none')
+PY
+```
+
+Both must print `none`. If you prefer to fill it by hand, this is the full list; note that
+the identity parameters are largely not yours to fill — the template creates its own
+managed identities.
+
 ```sh
 cp infra/azure-supported-three-arm.parameters.example.json infra/azure-supported-three-arm.parameters.json
 ```
