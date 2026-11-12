@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Stand-1341/thesis-agent-isolation-experiment/config/deployment.schema.json",
+  "title": "thesis-agent-isolation-experiment deployment configuration",
+  "description": "The single user-facing configuration surface for azd up. Everything else is resolved from ARM outputs.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {"type": "string"},
+    "namePrefix": {"type": "string", "pattern": "^[a-z0-9]{3,12}$", "default": "thesis", "description": "Prefix for all created resources (ACR name is <prefix>acr — must be globally unique)"},
+    "region": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "default": "centralus", "description": "Azure region; examples ship centralus/eastus"},
+    "vm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vmSize": {"type": "string", "default": "Standard_F1as_v7", "description": "Arm64 SKU for the VM arm and research host"},
+        "imageVersion": {"type": "string", "description": "Ubuntu image version; resolved automatically when omitted"},
+        "sshPublicKeyPath": {"type": "string", "default": "~/.ssh/id_ed25519.pub"}
+      }
+    },
+    "trustedControllerIp": {"type": "string", "description": "Your egress IP as /32; resolves automatically from the deployment host when omitted"},
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vnetAddressPrefix": {"type": "string", "pattern": "^[0-9./]+$", "default": "10.48.0.0/16"},
+        "existingVnetResourceId": {"type": "string", "description": "Reference a compatible existing VNet instead of creating one"}
+      }
+    },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "existingRegistryName": {"type": "string", "description": "Reuse an existing ACR by name instead of creating one"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "retentionDays": {"type": "integer", "minimum": 1, "maximum": 3650, "default": 7},
+        "retentionLock": {"type": "boolean", "default": false, "description": "NEVER set by deployment; requires explicit approval + verification (see deploy/readiness-report.mjs)"}
+      }
+    },
+    "components": {
+      "type": "object",
+      "description": "Optional components; the azd pipeline enables the required set for the three-arm study",
+      "additionalProperties": false,
+      "properties": {
+        "researchHost": {"type": "boolean", "default": true},
+        "registryPrivateEndpoint": {"type": "boolean", "default": true},
+        "registryMetadataReader": {"type": "boolean", "default": true}
+      }
+    },
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "skipBudgetCheck": {"type": "boolean", "default": false}
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "thesis-agent-isolation-experiment",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Azure-native, self-configuring deployment system for the thesis agent-isolation experiment. See DEPLOYMENT.md.",
+  "scripts": {
+    "test": "node --test deploy/*.test.mjs",
+    "study:execute": "node deploy/study-execute.mjs",
+    "preflight": "node deploy/preflight.mjs",
+    "teardown": "node deploy/teardown.mjs"
+  }
+}

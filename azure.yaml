@@ -1,0 +1,49 @@
+# azd project: thesis-agent-isolation-experiment
+#
+# One command — `azd up` — runs, in order:
+#   preprovision  : subscription preflight gate (permissions, providers, quota,
+#                   SKU restrictions, address overlap, ARM what-if preview)
+#   provision     : infra/main.bicep stage 'foundation' (registry, identities,
+#                   networking, storage) — no workloads yet, no image needed
+#   postprovision : build + push agent image to the new registry, pin its
+#                   digest into the azd environment, re-provision stage 'full'
+#                   (VM arm, ACA Jobs, sandbox config, evidence/fixture stores),
+#                   then auto-configure the experiment from ARM outputs
+#   postup        : non-counted deployment validation (P1/P2/P3 health checks,
+#                   effective-permission verification) and the readiness report
+#
+# Measured study execution is deliberately NOT part of `azd up`.
+# Run `npm run study:execute` (repo root) — a separately gated command.
+name: thesis-agent-isolation-experiment
+metadata:
+  template: thesis-agent-isolation-experiment@custom
+
+infra:
+  provider: bicep
+  path: infra
+  module: main
+
+# No azd service definitions: workloads are installed by the Bicep full stage
+# and the deploy/ hooks, not by `azd deploy`.
+
+hooks:
+  preprovision:
+    shell: sh
+    run: node deploy/resolve-inputs.mjs && node deploy/preflight.mjs
+    continueOnError: false
+    interactive: false
+  postprovision:
+    shell: sh
+    run: node deploy/postprovision.mjs
+    continueOnError: false
+    interactive: false
+  postup:
+    shell: sh
+    run: node deploy/validate-deployment.mjs && node deploy/readiness-report.mjs
+    continueOnError: false
+    interactive: false
+  predown:
+    shell: sh
+    run: node deploy/teardown.mjs --guard
+    continueOnError: false
+    interactive: false

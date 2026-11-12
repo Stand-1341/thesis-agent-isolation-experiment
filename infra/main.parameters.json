@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": {
+      "value": "${AZURE_NAME_PREFIX}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "stage": {
+      "value": "${PROVISION_STAGE}"
+    },
+    "sshPublicKey": {
+      "value": "${SSH_PUBLIC_KEY}"
+    },
+    "vmImageVersion": {
+      "value": "${VM_IMAGE_VERSION}"
+    },
+    "trustedControllerPublicIp": {
+      "value": "${TRUSTED_CONTROLLER_IP}"
+    },
+    "agentImageDigest": {
+      "value": "${AGENT_IMAGE_DIGEST}"
+    },
+    "agentRegistryName": {
+      "value": "${AGENT_REGISTRY_NAME}"
+    },
+    "evidenceRetentionDays": {
+      "value": "${EVIDENCE_RETENTION_DAYS}"
+    }
+  }
+}

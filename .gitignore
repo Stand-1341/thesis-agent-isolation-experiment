@@ -11,10 +11,14 @@ node_modules/
 **/.env.*
 **/*.parameters.json
 **/parameters.json
+# azd reads the committed parameter file on a fresh clone — keep it tracked
+!infra/main.parameters.json
 **/*local.settings.json
 **/*.publishsettings
 **/.azure/
 **/secrets.json
+# generated experiment config resolved from ARM outputs (deploy/configure.mjs)
+Complete_Thesis_Azure_Package/05-DOCKER-STARTER/config/experiment.generated.json
 **/credentials
 **/service-account.json
 **/*.pfx
