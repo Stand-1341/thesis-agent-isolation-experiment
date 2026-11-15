@@ -1,19 +1,25 @@
 # azd project: thesis-agent-isolation-experiment
 #
-# One command — `azd up` — runs, in order:
-#   preprovision  : subscription preflight gate (permissions, providers, quota,
-#                   SKU restrictions, address overlap, ARM what-if preview)
-#   provision     : infra/main.bicep stage 'foundation' (registry, identities,
-#                   networking, storage) — no workloads yet, no image needed
-#   postprovision : build + push agent image to the new registry, pin its
-#                   digest into the azd environment, re-provision stage 'full'
-#                   (VM arm, ACA Jobs, sandbox config, evidence/fixture stores),
-#                   then auto-configure the experiment from ARM outputs
-#   postup        : non-counted deployment validation (P1/P2/P3 health checks,
-#                   effective-permission verification) and the readiness report
+# Current v3 topology: azure_vm + azure_functions_flex +
+# azure_container_apps_sandboxes. The legacy aca_jobs composition remains
+# selectable only for archived v2 compatibility.
+#
+# `azd up` runs a deployment pipeline, not the study:
+#   resolve-inputs : validate/create the external CA, SSH key, operator /32,
+#                    VM sizes, image version, prefixes and operator identity
+#   preflight      : subscription/RBAC/provider/quota/budget/policy and ARM
+#                    what-if gate; nothing is billed until it passes
+#   provision      : infra/main.bicep stage 'foundation'
+#   postprovision  : seed Key Vault secrets, publish the pinned agent image,
+#                    preview the full stage, provision stage 'full', publish
+#                    identical Functions packages, create Sandbox disk images,
+#                    bootstrap the private research host, and configure outputs
+#   postup         : always emit validation and readiness artifacts, then return
+#                    the validation result
 #
 # Measured study execution is deliberately NOT part of `azd up`.
-# Run `npm run study:execute` (repo root) — a separately gated command.
+# The v3 protocol remains frozen with measuredExecutionEnabled=false until the
+# separate pilot, retention, verifier, and owner-authorization gates pass.
 name: thesis-agent-isolation-experiment
 metadata:
   template: thesis-agent-isolation-experiment@custom
@@ -28,22 +34,18 @@ infra:
 
 hooks:
   preprovision:
-    shell: sh
     run: node deploy/resolve-inputs.mjs && node deploy/preflight.mjs
     continueOnError: false
     interactive: false
   postprovision:
-    shell: sh
     run: node deploy/postprovision.mjs
     continueOnError: false
     interactive: false
   postup:
-    shell: sh
-    run: node deploy/validate-deployment.mjs && node deploy/readiness-report.mjs
+    run: node deploy/postup.mjs
     continueOnError: false
     interactive: false
   predown:
-    shell: sh
     run: node deploy/teardown.mjs --guard
     continueOnError: false
     interactive: false

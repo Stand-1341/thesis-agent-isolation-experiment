@@ -6,6 +6,8 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {writePilotEvidenceIndex} from './run-experiment-cli.mjs';
 
 const CLI=fileURLToPath(new URL('./run-experiment-cli.mjs',import.meta.url));
 const EXAMPLE=fileURLToPath(new URL('../config/experiment.example.json',import.meta.url));
@@ -18,6 +20,21 @@ const THREE_ARM_PROTOCOL_V1=fileURLToPath(new URL('../config/protocol-360-three-
 const THREE_ARM_PILOT_PROTOCOL=fileURLToPath(new URL('../config/protocol-450-three-arm-supported-v2-pilot-v1.json',import.meta.url));
 const THREE_ARM_PILOT_LOCK=fileURLToPath(new URL('../config/protocol-450-three-arm-supported-v2-pilot-v1-freeze-lock.json',import.meta.url));
 const THREE_ARM_EXAMPLE=fileURLToPath(new URL('../config/experiment.azure-three-arm.example.json',import.meta.url));
+
+test('pilot index writer indexes only intact runner envelopes and derives route claims from completed evidence',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'pilot-index-writer-'));
+  try {
+    const payload=JSON.stringify({runId:'pilot-azure_vm-P1-U1',mode:'non_counted_pilot',
+      trial:{deployment:'azure_vm',permission_profile:'P1',scenario:'U1'},classification:'unauthorized_success',
+      verificationEvidence:{scope:'azure_blob_verifier',deploymentValidation:{schemaVersion:1}}});
+    const envelope=Buffer.from(`${JSON.stringify({version:1,payload,sha256:createHash('sha256').update(payload).digest('hex')})}\n`);
+    await writeFile(join(root,'pilot-record.json'),envelope);
+    const {path,index}=await writePilotEvidenceIndex({directory:root,routes:[{deployment:'azure_vm',profile:'P1'},{deployment:'azure_vm',profile:'P2'}]});
+    assert.equal(index.evidenceFiles[0].sha256,createHash('sha256').update(envelope).digest('hex'));
+    assert.deepEqual(index.routesValidated,['azure_vm:P1']);
+    assert.deepEqual(JSON.parse(await (await import('node:fs/promises')).readFile(path,'utf8')),index);
+  } finally {await rm(root,{recursive:true,force:true});}
+});
 const V2_MATRIX_SHA256='3e9d26641b190eba202984c88234794fa480bb7ddbed2fd5ebc3188d269e40d6';
 const V1_MATRIX_SHA256='854d1f20e1443798d50933f01e57cd21e1684e3d5c1f7bdc490ef41e0c099ce6';
 

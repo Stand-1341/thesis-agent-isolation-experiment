@@ -18,6 +18,8 @@ param containerName string = 'trial-evidence'
 param evidenceRetentionDays int
 @description('Optional public IPv4 addresses or CIDRs for trusted controller/verifier access; do not include workloads.')
 param trustedPublicIpRules array = []
+@description('Optional operator principal used only for the read/write/delete deployment validation round-trip at container scope.')
+param validationPrincipalId string = ''
 
 resource account 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageName
@@ -34,7 +36,7 @@ resource account 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     networkAcls: {
       defaultAction: 'Deny'
       bypass: 'None'
-      ipRules: [for ip in trustedPublicIpRules: { action: 'Allow', value: ip }]
+      ipRules: [for ip in trustedPublicIpRules: { action: 'Allow', value: first(split(ip, '/')) }]
     }
   }
 }
@@ -81,6 +83,14 @@ resource reader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions','2a2b9908-6ea1-4ae2-8e65-a410df84e7d1')
     principalId: readerPrincipalId
+  }
+}
+resource validatorWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(validationPrincipalId)) {
+  scope: container
+  name: guid(container.id,validationPrincipalId,'validation-blob-contributor')
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions','ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+    principalId: validationPrincipalId
   }
 }
 resource sessionWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

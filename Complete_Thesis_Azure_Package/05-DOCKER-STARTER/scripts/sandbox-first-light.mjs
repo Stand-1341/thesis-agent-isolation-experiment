@@ -18,7 +18,9 @@
  *   5  usage error
  */
 
-import {readFile, writeFile} from 'node:fs/promises';
+import {readFile, writeFile, mkdtemp, rename, rm} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import {basename, dirname, join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createAcaSandboxDataPlaneClient} from './aca-sandbox-data-plane.mjs';
 import {createAzureRestTokenProvider} from './azure-inventory.mjs';
@@ -36,6 +38,33 @@ export const SANDBOX_DATA_PLANE_SCOPE = 'https://dynamicsessions.io/.default';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const REGION = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Write a record with an owner-only access control list on Windows. */
+async function writeOwnerOnly(path, contents) {
+  if (process.platform !== 'win32') {
+    await writeFile(path, contents, {encoding: 'utf8', mode: 0o600});
+    return;
+  }
+
+  // Node's mode: 0o600 is ignored by Windows. Create an empty sibling directory,
+  // remove inherited access before placing data in it, and give only this user access.
+  // The file is created inside that protected directory and receives an explicit DACL
+  // before it is moved into place. Any inability to establish that ACL fails closed.
+  const who = execFileSync('whoami.exe', ['/user', '/fo', 'csv', '/nh'], {encoding: 'utf8'});
+  const ownerSid = who.match(/"(S-1-[0-9-]+)"\s*$/m)?.[1];
+  if (!ownerSid) throw new Error('could not determine current Windows user SID');
+  const privateDir = await mkdtemp(join(dirname(path), `.${basename(path)}-private-`));
+  const privateFile = join(privateDir, basename(path));
+  const icacls = (target, ...args) => execFileSync('icacls.exe', [target, ...args], {stdio: 'pipe'});
+  try {
+    icacls(privateDir, '/inheritance:r', '/grant:r', `*${ownerSid}:(OI)(CI)F`);
+    await writeFile(privateFile, contents, {encoding: 'utf8', flag: 'wx'});
+    icacls(privateFile, '/inheritance:r', '/grant:r', `*${ownerSid}:F`);
+    await rename(privateFile, path);
+  } finally {
+    await rm(privateDir, {recursive: true, force: true});
+  }
+}
 
 /** Telemetry categories the sandbox platform can export. */
 export const TELEMETRY_CATEGORIES = Object.freeze([
@@ -347,15 +376,17 @@ export async function main({
   });
 
   const json = `${JSON.stringify(record)}\n`;
+  let finalExitCode = exitCode;
   if (options.outPath) {
     try {
-      await writeFile(options.outPath, json, {encoding: 'utf8', mode: 0o600});
+      await writeOwnerOnly(options.outPath, json);
     } catch (error) {
       stderr.write(`could not write --out ${options.outPath}\n`);
+      finalExitCode = 3;
     }
   }
   stdout.write(json);
-  return exitCode;
+  return finalExitCode;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

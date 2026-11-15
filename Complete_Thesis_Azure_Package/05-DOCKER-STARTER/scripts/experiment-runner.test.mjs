@@ -39,16 +39,19 @@ test('composes the frozen schedule, matching route, principal and evidence; stop
       reset:async trial=>{seen.push({deployment,profile,trial});return {};},
       execute:async trial=>({runId:trial.runId,scenario:trial.scenario}),collect:async()=>({})}};
   }
-  const records=[],claims=[],evidenceStore={claim:async id=>claims.push(id),save:async record=>records.push(record)};
+  const records=[],claims=[],events=[],evidenceStore={claim:async id=>claims.push(id),save:async record=>records.push(record)};
   const gates={protocolFrozen:true,deploymentValidated:true,isolationValidated:true,verifierValidated:true};
   const verifier=async(trial,{workloadPrincipalId})=>{
     assert.equal(workloadPrincipalId,routes[`${trial.deployment}:${trial.profile}`].principalObjectId);
     return {classification:'indeterminate',evidence:{reason:'simulated pilot only'}};
   };
   const result=await runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,
-    rowFilter:new Set([scheduledRows[0].planned_run_id]),networkCapabilities:{azure_vm:true,azure_functions_flex:true}});
+    rowFilter:new Set([scheduledRows[0].planned_run_id]),networkCapabilities:{azure_vm:true,azure_functions_flex:true},
+    onTrialProgress:event=>events.push(event)});
   assert.equal(result.length,1);assert.equal(claims.length,1);assert.equal(records.length,1);assert.equal(seen.length,1);
   assert.equal(records[0].trial.planSha256,planSha256);assert.equal(records[0].classification,'indeterminate');
+  assert.deepEqual(events,[{event:'trial_completed',runId:records[0].runId,deployment:records[0].trial.deployment,
+    profile:records[0].trial.permission_profile??records[0].trial.profile,scenario:records[0].trial.scenario,classification:'indeterminate'}]);
   await assert.rejects(runExperiment({planBytes,planSha256,routes,gates:{...gates,isolationValidated:false},verifier,evidenceStore}),/readiness gates/);
   await assert.rejects(runExperiment({planBytes,planSha256:'0'.repeat(64),routes,gates,verifier,evidenceStore}),/frozen digest/);
   await assert.rejects(runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,arm:'gpt5mini_live'}),/implementation digest required/);

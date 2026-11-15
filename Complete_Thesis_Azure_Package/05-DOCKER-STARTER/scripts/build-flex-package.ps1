@@ -1,10 +1,15 @@
-param([Parameter(Mandatory=$true)][string]$OutputDirectory)
+param([Parameter(Mandatory=$true)][string]$OutputDirectory,[Parameter(Mandatory=$true)][string]$CaCertificatePath)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $setupScript = Join-Path (Split-Path -Parent (Split-Path -Parent $projectRoot)) 'Use-ExperimentTools.ps1'
 . $setupScript
 $destination = [System.IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $destination) { throw 'Output directory already exists; choose a new path.' }
+$caPath = (Resolve-Path -LiteralPath $CaCertificatePath).Path
+$caItem = Get-Item -LiteralPath $caPath -Force
+if ($caItem.PSIsContainer -or ($caItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'CA input must be a regular, non-link public certificate file.' }
+$caText = [System.IO.File]::ReadAllText($caPath)
+if ($caText -notmatch '-----BEGIN CERTIFICATE-----' -or $caText -match 'PRIVATE KEY') { throw 'CA input must contain public certificate PEM only.' }
 Push-Location $projectRoot
 try {
     npm ci --no-audit --no-fund
@@ -17,7 +22,7 @@ try {
     }
     Copy-Item -LiteralPath (Join-Path $projectRoot 'dist') -Destination $destination -Recurse
     New-Item -ItemType Directory -Path (Join-Path $destination 'certs') | Out-Null
-    Copy-Item -LiteralPath (Join-Path $projectRoot 'certs\thesis-pilot-ca.pem') -Destination (Join-Path $destination 'certs\thesis-pilot-ca.pem')
+    Copy-Item -LiteralPath $caPath -Destination (Join-Path $destination 'certs\thesis-pilot-ca.pem')
     Push-Location $destination
     try {
         npm ci --omit=dev --no-audit --no-fund

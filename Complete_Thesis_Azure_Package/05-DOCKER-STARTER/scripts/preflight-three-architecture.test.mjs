@@ -214,15 +214,19 @@ test('without the session-store declaration U6/U8 are not applicable as a config
   assert.ok(report.blockers.some(blocker=>blocker.includes('azure_blob_external_namespace')));
 });
 
-test('Jobs P3 stays capability-blocked; VM and Sandbox denial capabilities stay distinct',()=>{
+test('Jobs and Functions Flex P3 stay capability-blocked; VM and Sandbox denial capabilities stay distinct',()=>{
   assert.equal(NETWORK_DENIAL_CAPABILITY.azure_container_apps_jobs.established,false);
   assert.equal(NETWORK_DENIAL_CAPABILITY.azure_container_apps_jobs.codePresent,true,
     'the Jobs reader is local code even though its target-specific capability is not configured');
   assert.equal(NETWORK_DENIAL_CAPABILITY.azure_container_apps_jobs.pilotValidated,false);
+  assert.equal(NETWORK_DENIAL_CAPABILITY.azure_functions_flex.established,false);
+  assert.equal(NETWORK_DENIAL_CAPABILITY.azure_functions_flex.codePresent,true,
+    'the Functions Flex reader is local code even though its route-specific inputs and pilot are not established');
+  assert.equal(NETWORK_DENIAL_CAPABILITY.azure_functions_flex.pilotValidated,false);
   assert.equal(NETWORK_DENIAL_CAPABILITY.azure_vm.established,true);
   assert.equal(NETWORK_DENIAL_CAPABILITY.azure_container_apps_sandboxes.established,true);
   const evidence=Object.values(NETWORK_DENIAL_CAPABILITY).map(item=>item.evidence);
-  assert.equal(new Set(evidence).size,3,'each arm states its own distinct evidence');
+  assert.equal(new Set(evidence).size,4,'each arm states its own distinct evidence');
   const report=preflightThreeArchitecture(preflightFixtures());
   assert.deepEqual(report.scheduleScope.unsupportedByRoute,
     {'azure_container_apps_jobs:P3:independent_network_denial_evidence_unavailable':10});

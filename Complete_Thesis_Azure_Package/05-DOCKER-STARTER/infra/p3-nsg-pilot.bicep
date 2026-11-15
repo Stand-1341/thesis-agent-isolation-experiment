@@ -1,5 +1,5 @@
-// Candidate outbound policy for a disposable VM pilot only. It is not attached
-// to a subnet here. Azure platform dependencies and enforcer logging MUST be
+// Candidate outbound policy for a disposable VM pilot and P3 Jobs. Azure
+// platform dependencies and enforcer logging MUST be
 // evaluated before use; this is not a validated Functions or sessions policy.
 param location string = resourceGroup().location
 param nsgName string
@@ -66,6 +66,19 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
           sourcePortRange: '*'
           destinationAddressPrefix: 'AzurePlatformDNS'
           destinationPortRange: '53'
+        }
+      }
+      {
+        name: 'allow-key-vault-https'
+        properties: {
+          priority: 120
+          direction: 'Outbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: '*'
+          sourcePortRange: '*'
+          destinationAddressPrefix: 'AzureKeyVault'
+          destinationPortRange: '443'
         }
       }
       {

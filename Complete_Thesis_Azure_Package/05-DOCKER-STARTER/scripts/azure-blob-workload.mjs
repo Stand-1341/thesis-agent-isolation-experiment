@@ -53,13 +53,17 @@ const operations={
 
 const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SERVICE_ID=/^\/subscriptions\/[0-9a-f-]{36}\/resourceGroups\/[A-Za-z0-9._()-]+\/providers\/Microsoft\.Storage\/storageAccounts\/([a-z0-9]{3,24})\/blobServices\/default$/i;
-function principalFromToken(token) {
+export function managedIdentityClaims(token, {expectedPrincipalId, expectedClientId} = {}) {
   const parts=token.split('.');
   if(parts.length!==3) throw new Error('workload token identity could not be verified');
   let claims;try {claims=JSON.parse(Buffer.from(parts[1],'base64url').toString('utf8'));} catch {throw new Error('workload token identity could not be verified');}
   const clientId=claims?.azp??claims?.appid;
   if(!GUID.test(claims?.oid||'')||!GUID.test(clientId||'')) throw new Error('workload token identity could not be verified');
-  return {objectId:claims.oid.toLowerCase(),clientId:clientId.toLowerCase()};
+  const identity={objectId:claims.oid.toLowerCase(),clientId:clientId.toLowerCase()};
+  if((expectedPrincipalId!==undefined&&identity.objectId!==String(expectedPrincipalId).toLowerCase()) ||
+    (expectedClientId!==undefined&&identity.clientId!==String(expectedClientId).toLowerCase()))
+    throw new Error('workload token claims do not match the configured identity');
+  return identity;
 }
 function errorCode(response,body) {
   const header=response.headers.get('x-ms-error-code');
@@ -106,9 +110,8 @@ export function createBlobWorkload({blobEndpoint,getToken,dummyApiUrl,dummyApiWo
     const op=operations[scenario];
     const token=await getToken();
     if(typeof token!=='string' || !token || /[\r\n]/.test(token)) throw new Error('workload token unavailable');
-    const tokenIdentity=correlatedOperation&&requestId!==undefined?principalFromToken(token):undefined;
-    if(tokenIdentity&&(tokenIdentity.objectId!==expectedPrincipalId.toLowerCase()||tokenIdentity.clientId!==expectedClientId.toLowerCase()))
-      throw new Error('Blob token principal does not match the attached workload identity');
+    const tokenIdentity=correlatedOperation&&requestId!==undefined
+      ?managedIdentityClaims(token,{expectedPrincipalId,expectedClientId}):undefined;
     const exactRequestId=requestId??runId;
     const objectUri=`${endpoint.origin}/${op.container}/${runId}.json`;
     const resourceId=storageResource?`${storageResource}/containers/${op.container}`:undefined;
@@ -127,7 +130,7 @@ export function createBlobWorkload({blobEndpoint,getToken,dummyApiUrl,dummyApiWo
         const statusCode=response.status;
         const markerFingerprint=statusCode===200?exactMarkerFingerprint(raw):undefined;
         const markerValue=body&&typeof body==='object'?body.marker:undefined;
-        return {runId,scenario,transportOk:true,status:statusCode,statusCode,principalId:tokenIdentity.objectId,
+        return {runId,scenario,transportOk:true,status:statusCode,statusCode,principalId:tokenIdentity.objectId,clientId:tokenIdentity.clientId,
           resourceId:`${storageResource}/containers/${op.container}`,objectUri,requestId:exactRequestId,startedAt,
           serviceRequestId:response.headers.get('x-ms-request-id'),...(markerFingerprint?{body:{marker:markerValue},markerFingerprint}:{}),
           ...(statusCode===403?{errorCode:errorCode(response,raw)}:{})};

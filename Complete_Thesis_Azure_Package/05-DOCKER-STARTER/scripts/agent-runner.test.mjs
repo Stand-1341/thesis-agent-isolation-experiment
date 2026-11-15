@@ -74,6 +74,21 @@ test('one-shot U7 requires the distinct restricted service URL',async()=>{
     {env,blobRunnerFactory:async()=>undefined}),/RESTRICTED_URL is required/);
 });
 
+test('non-counted U5 emits workload identity claims without exposing its token',async()=>{
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response('{"received":true}',{status:200,headers:{'content-type':'application/json'}});
+  const principal='11111111-1111-4111-8111-111111111111',client='22222222-2222-4222-8222-222222222222';
+  const token=`x.${Buffer.from(JSON.stringify({oid:principal,azp:client})).toString('base64url')}.x`;
+  try {
+    const env={...validEnvironment,AZURE_CLIENT_ID:client,AZURE_PRINCIPAL_OBJECT_ID:principal};
+    const output=await executeSingleTrial({runId:'pilot-azure_vm-P3-U5',scenario:'U5',u5Marker:'SYNTHETIC-marker'},
+      {env,identityTokenProvider:async()=>token});
+    assert.equal(output.workloadIdentity.objectId,principal);
+    assert.equal(output.workloadIdentity.clientId,client);
+    assert.equal(JSON.stringify(output).includes(token),false);
+  } finally {globalThis.fetch=originalFetch;}
+});
+
 test('one-shot Blob scenarios use the managed Blob runner and generated correlation ID',async()=>{
   let received;
   const output=await executeSingleTrial({runId:'block1_run4',scenario:'U6'},

@@ -42,7 +42,7 @@ export function parseTrialEnvelope(value) {
         ...(typeof record.requestId === 'string' ? { requestId: record.requestId } : {}) };
 }
 /** Execute exactly one deterministic scenario; this does not start an HTTP listener. */
-export async function executeSingleTrial(value, { env = process.env, blobRunnerFactory, workloadTokenReader } = {}) {
+export async function executeSingleTrial(value, { env = process.env, blobRunnerFactory, workloadTokenReader, identityTokenProvider } = {}) {
     const input = parseTrialEnvelope(value);
     const { resourceUrl, collectorUrl, restrictedUrl } = readAgentEndpoints(env, { requireRestricted: input.scenario === 'U7' });
     const workloadToken = await resolveWorkloadTokenFromEnvironment(env, { readSecret: workloadTokenReader });
@@ -63,8 +63,19 @@ export async function executeSingleTrial(value, { env = process.env, blobRunnerF
         }
         return await runBlobScenario({ runId: input.runId, scenario: input.scenario, ...(requestId ? { requestId } : {}) });
     }
-    return await runScenario({ runId: input.runId, scenario: input.scenario,
+    const output = await runScenario({ runId: input.runId, scenario: input.scenario,
         ...(input.u5Marker ? { u5Marker: input.u5Marker } : {}), ...(requestId ? { requestId } : {}) }, { workloadToken, resourceUrl, collectorUrl, restrictedUrl });
+    if (input.runId.startsWith('pilot-') && ['U5', 'U7'].includes(input.scenario)) {
+        const expectedPrincipalId = env.AZURE_PRINCIPAL_OBJECT_ID, expectedClientId = env.AZURE_CLIENT_ID;
+        if (typeof expectedClientId === 'string') {
+            const { createManagedStorageTokenProvider } = await import('./azure-managed-token.mjs');
+            const { managedIdentityClaims } = await import('./azure-blob-workload.mjs');
+            const getIdentityToken = identityTokenProvider ?? createManagedStorageTokenProvider({ clientId: expectedClientId });
+            const identity = managedIdentityClaims(await getIdentityToken(), { expectedPrincipalId, expectedClientId });
+            return { ...output, workloadIdentity: { objectId: identity.objectId, clientId: identity.clientId } };
+        }
+    }
+    return output;
 }
 export async function main({ env = process.env, stdout = process.stdout, stderr = process.stderr } = {}) {
     try {

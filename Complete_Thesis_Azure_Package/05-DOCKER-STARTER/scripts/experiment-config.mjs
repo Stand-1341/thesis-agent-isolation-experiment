@@ -161,6 +161,21 @@ export function validateExperimentConfig(raw,{requiredRoutes=REVISION_3_ROUTES,r
   const aciProtocol=requiredRoutes.some(key=>key.startsWith('azure_container_instances:'));
   const sessionProtocol=requiredRoutes.some(key=>key.startsWith('azure_custom_sessions_hyperv:'));
   const azureThreeArmProtocol=requiredRoutes.some(key=>key.startsWith('azure_container_apps_jobs:')||key.startsWith('azure_container_apps_sandboxes:'));
+  let routeRegions;
+  if(config.routeRegions!==undefined) {
+    const rawRegions=requireObject(config.routeRegions,'routeRegions');
+    routeRegions={};
+    for(const [deployment,profileMapValue] of Object.entries(rawRegions)) {
+      if(!SUPPORTED_DEPLOYMENTS.includes(deployment)) throw new Error(`routeRegions.${deployment} is not a supported deployment`);
+      const profileMap=requireObject(profileMapValue,`routeRegions.${deployment}`);
+      routeRegions[deployment]={};
+      for(const [profile,region] of Object.entries(profileMap)) {
+        if(!PROFILES.includes(profile)||typeof region!=='string'||! /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(region))
+          throw new Error(`routeRegions.${deployment}.${profile} must name a valid profile and Azure region`);
+        routeRegions[deployment][profile]=region;
+      }
+    }
+  }
   if(config.routes.length<requiredRoutes.length || (aciProtocol&&config.routes.length!==requiredRoutes.length))
     throw new Error(requiredRoutes.length===REVISION_3_ROUTES.length&&requiredRoutes.every((key,index)=>key===REVISION_3_ROUTES[index])
       ?`exactly ${REVISION_3_ROUTES.length} revision-3 routes are required, got ${config.routes.length}`
@@ -257,8 +272,16 @@ export function validateExperimentConfig(raw,{requiredRoutes=REVISION_3_ROUTES,r
       if(name!=='azure_container_apps_sandboxes') throw new Error(`deployments.${name}.kind aca_sandbox is only valid for azure_container_apps_sandboxes`);
       if(!GUID.test(entry.subscriptionId||'')) throw new Error(`deployments.${name}.subscriptionId must be a GUID`);
       const resourceGroup=resourceGroupName(entry.resourceGroup,`deployments.${name}.resourceGroup`);
-      if(typeof entry.region!=='string'||! /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.region))
-        throw new Error(`deployments.${name}.region must be an Azure region name`);
+      const rawProfileRegions=entry.profileRegions??Object.fromEntries(PROFILES.map(profile=>[profile,entry.region]));
+      const profileRegions=requireObject(rawProfileRegions,`deployments.${name}.profileRegions`);
+      const normalizedProfileRegions={};
+      for(const profile of PROFILES) {
+        const region=profileRegions[profile];
+        if(typeof region!=='string'||! /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(region))
+          throw new Error(`deployments.${name}.profileRegions.${profile} must be an Azure region name`);
+        normalizedProfileRegions[profile]=region;
+      }
+      const uniqueRegions=[...new Set(Object.values(normalizedProfileRegions))];
       const sandboxGroups=profileNames(entry.sandboxGroups,`deployments.${name}.sandboxGroups`);
       const diskImageIds=profileNames(entry.diskImageIds,`deployments.${name}.diskImageIds`);
       const agentImage=pinnedImage(entry.agentImage,`deployments.${name}.agentImage`);
@@ -274,7 +297,8 @@ export function validateExperimentConfig(raw,{requiredRoutes=REVISION_3_ROUTES,r
       const timeoutMs=entry.timeoutMs??300000;
       if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>3600000)
         throw new Error(`deployments.${name}.timeoutMs must be 1000..3600000`);
-      deployments[name]={kind:'aca_sandbox',subscriptionId:entry.subscriptionId,resourceGroup,region:entry.region,
+      deployments[name]={kind:'aca_sandbox',subscriptionId:entry.subscriptionId,resourceGroup,
+        profileRegions:normalizedProfileRegions,...(uniqueRegions.length===1?{region:uniqueRegions[0]}:{}),
         sandboxGroups,diskImageIds,agentImage,imagePullIdentityResourceId,resources,resourceUrl,collectorUrl,
         ...(restrictedUrl?{restrictedUrl}:{}),...(dataStore?{sessionDataStore:dataStore}:{}),apiVersion,timeoutMs};
     }
@@ -352,7 +376,12 @@ export function validateExperimentConfig(raw,{requiredRoutes=REVISION_3_ROUTES,r
   for(const key of requiredRoutes)
     if(!seen.has(key)) throw new Error(`missing route ${key}`);
 
-  return {evidenceDirectory:config.evidenceDirectory,auditWindowSeconds,deployments,routes};
+  if(routeRegions) for(const route of routes) {
+    if(!routeRegions[route.deployment]?.[route.profile])
+      throw new Error(`routeRegions is missing ${route.deployment}:${route.profile}`);
+  }
+
+  return {evidenceDirectory:config.evidenceDirectory,auditWindowSeconds,deployments,routes,...(routeRegions?{routeRegions}:{})};
 }
 
 /**

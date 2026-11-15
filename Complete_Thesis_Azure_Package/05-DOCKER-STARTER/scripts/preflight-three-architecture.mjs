@@ -29,7 +29,12 @@ const APPROVED_FROZEN_CANDIDATES=Object.freeze({
     matrixFile:'plan-360-three-arm-supported-v1.csv',matrixSha256:'854d1f20e1443798d50933f01e57cd21e1684e3d5c1f7bdc490ef41e0c099ce6'}),
   'protocol-450-three-arm-supported-v2.json':Object.freeze({
     revision:'three-arm-supported-450-v2',protocolSha256:'fdb135628361b17347f91df7099d48afc25d6366803b498fae545ae9c2c5d2bc',
-    matrixFile:'plan-450-three-arm-supported-v2.csv',matrixSha256:'3e9d26641b190eba202984c88234794fa480bb7ddbed2fd5ebc3188d269e40d6'})
+    matrixFile:'plan-450-three-arm-supported-v2.csv',matrixSha256:'3e9d26641b190eba202984c88234794fa480bb7ddbed2fd5ebc3188d269e40d6'}),
+  'protocol-450-flex-sandbox-supported-v3.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-450-v3',protocolSha256:'1d007cec5062dd8641b604e01fb6b7cea62ca166c44f184f9bae16085c62d266',
+    matrixFile:'plan-450-flex-sandbox-supported-v3.csv',matrixSha256:'d76cb846e3dc647c6bc7bf589ad6397d03f8a9885ecf42ace11c13e44740834e',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'})})
 });
 const APPROVED_FROZEN_PILOTS=Object.freeze({
   'protocol-450-three-arm-supported-v2-pilot-v1.json':Object.freeze({
@@ -51,6 +56,8 @@ const APPROVED_FROZEN_PILOTS=Object.freeze({
  */
 export const NETWORK_DENIAL_CAPABILITY=Object.freeze({
   azure_vm:Object.freeze({codePresent:true,established:true,pilotValidated:false,evidence:'VM VNet flow logs or VM-route Azure Firewall diagnostics'}),
+  azure_functions_flex:Object.freeze({codePresent:true,established:false,pilotValidated:false,
+    evidence:'Functions Flex dedicated-subnet target/rule-scoped Azure Firewall reader is implemented; exact-route U5/U7 inputs and an attributable pilot are not established'}),
   azure_container_apps_jobs:Object.freeze({codePresent:true,established:false,pilotValidated:false,
     evidence:'ACA Jobs target-scoped Azure Firewall application-rule reader is implemented; target-specific inputs and an attributable pilot are not established'}),
   azure_container_apps_sandboxes:Object.freeze({codePresent:true,established:true,pilotValidated:false,
@@ -115,12 +122,13 @@ export function validateSelectedProtocol({protocolBytes,matrixBytes,lock,paths={
     throw new Error('freeze lock does not name an approved selected protocol and matrix pair');
   if(lock.status!=='frozen_structural_launch_gated')
     throw new Error('freeze lock status is not a separately declared structural freeze');
-  if(!sameSet(protocol.deployments??[],THREE_ARM_DEPLOYMENTS))
-    throw new Error('selected protocol must declare exactly the three supported deployments');
-  if(!protocol.deploymentKinds||protocol.deploymentKinds.azure_vm!=='http'||
-    protocol.deploymentKinds.azure_container_apps_jobs!=='aca_job'||
-    protocol.deploymentKinds.azure_container_apps_sandboxes!=='aca_sandbox')
-    throw new Error('selected protocol deployment kinds do not match the three supported deployments');
+  const expectedDeployments=approvedCandidate.deployments??THREE_ARM_DEPLOYMENTS;
+  const expectedKinds=approvedCandidate.deploymentKinds??{azure_vm:'http',azure_container_apps_jobs:'aca_job',azure_container_apps_sandboxes:'aca_sandbox'};
+  if(!sameSet(protocol.deployments??[],expectedDeployments))
+    throw new Error('selected protocol does not declare the approved three supported deployments');
+  if(!protocol.deploymentKinds||!sameSet(Object.keys(protocol.deploymentKinds),Object.keys(expectedKinds))||
+    Object.entries(expectedKinds).some(([deployment,kind])=>protocol.deploymentKinds[deployment]!==kind))
+    throw new Error('selected protocol deployment kinds do not match the approved three supported deployments');
 
   const protocolDigest=sha256(protocolBytes);
   if(!/^[a-f0-9]{64}$/.test(lock.protocolSha256??'')||protocolDigest!==lock.protocolSha256||
@@ -160,7 +168,7 @@ export function validateSelectedProtocol({protocolBytes,matrixBytes,lock,paths={
     if(!/^[A-Za-z0-9_-]{1,150}$/.test(row.planned_run_id)||ids.has(row.planned_run_id))
       throw new Error('selected matrix shape contains an invalid or duplicate run ID');
     ids.add(row.planned_run_id);
-    if(!THREE_ARM_DEPLOYMENTS.includes(row.deployment)||!PROFILES.includes(row.permission_profile)||
+    if(!expectedDeployments.includes(row.deployment)||!PROFILES.includes(row.permission_profile)||
       !scenarios.includes(row.scenario_id))
       throw new Error('selected matrix shape contains a cell outside the declared protocol');
     if(row.scenario_type!==(row.scenario_id.startsWith('U')?'unauthorized':'legitimate')||
@@ -170,7 +178,7 @@ export function validateSelectedProtocol({protocolBytes,matrixBytes,lock,paths={
     if(cellKeys.has(cellKey)) throw new Error('selected matrix shape contains a duplicate cell');
     cellKeys.add(cellKey);
   }
-  const rowsPerBlock=THREE_ARM_DEPLOYMENTS.length*PROFILES.length*scenarios.length;
+  const rowsPerBlock=expectedDeployments.length*PROFILES.length*scenarios.length;
   const expectedTrials=rowsPerBlock*blocks;
   if(rows.length!==expectedTrials||protocol.expectedTrials!==expectedTrials||
     [...rowsByBlock.keys()].length!==blocks||[...rowsByBlock.values()].some(count=>count!==rowsPerBlock)||
@@ -178,7 +186,7 @@ export function validateSelectedProtocol({protocolBytes,matrixBytes,lock,paths={
     throw new Error('selected matrix shape does not match its declared factorial schedule');
   for(let block=1;block<=blocks;block++) {
     if(!rowsByBlock.has(block)) throw new Error('selected matrix shape has a missing block');
-    for(const deployment of THREE_ARM_DEPLOYMENTS) for(const profile of PROFILES) for(const scenario of scenarios)
+    for(const deployment of expectedDeployments) for(const profile of PROFILES) for(const scenario of scenarios)
       if(!cellKeys.has(`${block}|${deployment}|${profile}|${scenario}`))
         throw new Error('selected matrix shape is missing a declared cell');
   }
@@ -296,9 +304,9 @@ function pendingGates() {
   ];
 }
 
-function buildScheduleScope(rows,config) {
+function buildScheduleScope(rows,config,deployments=THREE_ARM_DEPLOYMENTS) {
   const sessionCapabilities={};
-  for(const deployment of THREE_ARM_DEPLOYMENTS) {
+  for(const deployment of deployments) {
     const declaration=config?.deployments?.[deployment]?.sessionDataStore;
     if(declaration==='azure_blob_external_namespace') sessionCapabilities[deployment]=true;
     else if(declaration!==undefined) sessionCapabilities[deployment]=false;
@@ -332,27 +340,29 @@ export function preflightThreeArchitecture({legacyPlanBytes,legacyProtocol,candi
   const selected=validateSelectedProtocol({protocolBytes:candidateProtocolBytes,
     matrixBytes:candidateMatrixBytes,lock:freezeLock,paths});
   const protocol=selected.protocol;
+  const selectedDeployments=protocol.deployments;
+  const selectedRoutes=selectedDeployments.flatMap(deployment=>PROFILES.map(profile=>`${deployment}:${profile}`));
   const protocolAssessment={matchesThreeArm:true,protocolDeployments:protocol.deployments,
     planningOnly:true,reason:'selected frozen protocol selects the three supported arms; launch gates remain open'};
   const routes=Array.isArray(config?.routes)?config.routes:[];
   const seen=routes.map(route=>`${route?.deployment}:${route?.profile}`);
-  const missingRoutes=THREE_ARM_ROUTES.filter(key=>!seen.includes(key));
+  const missingRoutes=selectedRoutes.filter(key=>!seen.includes(key));
   const duplicateRoutes=[...new Set(seen.filter((key,index)=>seen.indexOf(key)!==index))];
-  const oldArchitectureRoutes=[...new Set(seen.filter(key=>SUPERSEDED_DEPLOYMENTS.includes(key.split(':')[0])))];
+  const oldArchitectureRoutes=[...new Set(seen.filter(key=>SUPERSEDED_DEPLOYMENTS.includes(key.split(':')[0])&&!selectedDeployments.includes(key.split(':')[0])))];
   const unexpectedRoutes=[...new Set(seen.filter(key=>{
     const deployment=key.split(':')[0];
-    return !THREE_ARM_DEPLOYMENTS.includes(deployment)&&!SUPERSEDED_DEPLOYMENTS.includes(deployment);
+    return !selectedDeployments.includes(deployment)&&!SUPERSEDED_DEPLOYMENTS.includes(deployment);
   }))];
   let configValidation;
   try {
-    validateExperimentConfig(config,{requiredRoutes:THREE_ARM_ROUTES,requiredScenarios:protocol.scenarios.scheduled});
+    validateExperimentConfig(config,{requiredRoutes:selectedRoutes,requiredScenarios:protocol.scenarios.scheduled});
     configValidation={status:'valid_shape_only'};
   } catch {
     configValidation={status:'invalid_or_unsupported'};
   }
   const configAssessment={missingRoutes,duplicateRoutes,oldArchitectureRoutes,unexpectedRoutes,configValidation,
     note:'Shape validation is structural only; it establishes neither deployment nor identity/evidence readiness.'};
-  const scheduleScope=buildScheduleScope(selected.rows,config);
+  const scheduleScope=buildScheduleScope(selected.rows,config,selectedDeployments);
   const gates=pendingGates();
   const blockers=[];
   if(missingRoutes.length) blockers.push(`Configuration is missing required three-arm routes: ${missingRoutes.join(', ')}.`);
@@ -370,7 +380,7 @@ export function preflightThreeArchitecture({legacyPlanBytes,legacyProtocol,candi
 
   return {schema:'three_architecture_preflight_v3',ready:false,launchEnabled:false,
     frozenLegacyPlan,
-    selectedArchitecture:{deployments:THREE_ARM_DEPLOYMENTS,requiredRoutes:THREE_ARM_ROUTES},
+    selectedArchitecture:{deployments:selectedDeployments,requiredRoutes:selectedRoutes},
     protocolAssessment,configAssessment,
     selectedProtocol:{revision:protocol.revision,status:protocol.status,deployments:protocol.deployments,
       measuredExecutionEnabled:false,freezeLock:{file:paths.lockFile,

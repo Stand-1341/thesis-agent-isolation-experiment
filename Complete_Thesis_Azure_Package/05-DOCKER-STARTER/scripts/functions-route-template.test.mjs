@@ -4,11 +4,13 @@ import {readFile} from 'node:fs/promises';
 
 const source=await readFile(new URL('../infra/functions-route.bicep',import.meta.url),'utf8');
 
-test('Functions route template separates Flex host identity from the selected workload UAI',()=>{
+test('Functions route template separates Flex host identity, workload UAI, and Key Vault reader',()=>{
   assert.match(source,/resource workloadIdentity '[^']+' existing/);
+  assert.match(source,/resource secretReaderIdentity '[^']+' existing/);
   assert.match(source,/type:\s*'SystemAssigned, UserAssigned'/);
-  assert.match(source,/userAssignedIdentities:\s*\{\s*'\$\{workloadIdentity\.id\}':\s*\{\}\s*\}/);
+  assert.match(source,/userAssignedIdentities:\s*\{\s*'\$\{workloadIdentity\.id\}':\s*\{\}\s*'\$\{secretReaderIdentity\.id\}':\s*\{\}\s*\}/);
   assert.match(source,/name:\s*'AZURE_CLIENT_ID',[\s\S]*?value:\s*workloadIdentity\.properties\.clientId/);
+  assert.match(source,/keyVaultReferenceIdentity:\s*secretReaderIdentity\.id/);
   assert.match(source,/principalId:\s*app\.identity\.principalId/);
   assert.match(source,/output workloadPrincipalId string = workloadIdentity\.properties\.principalId/);
 });

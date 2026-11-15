@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {mkdtemp, readFile, stat} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
@@ -197,6 +198,18 @@ test('--out writes the record owner-only and still prints it when the chain fail
   assert.equal(written.failure.stage, 'create');
   // The same record is printed, so --out cannot hide a result.
   assert.deepEqual(JSON.parse(out), written);
-  const mode = (await stat(outPath)).mode & 0o777;
-  assert.equal(mode, 0o600, 'observation records are written owner-only');
+  if (process.platform === 'win32') {
+    // Inspect the actual Windows DACL; POSIX mode bits reported by Node are not
+    // meaningful on NTFS and must not be used as a security assertion.
+    const who = execFileSync('whoami.exe', ['/user', '/fo', 'csv', '/nh'], {encoding: 'utf8'});
+    const account = who.match(/^"([^"]+)"/m)?.[1];
+    const sid = who.match(/"(S-1-[0-9-]+)"\s*$/m)?.[1];
+    assert.ok(account && sid, 'current Windows user and SID are available');
+    const acl = execFileSync('icacls.exe', [outPath], {encoding: 'utf8'});
+    const ace = acl.split(/\r?\n/).find(line => line.includes(outPath))?.slice(outPath.length).trim();
+    assert.equal(ace?.toLowerCase(), `${account.toLowerCase()}:(f)`, 'record DACL grants only full control to its owner');
+  } else {
+    const mode = (await stat(outPath)).mode & 0o777;
+    assert.equal(mode, 0o600, 'observation records are written owner-only');
+  }
 });

@@ -16,14 +16,15 @@
  *   5  usage error
  */
 import {createHash} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
-import {dirname,isAbsolute,relative,resolve,sep} from 'node:path';
+import {readFile,readdir,writeFile} from 'node:fs/promises';
+import {dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {loadExperimentConfigShape,missingCredentialVariables,resolveCredentials} from './experiment-config.mjs';
 import {buildRoutes,describeRoutes,createLaneSelector} from './build-experiment.mjs';
 import {createTrialAdapterRouter} from './trial-adapter-router.mjs';
 import {runExperiment} from './experiment-runner.mjs';
 import {loadFrozenSchedule} from './trial-schedule.mjs';
+import {routeEvidenceMetadata,routeMapDigest} from './live-agent-evidence.mjs';
 import {analyzeTrialScope} from './scenario-scope.mjs';
 import {freezeLockPathFor,THREE_ARM_DEPLOYMENTS,validateFrozenPilotProtocol,validateSelectedProtocol} from './preflight-three-architecture.mjs';
 
@@ -50,6 +51,7 @@ const USAGE=`Usage: run-experiment-cli.mjs --config <file> [options]
                          aciAdapters keyed by deployment:profile for ACI routes}
   --dry-run              structural config/matrix/scope report only; never proves readiness
   --json                 machine-readable summary on stdout
+  --progress-events      emit safe STUDY_PROGRESS events after saved trial records
   --help
 
 A measured run is refused unless all four gates are asserted. A non-counted pilot
@@ -59,7 +61,7 @@ policy and an institution-approved retention period. The gates are operator
 assertions: this tool cannot verify them.`;
 
 function parseArgs(argv) {
-  const options={dryRun:false,json:false};
+  const options={dryRun:false,json:false,progressEvents:false};
   for(let index=0;index<argv.length;index++) {
     const arg=argv[index];
     const value=()=>{const v=argv[++index];if(v===undefined) throw new Error(`${arg} requires a value`);return v;};
@@ -95,6 +97,7 @@ function parseArgs(argv) {
       case '--gates': options.gates=value().split(',').map(s=>s.trim()).filter(Boolean); break;
       case '--dry-run': options.dryRun=true; break;
       case '--json': options.json=true; break;
+      case '--progress-events': options.progressEvents=true; break;
       case '--help': case '-h': options.help=true; break;
       default: throw new Error(`unknown option ${arg}`);
     }
@@ -495,7 +498,13 @@ async function main(argv) {
       concurrency:options.concurrency ?? 3,
       laneFor:typeof deps.laneFor==='function'?deps.laneFor:createLaneSelector(config),
       networkCapabilities:deps.denialReader?.capabilities ?? {},sessionCapabilities,
-      allowRepeatedCellsWithinBlock:declared.allowRepeatedCellsWithinBlock===true});
+      routeMetadataByRoute:Object.fromEntries((config.routes ?? []).map(route=>{
+        const deploymentMapDigest=routeMapDigest(config.routeRegions ?? {});
+        const metadata=routeEvidenceMetadata({config,arm:route.deployment,profile:route.profile,deploymentMapDigest});
+        return [`${route.deployment}:${route.profile}`,metadata];
+      }).filter(([,metadata])=>metadata)),
+      allowRepeatedCellsWithinBlock:declared.allowRepeatedCellsWithinBlock===true,
+      ...(options.progressEvents?{onTrialProgress:event=>process.stdout.write(`STUDY_PROGRESS ${JSON.stringify(event)}\n`)}:{})});
   } catch (error) {
     // A throw here means the run stopped; the evidence store already holds the
     // indeterminate records for the trial that failed.
@@ -510,6 +519,16 @@ async function main(argv) {
     matrixComplete:results.matrixComplete===true,pilotScheduleComplete:results.pilotScheduleComplete===true,classifications:counts,scope:results.scopeSummary,
     concurrency:results.concurrency??1,lanes:results.laneCount??1,notApplicable:results.notApplicable??0,
     gates,gatesVerifiedByTool:false};
+  if(options.pilot) {
+    try {
+      const pilotIndex=await writePilotEvidenceIndex({directory:evidenceDirectory,routes:config.routes,
+        indexPath:process.env.PILOT_INDEX_FILE?resolve(process.env.PILOT_INDEX_FILE):undefined});
+      summary.pilotIndex=pilotIndex.path;
+    } catch(error) {
+      process.stderr.write(`pilot index error: ${error.message}\n`);
+      return EXIT.partial;
+    }
+  }
   if(options.json) process.stdout.write(`${JSON.stringify(summary,null,2)}\n`);
   else {
     say('');
@@ -526,6 +545,38 @@ async function main(argv) {
   // code as a halt; matrixComplete remains in the summary as scope information.
   // matrixComplete stays in the summary as information; it must not gate the result.
   return summary.halted || !summary.scopeComplete || summary.executed!==summary.planned ? EXIT.partial : EXIT.complete;
+}
+
+/** Index only runner-written envelopes, preserving byte digests for later verification. */
+export async function writePilotEvidenceIndex({directory,routes=[],indexPath}={}) {
+  if(typeof directory!=='string'||!directory) throw new Error('pilot evidence directory is required');
+  const evidenceRoot=resolve(directory);
+  const outputPath=resolve(indexPath??join(evidenceRoot,'pilot-index.json'));
+  if(dirname(outputPath)!==evidenceRoot) throw new Error('pilot index must be inside its evidence directory');
+  const entries=await readdir(directory,{withFileTypes:true});
+  const evidenceFiles=[],records=[];
+  for(const entry of entries) {
+    if(!entry.isFile()||!entry.name.endsWith('.json')||entry.name==='pilot-index.json') continue;
+    const file=join(directory,entry.name),bytes=await readFile(file);
+    let envelope,record;
+    try {
+      envelope=JSON.parse(bytes.toString('utf8'));
+      if(envelope.version!==1||typeof envelope.payload!=='string'||
+        createHash('sha256').update(Buffer.from(envelope.payload,'utf8')).digest('hex')!==envelope.sha256) throw new Error('integrity');
+      record=JSON.parse(envelope.payload);
+    } catch { throw new Error(`invalid runner evidence envelope: ${entry.name}`); }
+    evidenceFiles.push({file:entry.name,sha256:createHash('sha256').update(bytes).digest('hex')});
+    records.push(record);
+  }
+  if(!evidenceFiles.length) throw new Error('pilot evidence directory contains no runner evidence envelopes');
+  const presentRoutes=new Set(records.filter(record=>record?.mode==='non_counted_pilot'&&record?.trial&&
+    record.classification&&record.classification!=='indeterminate'&&record.verificationEvidence&&
+    Object.keys(record.verificationEvidence).length>0)
+    .map(record=>`${record.trial.deployment}:${record.trial.permission_profile??record.trial.profile}`));
+  const routesValidated=routes.map(route=>`${route.deployment}:${route.profile}`).filter(key=>presentRoutes.has(key));
+  const index={schemaVersion:1,generatedAt:new Date().toISOString(),evidenceFiles,routesValidated};
+  await writeFile(outputPath,`${JSON.stringify(index,null,2)}\n`,{flag:'w'});
+  return {path:outputPath,index};
 }
 
 function buildRoutesForDisplay(config) {

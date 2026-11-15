@@ -21,16 +21,25 @@ param controllerIpCidr string
 param profile string
 @description('Name of the existing dedicated workload UAI in this resource group for this profile.')
 param workloadIdentityName string
+@description('Separate identity permitted to read only this route\'s workload and trial-request secrets.')
+param readerIdentityName string
 param researchUrl string
 param collectorUrl string
+param restrictedUrl string
 param fixtureBlobEndpoint string
-@secure()
-param workloadToken string
-@secure()
-param trialRequestKey string
+@description('Fixture storage account resource ID followed by /blobServices/default.')
+param fixtureBlobResourceId string
+@description('Versionless HTTPS Key Vault URI for this route\'s workload token. Resolved by Azure, never supplied as a template value.')
+param workloadTokenSecretUri string
+@description('Versionless HTTPS Key Vault URI for this route\'s distinct trial-request key. Resolved by Azure, never supplied as a template value.')
+param trialRequestKeySecretUri string
 
 resource workloadIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: workloadIdentityName
+}
+
+resource secretReaderIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: readerIdentityName
 }
 
 resource hostStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
@@ -80,6 +89,7 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
     type: 'SystemAssigned, UserAssigned'
     userAssignedIdentities: {
       '${workloadIdentity.id}': {}
+      '${secretReaderIdentity.id}': {}
     }
   }
   properties: {
@@ -87,6 +97,7 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
     httpsOnly: true
     virtualNetworkSubnetId: integrationSubnetId
     publicNetworkAccess: 'Enabled'
+    keyVaultReferenceIdentity: secretReaderIdentity.id
     siteConfig: {
       minTlsVersion: '1.2'
       ipSecurityRestrictionsDefaultAction: 'Deny'
@@ -97,13 +108,18 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'AzureWebJobsStorage__blobServiceUri', value: hostStorage.properties.primaryEndpoints.blob }
         { name: 'AzureWebJobsStorage__queueServiceUri', value: hostStorage.properties.primaryEndpoints.queue }
         { name: 'AzureWebJobsStorage__tableServiceUri', value: hostStorage.properties.primaryEndpoints.table }
+        { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
         { name: 'RESEARCH_URL', value: researchUrl }
         { name: 'COLLECTOR_URL', value: collectorUrl }
+        { name: 'RESTRICTED_URL', value: restrictedUrl }
         { name: 'AZURE_BLOB_ENDPOINT', value: fixtureBlobEndpoint }
+        { name: 'THESIS_BLOB_RESOURCE_ID', value: fixtureBlobResourceId }
         { name: 'AZURE_CLIENT_ID', value: workloadIdentity.properties.clientId }
+        { name: 'AZURE_PRINCIPAL_OBJECT_ID', value: workloadIdentity.properties.principalId }
         { name: 'NODE_EXTRA_CA_CERTS', value: '/home/site/wwwroot/certs/thesis-pilot-ca.pem' }
-        { name: 'WORKLOAD_TOKEN', value: workloadToken }
-        { name: 'TRIAL_REQUEST_KEY', value: trialRequestKey }
+        { name: 'SCENARIO_PROFILE', value: profile }
+        { name: 'WORKLOAD_TOKEN', value: '@Microsoft.KeyVault(SecretUri=${workloadTokenSecretUri})' }
+        { name: 'TRIAL_REQUEST_KEY', value: '@Microsoft.KeyVault(SecretUri=${trialRequestKeySecretUri})' }
       ]
     }
     functionAppConfig: {
@@ -115,7 +131,11 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
         }
       }
       runtime: { name: 'node', version: '22' }
-      scaleAndConcurrency: { maximumInstanceCount: 1, instanceMemoryMB: 2048 }
+      scaleAndConcurrency: {
+        maximumInstanceCount: 1
+        instanceMemoryMB: 2048
+        triggers: { http: { perInstanceConcurrency: 1 } }
+      }
     }
   }
   tags: {

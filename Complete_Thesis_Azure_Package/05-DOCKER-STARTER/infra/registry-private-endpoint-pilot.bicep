@@ -37,4 +37,5 @@ resource dnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-
   }
 }
 output endpointId string = endpoint.id
-output registryPrivateEndpointIps array = endpoint.properties.customDnsConfigs[0].ipAddresses
+output registryPrivateEndpointIps array = empty(endpoint.properties.customDnsConfigs) ? [] : endpoint.properties.customDnsConfigs[0].ipAddresses
+output privateDnsZoneId string = dns.id

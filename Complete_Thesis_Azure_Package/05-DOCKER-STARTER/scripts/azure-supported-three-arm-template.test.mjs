@@ -2,9 +2,11 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const composition=await readFile(new URL('../infra/azure-supported-three-arm.bicep',import.meta.url),'utf8');
-const evidenceEndpoint=await readFile(new URL('../infra/evidence-private-endpoint-pilot.bicep',import.meta.url),'utf8');
-const fixtureEndpoint=await readFile(new URL('../infra/fixture-private-endpoint-pilot.bicep',import.meta.url),'utf8');
+// Treat source line endings as text-file formatting, not part of the Bicep contract.
+const readBicep=async path=>(await readFile(new URL(path,import.meta.url),'utf8')).replace(/\r\n/g,'\n');
+const composition=await readBicep('../infra/azure-supported-three-arm.bicep');
+const evidenceEndpoint=await readBicep('../infra/evidence-private-endpoint-pilot.bicep');
+const fixtureEndpoint=await readBicep('../infra/fixture-private-endpoint-pilot.bicep');
 const declarationBlock=(kind,name)=>{
   const lines=composition.split('\n');
   const start=lines.findIndex(line=>line.startsWith(`${kind} ${name} `));
@@ -14,8 +16,8 @@ const declarationBlock=(kind,name)=>{
 };
 const hasLine=(block,expected)=>block.split('\n').some(line=>line.trim()===expected);
 
-test('shared Blob private DNS exists when either optional storage arm is enabled',()=>{
-  assert.ok(composition.split('\n').includes('var deployBlobPrivateDns = deployEvidenceStore || deploySyntheticFixtures'));
+test('shared Blob private DNS exists for storage arms and regional P3 support',()=>{
+  assert.ok(composition.split('\n').includes('var deployBlobPrivateDns = deployEvidenceStore || deploySyntheticFixtures || deployRegionalP3Support'));
   const zone=declarationBlock('resource','blobPrivateDnsZone');
   const link=declarationBlock('resource','blobPrivateDnsVnetLink');
   assert.ok(zone,'shared private DNS zone declaration must exist');

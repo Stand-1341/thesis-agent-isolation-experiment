@@ -1,5 +1,26 @@
 import {createHash} from 'node:crypto';
 const sha256=value=>createHash('sha256').update(value,'utf8').digest('hex');
+const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'
+  ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+
+export function routeMapDigest(routeRegions={}) {
+  return sha256(JSON.stringify(canonical(routeRegions)));
+}
+
+/** Resolve route-level region/resource metadata for persisted trial evidence. */
+export function routeEvidenceMetadata({config,arm,profile,deploymentMapDigest}={}) {
+  const route=Array.isArray(config?.routes)
+    ? config.routes.find(item=>item.deployment===arm&&item.profile===profile)
+    : config?.routes?.[arm]?.[profile];
+  const region=config?.routeRegions?.[arm]?.[profile] ?? route?.region;
+  if(!route || typeof region!=='string' || !region.trim()) return undefined;
+  return {
+    region:region.trim().toLowerCase(),
+    routeResourceId:route.resourceId ?? route.sandboxGroupId,
+    ...(typeof deploymentMapDigest==='string'&&/^[a-f0-9]{64}$/i.test(deploymentMapDigest)
+      ? {deploymentMapDigest:deploymentMapDigest.toLowerCase()}:{}),
+  };
+}
 
 /** Keep model/tool evidence while excluding tool bodies and final text that can contain synthetic secrets. */
 export function summarizeLiveOutput(output) {
@@ -9,6 +30,9 @@ export function summarizeLiveOutput(output) {
     reasoningEffort:output.reasoningEffort,agentOutcome:output.agentOutcome,phaseSpentUsd:output.phaseSpentUsd,
     totalInputTokens:output.totalInputTokens,totalOutputTokens:output.totalOutputTokens,estimatedUsd:output.estimatedUsd,
     promptHashes:output.promptHashes,documentSha256:output.documentSha256,
+    ...(output.routeMetadata?{routeMetadata:{region:output.routeMetadata.region,
+      routeResourceId:output.routeMetadata.routeResourceId,
+      deploymentMapDigest:output.routeMetadata.deploymentMapDigest}}:{}),
     trace:output.trace?{variant:output.trace.variant,briefRetrieved:output.trace.briefRetrieved,
       protectedReadAttempted:output.trace.protectedReadAttempted,protectedReadSucceeded:output.trace.protectedReadSucceeded,
       exfiltrationToolAttempted:output.trace.exfiltrationToolAttempted,exfiltrationReachedWorkload:output.trace.exfiltrationReachedWorkload,

@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const template=await readFile(new URL('../infra/functions-p3-egress-candidate.bicep',import.meta.url),'utf8');
+const template=(await readFile(new URL('../infra/functions-p3-egress-candidate.bicep',import.meta.url),'utf8')).replace(/\r\n/g,'\n');
 
 test('Functions P3 firewall candidate is disabled by default and does not claim proof',()=>{
   assert.match(template,/param enableCandidate bool = false/);

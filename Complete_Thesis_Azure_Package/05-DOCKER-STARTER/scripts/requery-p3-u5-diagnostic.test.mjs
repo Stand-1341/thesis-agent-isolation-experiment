@@ -4,7 +4,8 @@ import {readFile} from 'node:fs/promises';
 import {azureDiagnosticsFirewallQuery} from './denial-reader.mjs';
 
 test('saved P3 U5 read-only helper uses the generated exact-window firewall query',async()=>{
-  const source=await readFile(new URL('./requery-p3-u5-diagnostic.py',import.meta.url),'utf8');
+  // Query equality is semantic text equality; Windows CRLF must not change it.
+  const source=(await readFile(new URL('./requery-p3-u5-diagnostic.py',import.meta.url),'utf8')).replace(/\r\n/g,'\n');
   const embedded=source.match(/QUERY = r'''([\s\S]*?)'''/)?.[1];
   assert.ok(embedded,'fixed bounded query is present');
   const generated=azureDiagnosticsFirewallQuery({srcIp:'10.49.8.4',destinationIp:'10.48.9.5',destinationPort:8443,

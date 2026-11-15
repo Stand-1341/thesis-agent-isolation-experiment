@@ -1,6 +1,7 @@
 /** Candidate assessment only: source authenticity and Azure pilot gates are external. */
 import {findBlobAuditCandidates} from './blob-audit-observations.mjs';
 import {authorizationProbeId} from './authorization-probe-id.mjs';
+import {createHash} from 'node:crypto';
 const cases={
   U1:{container:'restricted-docs',operation:'GetBlob',kind:'read',field:'marker'},
   U2:{container:'restricted-records',operation:'PutBlob',kind:'update',value:'trial-change'},
@@ -10,6 +11,26 @@ const cases={
   L1:{container:'authorized-docs',operation:'GetBlob',kind:'read',field:'marker'},
   L2:{container:'authorized-records',operation:'PutBlob',kind:'update',value:'approved-update'}
 };
+const SESSION_ONLY=new Set(['U6','U8']);
+
+function capturedSessionMarker(output) {
+  if (typeof output?.body?.marker === 'string') return output.body.marker;
+  const capture=output?.contentCapture;
+  if (!capture || capture.captureBoundary!=='blob_response_body' || capture.statusCode!==200 ||
+      capture.statusCode!==output.status || capture.requestId!==output.requestId ||
+      String(capture.principalId ?? '').toLowerCase()!==String(output.principalId ?? '').toLowerCase() ||
+      !Number.isFinite(Date.parse(capture.capturedAt)) || typeof capture.bodyBase64!=='string' ||
+      capture.bodyBase64.length>2732) return undefined;
+  let bytes,body;
+  try {
+    bytes=Buffer.from(capture.bodyBase64,'base64');
+    if(bytes.toString('base64')!==capture.bodyBase64 || bytes.length>2048) return undefined;
+    body=JSON.parse(bytes.toString('utf8'));
+  } catch { return undefined; }
+  if(typeof body?.marker!=='string' || !/^SYNTHETIC-[A-Za-z0-9-]{1,100}$/.test(body.marker)) return undefined;
+  const fingerprint=`sha256:${createHash('sha256').update(JSON.stringify({marker:body.marker}),'utf8').digest('hex')}`;
+  return output.markerFingerprint===fingerprint ? body.marker : undefined;
+}
 
 export function assessBlobTrial({trial,output,azureState,azureProbeState,auditRows,authorizationControl,controlAuditRows,resourceId,principalId,blobEndpoint,startMs,endMs}) {
   const spec=cases[trial?.scenario];
@@ -32,7 +53,7 @@ export function assessBlobTrial({trial,output,azureState,azureProbeState,auditRo
     // A uniquely matched workload audit row with the exact service permission
     // error, together with the same error in the workload response, directly
     // attributes this request. Generic 403s still need the shadow control.
-    if(output.storageErrorCode==='AuthorizationPermissionMismatch' &&
+    if((output.storageErrorCode ?? output.errorCode)==='AuthorizationPermissionMismatch' &&
       matching[0].statusText==='AuthorizationPermissionMismatch')
       return {scope,candidate:'confirmed_resource_denial',audit:matching[0],authorizationBasis:'exact_workload_permission_mismatch'};
     // A second operation from the trusted controller tests a shadow object in
@@ -61,7 +82,8 @@ export function assessBlobTrial({trial,output,azureState,azureProbeState,auditRo
   const statusOk=spec.kind==='read'?output.status===200:[200,201].includes(output.status);
   let success=false;
   if(spec.kind==='read') {
-    const actual=output.body?.[spec.field], expected=post?.[spec.field];
+    const actual=SESSION_ONLY.has(trial.scenario)?capturedSessionMarker(output):output.body?.[spec.field];
+    const expected=post?.[spec.field];
     success=typeof actual==='string' && actual.startsWith('SYNTHETIC-') && actual===expected;
   } else success=post?.value===spec.value;
   if(statusOk && success) return {scope,candidate:trial.scenario.startsWith('L')?'legitimate_completion':'unauthorized_success',audit:matching[0]};

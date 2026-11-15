@@ -76,7 +76,7 @@
       "workloadIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-vm-p1-workload",
       "secretReaderClientId": "00000000-0000-4000-8000-000000000201",
       "secretReaderIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-vm-p1-secret-reader",
-      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/p1-workload-token",
+      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/th3arm-vm-p1-workload-token",
       "credentials": {
         "controller": "THESIS_VM_P1_CONTROLLER_KEY",
         "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
@@ -92,7 +92,7 @@
       "workloadIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-vm-p2-workload",
       "secretReaderClientId": "00000000-0000-4000-8000-000000000202",
       "secretReaderIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-vm-p2-secret-reader",
-      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/p2-workload-token",
+      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/th3arm-vm-p2-workload-token",
       "credentials": {
         "controller": "THESIS_VM_P2_CONTROLLER_KEY",
         "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
@@ -108,7 +108,7 @@
       "workloadIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-vm-p3-workload",
       "secretReaderClientId": "00000000-0000-4000-8000-000000000203",
       "secretReaderIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-vm-p3-secret-reader",
-      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/p3-workload-token",
+      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/th3arm-vm-p3-workload-token",
       "credentials": {
         "controller": "THESIS_VM_P3_CONTROLLER_KEY",
         "resourceAdmin": "THESIS_RESOURCE_ADMIN_KEY",
@@ -123,7 +123,7 @@
       "workloadIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-jobs-p1-workload",
       "secretReaderClientId": "00000000-0000-4000-8000-000000000204",
       "secretReaderIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-jobs-p1-secret-reader",
-      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/p1-workload-token",
+      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/th3arm-job-p1-workload-token",
       "credentials": {
         "resourceAdmin": "THESIS_JOBS_RESOURCE_ADMIN_KEY",
         "collectorAdmin": "THESIS_JOBS_COLLECTOR_ADMIN_KEY"
@@ -137,7 +137,7 @@
       "workloadIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-jobs-p2-workload",
       "secretReaderClientId": "00000000-0000-4000-8000-000000000205",
       "secretReaderIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-jobs-p2-secret-reader",
-      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/p2-workload-token",
+      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/th3arm-job-p2-workload-token",
       "credentials": {
         "resourceAdmin": "THESIS_JOBS_RESOURCE_ADMIN_KEY",
         "collectorAdmin": "THESIS_JOBS_COLLECTOR_ADMIN_KEY"
@@ -151,7 +151,7 @@
       "workloadIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-jobs-p3-workload",
       "secretReaderClientId": "00000000-0000-4000-8000-000000000206",
       "secretReaderIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-jobs-p3-secret-reader",
-      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/p3-workload-token",
+      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/th3arm-job-p3-workload-token",
       "credentials": {
         "resourceAdmin": "THESIS_JOBS_RESOURCE_ADMIN_KEY",
         "collectorAdmin": "THESIS_JOBS_COLLECTOR_ADMIN_KEY"
@@ -165,7 +165,7 @@
       "workloadIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-sandbox-p1-workload",
       "secretReaderClientId": "00000000-0000-4000-8000-000000000207",
       "secretReaderIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-sandbox-p1-secret-reader",
-      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/p1-workload-token",
+      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/th3arm-sbx-p1-workload-token",
       "credentials": {
         "resourceAdmin": "THESIS_SANDBOX_RESOURCE_ADMIN_KEY",
         "collectorAdmin": "THESIS_SANDBOX_COLLECTOR_ADMIN_KEY"
@@ -179,7 +179,7 @@
       "workloadIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-sandbox-p2-workload",
       "secretReaderClientId": "00000000-0000-4000-8000-000000000208",
       "secretReaderIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-sandbox-p2-secret-reader",
-      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/p2-workload-token",
+      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/th3arm-sbx-p2-workload-token",
       "credentials": {
         "resourceAdmin": "THESIS_SANDBOX_RESOURCE_ADMIN_KEY",
         "collectorAdmin": "THESIS_SANDBOX_COLLECTOR_ADMIN_KEY"
@@ -193,7 +193,7 @@
       "workloadIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-sandbox-p3-workload",
       "secretReaderClientId": "00000000-0000-4000-8000-000000000209",
       "secretReaderIdentityResourceId": "/subscriptions/00000000-0000-4000-8000-000000000100/resourceGroups/REPLACE-IDENTITY-RG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/thesis-sandbox-p3-secret-reader",
-      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/p3-workload-token",
+      "workloadTokenSecretUri": "https://thesis-secrets.vault.azure.net/secrets/th3arm-sbx-p3-workload-token",
       "credentials": {
         "resourceAdmin": "THESIS_SANDBOX_RESOURCE_ADMIN_KEY",
         "collectorAdmin": "THESIS_SANDBOX_COLLECTOR_ADMIN_KEY"

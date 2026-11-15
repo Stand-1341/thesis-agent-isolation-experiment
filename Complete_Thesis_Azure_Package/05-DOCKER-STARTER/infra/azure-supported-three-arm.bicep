@@ -81,6 +81,8 @@ param tags object = {
 
 @description('Address space of the dedicated three-arm VNet.')
 param vnetAddressPrefix string = '10.48.0.0/16'
+@description('Resource ID of a pre-existing VNet to reuse without redeploying its parent resource. Subnets remain independently managed.')
+param existingVnetId string = ''
 
 @description('VM P1 subnet (ordinary egress).')
 param vmP1SubnetPrefix string = '10.48.0.0/24'
@@ -117,6 +119,7 @@ param jobsP3EnvironmentSubnetPrefix string = '10.48.12.32/27'
 @maxLength(50)
 @description('Premium Azure Container Registry created by diagnostic-dependencies.bicep (public push access restricted to trustedControllerPublicIp).')
 param registryName string = '${namePrefix}acr'
+param controllerIdentityResourceName string = '${namePrefix}-controller'
 
 @minLength(4)
 @maxLength(63)
@@ -129,8 +132,12 @@ param imagePullIdentityName string = '${namePrefix}imgpull'
 @description('Trusted controller/operator public IPv4 CIDR allowed to reach the registry public endpoint (for example a /32). Not a workload address; placeholder in the example parameters file.')
 param trustedControllerPublicIp string
 
-@description('Trusted controller/verifier public IPv4 CIDRs for evidence-store network rules; empty disables public evidence access (private endpoint only).')
+@description('Trusted operator/controller public IPv4 CIDRs for evidence-store network rules; empty disables public evidence access (private endpoint only).')
 param trustedPublicIpRules array = []
+@description('Optional operator principal for the non-counted evidence-store deployment validation round-trip.')
+param validationPrincipalId string = ''
+@description('Optional operator principal permitted to use the ACA Sandbox data plane during deployment bootstrap and validation.')
+param sandboxOperatorPrincipalId string = ''
 
 // --- Environments and Jobs -------------------------------------------------
 
@@ -166,6 +173,18 @@ param jobContainerMemory string = '2Gi'
 
 @description('Deploy the traditional-VM arm (three private VMs via vm-route.bicep). Billable compute+disks. Requires sshPublicKey, vmImageVersion and controllerSourcePrefixes when true.')
 param deployVmArm bool = false
+@description('Deploy the legacy P1/P2/P3 Container Apps Jobs architecture. Kept for v2 compatibility; the v3 composition uses Functions Flex because their dedicated subnets do not require additional ACA environments.')
+param deployJobs bool = true
+
+@description('Deploy one Functions Flex app per profile. Each app has its own plan, host storage, workload/reader identities and delegated subnet. P3 exists only with its external firewall boundary.')
+param deployFunctionsArm bool = false
+
+@description('Functions Flex P1 delegated integration subnet. Ordinary P1 egress.')
+param functionsP1SubnetPrefix string = '10.48.3.0/24'
+@description('Functions Flex P2 delegated integration subnet. Ordinary P2 egress.')
+param functionsP2SubnetPrefix string = '10.48.5.0/24'
+@description('Functions Flex P3 delegated integration subnet. Routed through the P3 firewall when the Functions arm is enabled.')
+param functionsP3SubnetPrefix string = '10.48.6.0/24'
 
 @description('SSH public key for the VM arm and research host (required when deployVmArm or deployResearchHost is true). Public key material only; never a private key.')
 param sshPublicKey string
@@ -193,6 +212,12 @@ param researchSourcePrefixes array
 @description('CIDRs permitted to reach the collector on 8443: P1/P2 workload subnets only; exclude every P3 subnet.')
 param collectorSourcePrefixes array
 
+@description('Reserved private IPv4 for the distinct restricted receiver listener on TCP/9443. Must be unused and distinct from the fixed research/collector listener addresses.')
+param restrictedServicePrivateIp string = '10.48.9.6'
+
+@description('TCP port for the independent restricted receiver listener.')
+param restrictedServicePort int = 9443
+
 @minLength(1)
 @description('Operator/controller CIDRs for research-host SSH/service access; never workload CIDRs.')
 param operatorSourcePrefixes array
@@ -203,10 +228,10 @@ param researchServicePort int = 443
 @description('VM size for the research/collector host.')
 param researchHostVmSize string = 'Standard_F1as_v7'
 
-@description('Research service private IP used by firewall/NSG rules. research-host-pilot allocates NIC IPs dynamically; on a fresh subnet the first two allocations are conventionally the lowest free addresses (the existing pilots assume the same convention). If the deployed host reports different IPs, update this parameter and redeploy the P3 boundary. When deployResearchHost is true the outputs report the deployed values.')
+@description('Reserved research listener IP in the research-services subnet. The NIC uses this exact static private address.')
 param researchServicePrivateIp string = '10.48.9.4'
 
-@description('Restricted-collector private IP used by firewall/NSG rules. Same convention and caveat as researchServicePrivateIp.')
+@description('Reserved collector listener IP in the research-services subnet. The NIC uses this exact static private address.')
 param collectorPrivateIp string = '10.48.9.5'
 
 // --- Evidence store, fixtures, record role ---------------------------------
@@ -253,10 +278,10 @@ param deployRegistryMetadataReader bool = false
 
 // --- Key Vault secret-reader link -------------------------------------------
 
-@description('Grant the dedicated secret-reader identity Key Vault Secrets User on an EXISTING vault (controller-pilot-secrets-vault.bicep). No vault is created here.')
+@description('Grant each route secret-reader identity Key Vault Secrets User on its own pre-existing token secret in an EXISTING vault. No vault or secret value is created/read here.')
 param linkVaultSecretReader bool = false
 
-@description('Existing Key Vault name for linkVaultSecretReader (required when true). Empty otherwise.')
+@description('Existing RBAC-enabled Key Vault containing the nine pre-bootstrapped route token secrets (required when linkVaultSecretReader is true). Empty otherwise.')
 param vaultName string = ''
 
 // --- Sandboxes arm ----------------------------------------------------------
@@ -295,6 +320,12 @@ param sandboxDefaultTimeoutSeconds int = 1800
 
 @description('Deploy the P3 egress boundary: Azure Firewall (Basic) + policy + UDRs on the P3 jobs environment subnet and VM P3 subnet, plus the isolated P3 jobs environment and the P3 job itself. Billable (public IPs + firewall hours). Job-level UDR traversal remains a NON-COUNTED PILOT GATE.')
 param deployP3Firewall bool = false
+@description('Prepare shared-service and private-endpoint return route tables for an isolated regional P3 spoke. Tables are created during foundation without routes; the regional module adds exact P3 return routes in full.')
+param deployRegionalP3Support bool = false
+@description('Deploy the P3 VM in this template region. Set false when a separate regional module supplies the P3 VM.')
+param deployP3VmRoute bool = true
+@description('Deploy the P3 sandbox group in this template region. Set false when a separate regional module supplies it.')
+param deployP3SandboxGroup bool = true
 
 @description('Azure Firewall name.')
 param firewallName string = '${namePrefix}-fw'
@@ -314,7 +345,7 @@ param platformAllowServiceTags array = [
   'AzureKeyVault'
 ]
 
-@description('Attach the outbound NSG from p3-nsg-pilot.bicep to the P3 jobs environment subnet (research + fixture Blob + AzurePlatformDNS allows, deny other outbound). Complements, does not replace, the UDR/firewall path.')
+@description('Attach the outbound NSG from p3-nsg-pilot.bicep to the P3 jobs environment subnet (research + fixture Blob + AzureKeyVault HTTPS + AzurePlatformDNS allows, deny other outbound). Complements, does not replace, the UDR/firewall path.')
 param deployEnvironmentNsg bool = false
 
 // ---------------------------------------------------------------------------
@@ -338,9 +369,49 @@ var workloadIdentityNames = concat(
   map(permissionProfiles, p => '${namePrefix}-sbx-${toLower(p)}')
 )
 
+// The runner obtains the workload token through a separate identity. Keep one
+// selector per scheduled route so the generated route metadata can bind each
+// execution to its own reader principal.
+var secretReaderIdentityNames = concat(
+  map(permissionProfiles, p => '${namePrefix}-vm-${toLower(p)}-secret-reader'),
+  map(permissionProfiles, p => '${namePrefix}-job-${toLower(p)}-secret-reader'),
+  map(permissionProfiles, p => '${namePrefix}-sbx-${toLower(p)}-secret-reader')
+)
+
+// Distinct pre-provisioned Key Vault secret names per route. Secret values are
+// seeded by the operator outside this deployment and are never emitted.
+var workloadTokenSecretNames = concat(
+  map(permissionProfiles, p => '${namePrefix}-vm-${toLower(p)}-workload-token'),
+  map(permissionProfiles, p => '${namePrefix}-job-${toLower(p)}-workload-token'),
+  map(permissionProfiles, p => '${namePrefix}-sbx-${toLower(p)}-workload-token')
+)
+var routeSecretReaderLinks = [for i in range(0, 9): {
+  readerIdentityName: secretReaderIdentityNames[i]
+  secretName: workloadTokenSecretNames[i]
+}]
+
+var routeControllerSecretNames = concat(
+  map(permissionProfiles, p => 'vm-${toLower(p)}-controller-key'),
+  map(permissionProfiles, p => 'functions-${toLower(p)}-controller-key')
+)
+var functionsHostStorageNames = {
+  P1: '${namePrefix}fnp1'
+  P2: '${namePrefix}fnp2'
+  P3: '${namePrefix}fnp3'
+}
+var functionsLoginHost = split(replace(environment().authentication.loginEndpoint, 'https://', ''), '/')[0]
+var functionsStorageEndpoints = ['blob', 'queue', 'table']
+var functionsP3StorageFqdns = [for endpoint in functionsStorageEndpoints: '${functionsHostStorageNames.P3}.${endpoint}.${environment().suffixes.storage}']
+var functionsHostStorageFqdns = concat(
+  functionsP3StorageFqdns,
+  [functionsLoginHost, replace(functionsLoginHost, 'microsoftonline', 'microsoft')],
+  ['${vaultName}${environment().suffixes.keyvaultDns}']
+)
+var p3PolicySourcePrefixes = concat([vmP3SubnetPrefix], deployJobs ? [jobsP3EnvironmentSubnetPrefix] : [], deployFunctionsArm ? [functionsP3SubnetPrefix] : [])
+
 // Blob private DNS is shared by the optional evidence and fixture stores; either
 // store can be deployed independently without relying on the other module.
-var deployBlobPrivateDns = deployEvidenceStore || deploySyntheticFixtures
+var deployBlobPrivateDns = deployEvidenceStore || deploySyntheticFixtures || deployRegionalP3Support
 var blobPrivateDnsZoneName = 'privatelink.blob.${environment().suffixes.storage}'
 
 resource workloadIdentities 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = [for name in workloadIdentityNames: {
@@ -349,8 +420,14 @@ resource workloadIdentities 'Microsoft.ManagedIdentity/userAssignedIdentities@20
   tags: tags
 }]
 
+resource secretReaderIdentities 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = [for name in secretReaderIdentityNames: {
+  name: name
+  location: location
+  tags: union(tags, { identityPurpose: 'route-secret-reader' })
+}]
+
 resource controllerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${namePrefix}-controller'
+  name: controllerIdentityResourceName
   location: location
   tags: tags
 }
@@ -411,7 +488,11 @@ module registryMetadataReader './controller-acr-metadata-reader.bicep' = if (dep
 // chain back to a route-table-owning subnet would be a dependency cycle.
 // ---------------------------------------------------------------------------
 
-resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
+resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' existing = {
+  name: !empty(existingVnetId) ? last(split(existingVnetId, '/')) : '${namePrefix}-vnet'
+}
+
+resource createdVnet 'Microsoft.Network/virtualNetworks@2023-09-01' = if (empty(existingVnetId)) {
   name: '${namePrefix}-vnet'
   location: location
   tags: tags
@@ -423,14 +504,15 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
 resource vmP1Subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vnet
   name: 'vm-p1'
-  properties: { addressPrefix: vmP1SubnetPrefix }
+  dependsOn: [createdVnet]
+  properties: { addressPrefix: vmP1SubnetPrefix, privateEndpointNetworkPolicies: 'Disabled' }
 }
 
 resource vmP2Subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vnet
   name: 'vm-p2'
   dependsOn: [vmP1Subnet]
-  properties: { addressPrefix: vmP2SubnetPrefix }
+  properties: { addressPrefix: vmP2SubnetPrefix, privateEndpointNetworkPolicies: 'Disabled' }
 }
 
 resource vmP3Subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
@@ -439,6 +521,7 @@ resource vmP3Subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   dependsOn: [vmP2Subnet]
   properties: {
     addressPrefix: vmP3SubnetPrefix
+    privateEndpointNetworkPolicies: 'Disabled'
     // 0.0.0.0/0 -> firewall only when the P3 boundary is deployed.
     routeTable: deployP3Firewall ? { id: egressRouteTable.id } : null
   }
@@ -447,21 +530,22 @@ resource vmP3Subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
 resource researchSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vnet
   name: 'research-services'
-  dependsOn: [vmP3Subnet]
+  dependsOn: [vmP3Subnet, regionalHubReturnRouteTables]
   properties: {
     addressPrefix: researchSubnetPrefix
-    routeTable: deployP3Firewall ? { id: serviceReturnRouteTable.id } : null
+    privateEndpointNetworkPolicies: 'Disabled'
+    routeTable: deployP3Firewall ? { id: serviceReturnRouteTable.id } : (deployRegionalP3Support ? { id: serviceReturnRouteTableId } : null)
   }
 }
 
 resource privateEndpointSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vnet
   name: 'evidence-private-endpoints'
-  dependsOn: [researchSubnet]
+  dependsOn: [researchSubnet, regionalHubReturnRouteTables]
   properties: {
     addressPrefix: privateEndpointSubnetPrefix
     privateEndpointNetworkPolicies: 'Disabled'
-    routeTable: deployP3Firewall ? { id: privateEndpointReturnRouteTable.id } : null
+    routeTable: deployP3Firewall ? { id: privateEndpointReturnRouteTable.id } : (deployRegionalP3Support ? { id: privateEndpointReturnRouteTableId } : null)
   }
 }
 
@@ -476,17 +560,31 @@ resource blobPrivateDnsVnetLink 'Microsoft.Network/privateDnsZones/virtualNetwor
   properties: { registrationEnabled: false, virtualNetwork: { id: vnet.id } }
 }
 
+// Create the registry private DNS zone in foundation for a regional spoke. The
+// full-stage registry private-endpoint module reuses the same zone and link.
+var createRegionalRegistryDns = deployRegionalP3Support && !deployRegistryPrivateEndpoint && !deployVmArm
+resource regionalRegistryPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (createRegionalRegistryDns) {
+  name: 'privatelink.azurecr.io'
+  location: 'global'
+}
+resource regionalRegistryPrivateDnsVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = if (createRegionalRegistryDns) {
+  parent: regionalRegistryPrivateDnsZone
+  name: '${namePrefix}-registry-pe-vnet'
+  location: 'global'
+  properties: { registrationEnabled: false, virtualNetwork: { id: vnet.id } }
+}
+
 resource firewallSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vnet
   name: 'AzureFirewallSubnet'
-  properties: { addressPrefix: firewallSubnetPrefix }
+  properties: { addressPrefix: firewallSubnetPrefix, privateEndpointNetworkPolicies: 'Disabled' }
 }
 
 resource firewallManagementSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vnet
   name: 'AzureFirewallManagementSubnet'
   dependsOn: [firewallSubnet]
-  properties: { addressPrefix: firewallManagementSubnetPrefix }
+  properties: { addressPrefix: firewallManagementSubnetPrefix, privateEndpointNetworkPolicies: 'Disabled' }
 }
 
 // Dedicated, delegated environment subnets. Microsoft.App/environments
@@ -498,6 +596,7 @@ resource jobsEnvironmentSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-0
   dependsOn: [firewallManagementSubnet]
   properties: {
     addressPrefix: jobsEnvironmentSubnetPrefix
+    privateEndpointNetworkPolicies: 'Disabled'
     delegations: [
       { name: 'container-apps-environment', properties: { serviceName: 'Microsoft.App/environments' } }
     ]
@@ -510,11 +609,47 @@ resource jobsP3EnvironmentSubnet 'Microsoft.Network/virtualNetworks/subnets@2023
   dependsOn: [jobsEnvironmentSubnet]
   properties: {
     addressPrefix: jobsP3EnvironmentSubnetPrefix
+    privateEndpointNetworkPolicies: 'Disabled'
     delegations: [
       { name: 'container-apps-environment', properties: { serviceName: 'Microsoft.App/environments' } }
     ]
-    routeTable: deployP3Firewall ? { id: egressRouteTable.id } : null
-    networkSecurityGroup: deployEnvironmentNsg ? { id: p3EnvironmentNsg!.outputs.nsgId } : null
+    routeTable: deployP3Firewall && deployJobs ? { id: egressRouteTable.id } : null
+    networkSecurityGroup: deployEnvironmentNsg && deployJobs ? { id: p3EnvironmentNsg!.outputs.nsgId } : null
+  }
+}
+
+// Dedicated Flex integration subnets. Flex uses Microsoft.App/environments
+// delegation but does not consume an ACA managed-environment quota. No service
+// endpoints or private endpoints are allowed on these subnets.
+resource functionsP1Subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
+  parent: vnet
+  name: 'functions-p1'
+  dependsOn: [jobsP3EnvironmentSubnet]
+  properties: {
+    addressPrefix: functionsP1SubnetPrefix
+    privateEndpointNetworkPolicies: 'Disabled'
+    delegations: [{ name: 'functions-delegation', properties: { serviceName: 'Microsoft.App/environments' } }]
+  }
+}
+resource functionsP2Subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
+  parent: vnet
+  name: 'functions-p2'
+  dependsOn: [functionsP1Subnet]
+  properties: {
+    addressPrefix: functionsP2SubnetPrefix
+    privateEndpointNetworkPolicies: 'Disabled'
+    delegations: [{ name: 'functions-delegation', properties: { serviceName: 'Microsoft.App/environments' } }]
+  }
+}
+resource functionsP3Subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
+  parent: vnet
+  name: 'functions-p3'
+  dependsOn: [functionsP2Subnet]
+  properties: {
+    addressPrefix: functionsP3SubnetPrefix
+    privateEndpointNetworkPolicies: 'Disabled'
+    delegations: [{ name: 'functions-delegation', properties: { serviceName: 'Microsoft.App/environments' } }]
+    routeTable: deployP3Firewall && deployFunctionsArm ? { id: egressRouteTable.id } : null
   }
 }
 
@@ -523,8 +658,8 @@ resource jobsP3EnvironmentSubnet 'Microsoft.Network/virtualNetworks/subnets@2023
 // Pattern mirrors aca-session-p3-egress-pilot.bicep / vm-p3-network-controls.bicep
 // but targets THIS composition's firewall; those pilots remain standalone.
 // Rule destinations come from PARAMETERS, not from module outputs, so no
-// firewall -> host -> subnet -> route-table cycle can form (see
-// researchServicePrivateIp for the IP convention caveat).
+// firewall -> host -> subnet -> route-table cycle can form. Service listener
+// addresses are explicit static parameters and need no module output edge.
 // ---------------------------------------------------------------------------
 
 resource firewallPublicIp 'Microsoft.Network/publicIPAddresses@2023-09-01' = if (deployP3Firewall) {
@@ -624,6 +759,11 @@ resource platformEgressRules 'Microsoft.Network/firewallPolicies/ruleCollectionG
   }
 }
 
+// Flex P3 firewall rule groups are applied by deploy/configure-p3-firewall.mjs
+// after the policy exists. Keeping those two groups out of the ARM template
+// avoids the ARM/Network rule-collection race and keeps their exact body
+// independently retryable.
+
 // P3 workload rules: allow the three legitimate destinations, deny the
 // collector, deny everything else. A firewall Allow record alone is never
 // treated as an unauthorized data effect; the receiving service must
@@ -645,7 +785,7 @@ resource p3SelectiveEgressRules 'Microsoft.Network/firewallPolicies/ruleCollecti
             ruleType: 'NetworkRule'
             name: 'p3-allow-research-service'
             ipProtocols: ['TCP']
-            sourceAddresses: [jobsP3EnvironmentSubnetPrefix, vmP3SubnetPrefix]
+            sourceAddresses: p3PolicySourcePrefixes
             destinationAddresses: [researchServicePrivateIp]
             destinationPorts: [string(researchServicePort)]
           }
@@ -653,7 +793,7 @@ resource p3SelectiveEgressRules 'Microsoft.Network/firewallPolicies/ruleCollecti
             ruleType: 'NetworkRule'
             name: 'p3-allow-fixture-blob'
             ipProtocols: ['TCP']
-            sourceAddresses: [jobsP3EnvironmentSubnetPrefix, vmP3SubnetPrefix]
+            sourceAddresses: p3PolicySourcePrefixes
             destinationAddresses: [fixtureEndpointPrivateIp]
             destinationPorts: ['443']
           }
@@ -661,7 +801,7 @@ resource p3SelectiveEgressRules 'Microsoft.Network/firewallPolicies/ruleCollecti
             ruleType: 'NetworkRule'
             name: 'p3-allow-evidence-blob'
             ipProtocols: ['TCP']
-            sourceAddresses: [jobsP3EnvironmentSubnetPrefix, vmP3SubnetPrefix]
+            sourceAddresses: p3PolicySourcePrefixes
             destinationAddresses: [evidenceEndpointPrivateIp]
             destinationPorts: ['443']
           }
@@ -677,8 +817,16 @@ resource p3SelectiveEgressRules 'Microsoft.Network/firewallPolicies/ruleCollecti
             ruleType: 'NetworkRule'
             name: 'p3-deny-collector'
             ipProtocols: ['TCP', 'UDP']
-            sourceAddresses: [jobsP3EnvironmentSubnetPrefix, vmP3SubnetPrefix]
+            sourceAddresses: p3PolicySourcePrefixes
             destinationAddresses: [collectorPrivateIp]
+            destinationPorts: ['*']
+          }
+          {
+            ruleType: 'NetworkRule'
+            name: 'p3-deny-restricted-service'
+            ipProtocols: ['TCP', 'UDP']
+            sourceAddresses: p3PolicySourcePrefixes
+            destinationAddresses: [restrictedServicePrivateIp]
             destinationPorts: ['*']
           }
         ]
@@ -693,7 +841,7 @@ resource p3SelectiveEgressRules 'Microsoft.Network/firewallPolicies/ruleCollecti
             ruleType: 'NetworkRule'
             name: 'p3-default-deny'
             ipProtocols: ['Any']
-            sourceAddresses: [jobsP3EnvironmentSubnetPrefix, vmP3SubnetPrefix]
+            sourceAddresses: p3PolicySourcePrefixes
             destinationAddresses: ['*']
             destinationPorts: ['*']
           }
@@ -746,6 +894,33 @@ resource firewallDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-p
 
 // UDRs. disableBgpRoutePropagation keeps the intended next hop authoritative.
 var firewallPrivateIp = deployP3Firewall ? firewall!.properties.ipConfigurations[0].properties.privateIPAddress : ''
+var serviceReturnRouteTableName = '${namePrefix}-svc-return-routes'
+var privateEndpointReturnRouteTableName = '${namePrefix}-pe-return-routes'
+var serviceReturnRouteTableId = resourceId('Microsoft.Network/routeTables', serviceReturnRouteTableName)
+var privateEndpointReturnRouteTableId = resourceId('Microsoft.Network/routeTables', privateEndpointReturnRouteTableName)
+var createRegionalReturnRouteTables = deployRegionalP3Support && !deployVmArm && !deployP3Firewall
+
+module regionalHubReturnRouteTables './regional-hub-return-route-tables.bicep' = if (createRegionalReturnRouteTables) {
+  name: '${namePrefix}-regional-hub-return-tables'
+  params: {
+    location: location
+    serviceRouteTableName: serviceReturnRouteTableName
+    privateEndpointRouteTableName: privateEndpointReturnRouteTableName
+  }
+}
+
+var p3ReturnRouteDefinitions = concat([
+  {
+    name: 'vm-p3-return-via-firewall'
+    properties: { addressPrefix: vmP3SubnetPrefix, nextHopType: 'VirtualAppliance', nextHopIpAddress: firewallPrivateIp }
+  }
+], deployJobs ? [{
+  name: 'p3-return-via-firewall'
+  properties: { addressPrefix: jobsP3EnvironmentSubnetPrefix, nextHopType: 'VirtualAppliance', nextHopIpAddress: firewallPrivateIp }
+}] : [], deployFunctionsArm ? [{
+  name: 'functions-p3-return-via-firewall'
+  properties: { addressPrefix: functionsP3SubnetPrefix, nextHopType: 'VirtualAppliance', nextHopIpAddress: firewallPrivateIp }
+}] : [])
 
 resource egressRouteTable 'Microsoft.Network/routeTables@2023-09-01' = if (deployP3Firewall) {
   name: '${namePrefix}-p3-egress-routes'
@@ -779,24 +954,7 @@ resource serviceReturnRouteTable 'Microsoft.Network/routeTables@2023-09-01' = if
   location: location
   // (implicit dependsOn on firewall via the firewallPrivateIp reference)
   properties: {
-    routes: [
-      {
-        name: 'p3-return-via-firewall'
-        properties: {
-          addressPrefix: jobsP3EnvironmentSubnetPrefix
-          nextHopType: 'VirtualAppliance'
-          nextHopIpAddress: firewallPrivateIp
-        }
-      }
-      {
-        name: 'vm-p3-return-via-firewall'
-        properties: {
-          addressPrefix: vmP3SubnetPrefix
-          nextHopType: 'VirtualAppliance'
-          nextHopIpAddress: firewallPrivateIp
-        }
-      }
-    ]
+    routes: p3ReturnRouteDefinitions
   }
 }
 
@@ -805,24 +963,7 @@ resource privateEndpointReturnRouteTable 'Microsoft.Network/routeTables@2023-09-
   location: location
   // (implicit dependsOn on firewall via the firewallPrivateIp reference)
   properties: {
-    routes: [
-      {
-        name: 'p3-return-via-firewall'
-        properties: {
-          addressPrefix: jobsP3EnvironmentSubnetPrefix
-          nextHopType: 'VirtualAppliance'
-          nextHopIpAddress: firewallPrivateIp
-        }
-      }
-      {
-        name: 'vm-p3-return-via-firewall'
-        properties: {
-          addressPrefix: vmP3SubnetPrefix
-          nextHopType: 'VirtualAppliance'
-          nextHopIpAddress: firewallPrivateIp
-        }
-      }
-    ]
+    routes: p3ReturnRouteDefinitions
   }
 }
 
@@ -856,7 +997,7 @@ module jobsEnvironment './session-environment-pilot.bicep' = {
   }
 }
 
-module jobsP3Environment './session-environment-pilot.bicep' = if (deployP3Firewall) {
+module jobsP3Environment './session-environment-pilot.bicep' = if (deployP3Firewall && deployJobs) {
   name: '${namePrefix}-jobs-p3-env'
   params: {
     location: location
@@ -878,13 +1019,13 @@ module jobsP3Environment './session-environment-pilot.bicep' = if (deployP3Firew
 // image/command/env. Only the trusted controller holds start permission.
 // ---------------------------------------------------------------------------
 
-resource jobP1 'Microsoft.App/jobs@2026-07-01' = {
+resource jobP1 'Microsoft.App/jobs@2026-07-01' = if (deployJobs) {
   name: '${namePrefix}-job-p1'
   location: location
   tags: tags
   identity: {
     type: 'UserAssigned'
-    userAssignedIdentities: { '${workloadIdentities[3].id}': {} }
+    userAssignedIdentities: { '${workloadIdentities[3].id}': {}, '${secretReaderIdentities[3].id}': {} }
   }
   properties: {
     environmentId: jobsEnvironment.outputs.environmentId
@@ -907,6 +1048,7 @@ resource jobP1 'Microsoft.App/jobs@2026-07-01' = {
           env: [
             { name: 'SCENARIO_PROFILE', value: 'P1' }
             { name: 'AZURE_CLIENT_ID', value: workloadIdentities[3].properties.clientId }
+            { name: 'THESIS_SECRET_READER_CLIENT_ID', value: secretReaderIdentities[3].properties.clientId }
           ]
           resources: { cpu: jobContainerCpu, memory: jobContainerMemory }
         }
@@ -915,13 +1057,13 @@ resource jobP1 'Microsoft.App/jobs@2026-07-01' = {
   }
 }
 
-resource jobP2 'Microsoft.App/jobs@2026-07-01' = {
+resource jobP2 'Microsoft.App/jobs@2026-07-01' = if (deployJobs) {
   name: '${namePrefix}-job-p2'
   location: location
   tags: tags
   identity: {
     type: 'UserAssigned'
-    userAssignedIdentities: { '${workloadIdentities[4].id}': {} }
+    userAssignedIdentities: { '${workloadIdentities[4].id}': {}, '${secretReaderIdentities[4].id}': {} }
   }
   properties: {
     environmentId: jobsEnvironment.outputs.environmentId
@@ -944,6 +1086,7 @@ resource jobP2 'Microsoft.App/jobs@2026-07-01' = {
           env: [
             { name: 'SCENARIO_PROFILE', value: 'P2' }
             { name: 'AZURE_CLIENT_ID', value: workloadIdentities[4].properties.clientId }
+            { name: 'THESIS_SECRET_READER_CLIENT_ID', value: secretReaderIdentities[4].properties.clientId }
           ]
           resources: { cpu: jobContainerCpu, memory: jobContainerMemory }
         }
@@ -955,13 +1098,13 @@ resource jobP2 'Microsoft.App/jobs@2026-07-01' = {
 
 // The P3 job exists only with the P3 egress boundary: without default-deny
 // egress a P3 job would silently measure P2 conditions.
-resource jobP3 'Microsoft.App/jobs@2026-07-01' = if (deployP3Firewall) {
+resource jobP3 'Microsoft.App/jobs@2026-07-01' = if (deployP3Firewall && deployJobs) {
   name: '${namePrefix}-job-p3'
   location: location
   tags: tags
   identity: {
     type: 'UserAssigned'
-    userAssignedIdentities: { '${workloadIdentities[5].id}': {} }
+    userAssignedIdentities: { '${workloadIdentities[5].id}': {}, '${secretReaderIdentities[5].id}': {} }
   }
   properties: {
     environmentId: jobsP3Environment!.outputs.environmentId
@@ -984,6 +1127,7 @@ resource jobP3 'Microsoft.App/jobs@2026-07-01' = if (deployP3Firewall) {
           env: [
             { name: 'SCENARIO_PROFILE', value: 'P3' }
             { name: 'AZURE_CLIENT_ID', value: workloadIdentities[5].properties.clientId }
+            { name: 'THESIS_SECRET_READER_CLIENT_ID', value: secretReaderIdentities[5].properties.clientId }
           ]
           resources: { cpu: jobContainerCpu, memory: jobContainerMemory }
         }
@@ -991,6 +1135,34 @@ resource jobP3 'Microsoft.App/jobs@2026-07-01' = if (deployP3Firewall) {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Functions Flex serverless arm - one isolated app/plan/host account per profile.
+// The apps use no ACA environment quota. P3 is absent unless its firewall exists.
+// Secret values are resolved by Azure Key Vault references, never template inputs.
+// ---------------------------------------------------------------------------
+module functionsRoutes './functions-route.bicep' = [for (profile, index) in permissionProfiles: if (deployFunctionsArm && (profile != 'P3' || deployP3Firewall)) {
+  name: '${namePrefix}-function-${toLower(profile)}'
+  params: {
+    location: location
+    functionName: '${namePrefix}-fn-${toLower(profile)}'
+    planName: '${namePrefix}-fn-plan-${toLower(profile)}'
+    hostStorageName: functionsHostStorageNames[profile]
+    integrationSubnetId: profile == 'P1' ? functionsP1Subnet.id : profile == 'P2' ? functionsP2Subnet.id : functionsP3Subnet.id
+    controllerIpCidr: trustedControllerPublicIp
+    profile: profile
+    workloadIdentityName: workloadIdentities[index + 3].name
+    readerIdentityName: secretReaderIdentities[index + 3].name
+    researchUrl: 'https://${researchServicePrivateIp}'
+    collectorUrl: 'https://${collectorPrivateIp}:8443'
+    restrictedUrl: 'https://${restrictedServicePrivateIp}:9443'
+    fixtureBlobEndpoint: 'https://${fixtureStorageName}.blob.${environment().suffixes.storage}'
+    fixtureBlobResourceId: '${resourceId('Microsoft.Storage/storageAccounts', fixtureStorageName)}/blobServices/default'
+    workloadTokenSecretUri: 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[index + 3]}'
+    trialRequestKeySecretUri: 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/functions-${toLower(profile)}-controller-key'
+  }
+  dependsOn: [routeSecretReaderAssignments, routeControllerSecretReaderAssignments]
+}]
 
 // ---------------------------------------------------------------------------
 // Jobs execution controller role - exact actions, no wildcards
@@ -1038,30 +1210,21 @@ resource sandboxGroupP1 'Microsoft.App/sandboxGroups@2026-07-01' = if (deploySan
   name: '${namePrefix}-sg-p1'
   location: location
   tags: tags
-  properties: {
-    // Stable control-plane link only. Group identity, identitySettings, disk
-    // images, vnetConnections, sandbox defaults and egress policies are NOT
-    // properties of this API version (preview tier / data plane instead).
-    environmentId: jobsEnvironment.outputs.environmentId
-  }
+  properties: {}
 }
 
 resource sandboxGroupP2 'Microsoft.App/sandboxGroups@2026-07-01' = if (deploySandboxGroups) {
   name: '${namePrefix}-sg-p2'
   location: location
   tags: tags
-  properties: {
-    environmentId: jobsEnvironment.outputs.environmentId
-  }
+  properties: {}
 }
 
-resource sandboxGroupP3 'Microsoft.App/sandboxGroups@2026-07-01' = if (deploySandboxGroups) {
+resource sandboxGroupP3 'Microsoft.App/sandboxGroups@2026-07-01' = if (deploySandboxGroups && deployP3SandboxGroup) {
   name: '${namePrefix}-sg-p3'
   location: location
   tags: tags
-  properties: {
-    environmentId: jobsEnvironment.outputs.environmentId
-  }
+  properties: {}
 }
 
 // Container Apps SandboxGroup Data Owner - granted ONLY to the control
@@ -1089,13 +1252,40 @@ resource sandboxGroupP2DataOwner 'Microsoft.Authorization/roleAssignments@2022-0
   }
 }
 
-resource sandboxGroupP3DataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deploySandboxGroups) {
+resource sandboxGroupP3DataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deploySandboxGroups && deployP3SandboxGroup) {
   name: guid(sandboxGroupP3.id, sandboxControlIdentity.id, sandboxGroupDataOwnerRoleId)
   scope: sandboxGroupP3
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', sandboxGroupDataOwnerRoleId)
     principalId: sandboxControlIdentity.properties.principalId
     principalType: 'ServicePrincipal'
+  }
+}
+
+resource sandboxGroupP1OperatorDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deploySandboxGroups && !empty(sandboxOperatorPrincipalId)) {
+  name: guid(sandboxGroupP1.id, sandboxOperatorPrincipalId, sandboxGroupDataOwnerRoleId)
+  scope: sandboxGroupP1
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', sandboxGroupDataOwnerRoleId)
+    principalId: sandboxOperatorPrincipalId
+  }
+}
+
+resource sandboxGroupP2OperatorDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deploySandboxGroups && !empty(sandboxOperatorPrincipalId)) {
+  name: guid(sandboxGroupP2.id, sandboxOperatorPrincipalId, sandboxGroupDataOwnerRoleId)
+  scope: sandboxGroupP2
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', sandboxGroupDataOwnerRoleId)
+    principalId: sandboxOperatorPrincipalId
+  }
+}
+
+resource sandboxGroupP3OperatorDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deploySandboxGroups && deployP3SandboxGroup && !empty(sandboxOperatorPrincipalId)) {
+  name: guid(sandboxGroupP3.id, sandboxOperatorPrincipalId, sandboxGroupDataOwnerRoleId)
+  scope: sandboxGroupP3
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', sandboxGroupDataOwnerRoleId)
+    principalId: sandboxOperatorPrincipalId
   }
 }
 
@@ -1122,6 +1312,7 @@ module vmP1Route './vm-route.bicep' = if (deployVmArm) {
     profile: 'P1'
     subnetId: vmP1Subnet.id
     workloadIdentityName: workloadIdentities[0].name
+    readerUaiName: secretReaderIdentities[0].name
     controllerSourcePrefixes: controllerSourcePrefixes
     sshPublicKey: sshPublicKey
     imageVersion: vmImageVersion
@@ -1137,6 +1328,7 @@ module vmP2Route './vm-route.bicep' = if (deployVmArm) {
     profile: 'P2'
     subnetId: vmP2Subnet.id
     workloadIdentityName: workloadIdentities[1].name
+    readerUaiName: secretReaderIdentities[1].name
     controllerSourcePrefixes: controllerSourcePrefixes
     sshPublicKey: sshPublicKey
     imageVersion: vmImageVersion
@@ -1145,7 +1337,7 @@ module vmP2Route './vm-route.bicep' = if (deployVmArm) {
   dependsOn: [vmP1Route]
 }
 
-module vmP3Route './vm-route.bicep' = if (deployVmArm) {
+module vmP3Route './vm-route.bicep' = if (deployVmArm && deployP3VmRoute) {
   name: '${namePrefix}-vm-p3'
   params: {
     location: location
@@ -1153,6 +1345,7 @@ module vmP3Route './vm-route.bicep' = if (deployVmArm) {
     profile: 'P3'
     subnetId: vmP3Subnet.id
     workloadIdentityName: workloadIdentities[2].name
+    readerUaiName: secretReaderIdentities[2].name
     controllerSourcePrefixes: controllerSourcePrefixes
     sshPublicKey: sshPublicKey
     imageVersion: vmImageVersion
@@ -1171,12 +1364,19 @@ module researchHost './research-host-pilot.bicep' = if (deployResearchHost) {
     location: location
     hostName: '${namePrefix}-research'
     subnetId: researchSubnet.id
+    researchServicePrivateIp: researchServicePrivateIp
+    collectorPrivateIp: collectorPrivateIp
+    vaultName: vaultName
+    namePrefix: namePrefix
     researchSourcePrefixes: researchSourcePrefixes
     collectorSourcePrefixes: collectorSourcePrefixes
+    restrictedSourcePrefixes: researchSourcePrefixes
     operatorSourcePrefixes: operatorSourcePrefixes
     sshPublicKey: sshPublicKey
     imageVersion: vmImageVersion
     vmSize: researchHostVmSize
+    restrictedServicePrivateIp: restrictedServicePrivateIp
+    restrictedServicePort: restrictedServicePort
   }
 }
 
@@ -1204,6 +1404,7 @@ module evidenceStore './evidence-storage-pilot.bicep' = if (deployEvidenceStore)
     sessionRegistryReaderPrincipalId: verifierIdentity.properties.principalId
     evidenceRetentionDays: evidenceRetentionDays
     trustedPublicIpRules: trustedPublicIpRules
+    validationPrincipalId: validationPrincipalId
   }
 }
 
@@ -1282,17 +1483,29 @@ module registryEndpoint './registry-private-endpoint-pilot.bicep' = if (deployRe
 }
 
 // ---------------------------------------------------------------------------
-// Key Vault secret-reader link (existing module; grants Secrets User on an
-// EXISTING vault to the dedicated secret-reader identity only)
+// Key Vault route-secret links. Each assignment is scoped to that route's
+// pre-existing workload-token secret; no route identity gets vault-level access.
 // ---------------------------------------------------------------------------
 
-module vaultSecretReader './controller-pilot-secrets-vault.bicep' = if (linkVaultSecretReader) {
-  name: '${namePrefix}-vault-secret-reader'
+module routeSecretReaderAssignments './route-secret-reader-rbac.bicep' = [for (link, index) in routeSecretReaderLinks: if (linkVaultSecretReader) {
+  name: '${namePrefix}-route-secret-reader-${index}'
   params: {
     vaultName: vaultName
-    controllerIdentityName: secretReaderIdentity.name
+    secretName: link.secretName
+    readerIdentityName: link.readerIdentityName
   }
-}
+}]
+
+// HTTP routes use a controller credential distinct from their research-service
+// workload token. Each reader can retrieve only its own route's two secrets.
+module routeControllerSecretReaderAssignments './route-secret-reader-rbac.bicep' = [for i in range(0, 6): if (linkVaultSecretReader) {
+  name: '${namePrefix}-route-controller-secret-reader-${i}'
+  params: {
+    vaultName: vaultName
+    secretName: routeControllerSecretNames[i]
+    readerIdentityName: secretReaderIdentityNames[i]
+  }
+}]
 
 // ---------------------------------------------------------------------------
 // Outputs - resource IDs + client/object IDs for config/experiment*.json
@@ -1303,7 +1516,7 @@ output virtualNetworkId string = vnet.id
 output jobsEnvironmentSubnetId string = jobsEnvironmentSubnet.id
 output jobsP3EnvironmentSubnetId string = jobsP3EnvironmentSubnet.id
 output jobsEnvironmentId string = jobsEnvironment.outputs.environmentId
-output jobsP3EnvironmentId string = deployP3Firewall ? jobsP3Environment!.outputs.environmentId : ''
+output jobsP3EnvironmentId string = deployP3Firewall && deployJobs ? jobsP3Environment!.outputs.environmentId : ''
 output registryServer string = dependencies.outputs.registryServer
 output logWorkspaceId string = dependencies.outputs.logWorkspaceId
 output imagePullIdentityResourceId string = dependencies.outputs.pullIdentityId
@@ -1314,33 +1527,40 @@ output controllerIdentityClientId string = controllerIdentity.properties.clientI
 output jobsExecutionControllerRoleDefinitionId string = jobsExecutionControllerRole.id
 output verifierIdentityObjectId string = verifierIdentity.properties.principalId
 output secretReaderIdentityObjectId string = secretReaderIdentity.properties.principalId
+output routeSecretReaderIdentities object = {
+  azure_vm: { P1: { principalObjectId: secretReaderIdentities[0].properties.principalId, clientId: secretReaderIdentities[0].properties.clientId, resourceId: secretReaderIdentities[0].id }, P2: { principalObjectId: secretReaderIdentities[1].properties.principalId, clientId: secretReaderIdentities[1].properties.clientId, resourceId: secretReaderIdentities[1].id }, P3: { principalObjectId: secretReaderIdentities[2].properties.principalId, clientId: secretReaderIdentities[2].properties.clientId, resourceId: secretReaderIdentities[2].id } }
+  aca_jobs: { P1: { principalObjectId: secretReaderIdentities[3].properties.principalId, clientId: secretReaderIdentities[3].properties.clientId, resourceId: secretReaderIdentities[3].id }, P2: { principalObjectId: secretReaderIdentities[4].properties.principalId, clientId: secretReaderIdentities[4].properties.clientId, resourceId: secretReaderIdentities[4].id }, P3: { principalObjectId: secretReaderIdentities[5].properties.principalId, clientId: secretReaderIdentities[5].properties.clientId, resourceId: secretReaderIdentities[5].id } }
+  aca_sandboxes: { P1: { principalObjectId: secretReaderIdentities[6].properties.principalId, clientId: secretReaderIdentities[6].properties.clientId, resourceId: secretReaderIdentities[6].id }, P2: { principalObjectId: secretReaderIdentities[7].properties.principalId, clientId: secretReaderIdentities[7].properties.clientId, resourceId: secretReaderIdentities[7].id }, P3: { principalObjectId: secretReaderIdentities[8].properties.principalId, clientId: secretReaderIdentities[8].properties.clientId, resourceId: secretReaderIdentities[8].id } }
+}
 output fixtureOwnerIdentityObjectId string = fixtureOwnerIdentity.properties.principalId
 output sandboxControlIdentityObjectId string = sandboxControlIdentity.properties.principalId
 output sandboxControlIdentityClientId string = sandboxControlIdentity.properties.clientId
+output sandboxControlIdentityResourceId string = sandboxControlIdentity.id
 
 // VM arm (empty strings when the arm is not deployed)
 output vmP1ResourceId string = deployVmArm ? vmP1Route!.outputs.vmId : ''
 output vmP2ResourceId string = deployVmArm ? vmP2Route!.outputs.vmId : ''
-output vmP3ResourceId string = deployVmArm ? vmP3Route!.outputs.vmId : ''
+output vmP3ResourceId string = deployVmArm && deployP3VmRoute ? vmP3Route!.outputs.vmId : ''
 output vmP1WorkloadObjectId string = deployVmArm ? vmP1Route!.outputs.workloadPrincipalId : ''
 output vmP2WorkloadObjectId string = deployVmArm ? vmP2Route!.outputs.workloadPrincipalId : ''
-output vmP3WorkloadObjectId string = deployVmArm ? vmP3Route!.outputs.workloadPrincipalId : ''
+output vmP3WorkloadObjectId string = deployVmArm && deployP3VmRoute ? vmP3Route!.outputs.workloadPrincipalId : ''
 
 // Jobs arm
-output jobP1ResourceId string = jobP1.id
-output jobP2ResourceId string = jobP2.id
-output jobP3ResourceId string = deployP3Firewall ? jobP3.id : ''
+output jobP1ResourceId string = deployJobs ? jobP1!.id : ''
+output jobP2ResourceId string = deployJobs ? jobP2!.id : ''
+output jobP3ResourceId string = deployP3Firewall && deployJobs ? jobP3!.id : ''
 output jobP1WorkloadObjectId string = workloadIdentities[3].properties.principalId
 output jobP2WorkloadObjectId string = workloadIdentities[4].properties.principalId
 output jobP3WorkloadObjectId string = workloadIdentities[5].properties.principalId
 output jobP1WorkloadClientId string = workloadIdentities[3].properties.clientId
 output jobP2WorkloadClientId string = workloadIdentities[4].properties.clientId
 output jobP3WorkloadClientId string = workloadIdentities[5].properties.clientId
+output jobP3WorkloadIdentityResourceId string = workloadIdentities[5].id
 
 // Sandboxes arm (control plane only; runtime + disk images are data-plane)
 output sandboxGroupP1ResourceId string = deploySandboxGroups ? sandboxGroupP1.id : ''
 output sandboxGroupP2ResourceId string = deploySandboxGroups ? sandboxGroupP2.id : ''
-output sandboxGroupP3ResourceId string = deploySandboxGroups ? sandboxGroupP3.id : ''
+output sandboxGroupP3ResourceId string = deploySandboxGroups && deployP3SandboxGroup ? sandboxGroupP3.id : ''
 output sandboxP1WorkloadObjectId string = workloadIdentities[6].properties.principalId
 output sandboxP2WorkloadObjectId string = workloadIdentities[7].properties.principalId
 output sandboxP3WorkloadObjectId string = workloadIdentities[8].properties.principalId
@@ -1358,27 +1578,52 @@ output sandboxDiskImageNames object = {
 // Common services
 output researchServicePrivateIp string = deployResearchHost ? researchHost!.outputs.researchPrivateIp : researchServicePrivateIp
 output collectorPrivateIp string = deployResearchHost ? researchHost!.outputs.collectorPrivateIp : collectorPrivateIp
+output restrictedServicePrivateIp string = deployResearchHost ? researchHost!.outputs.restrictedPrivateIp : ''
+output restrictedServicePolicyIp string = restrictedServicePrivateIp
+output researchHostResourceId string = deployResearchHost ? researchHost!.outputs.hostId : ''
+output researchHostSecretReaderClientId string = deployResearchHost ? researchHost!.outputs.hostSecretReaderClientId : ''
+output researchHostSecretReaderPrincipalId string = deployResearchHost ? researchHost!.outputs.hostSecretReaderPrincipalId : ''
+output researchHostSecretReaderIdentityResourceId string = deployResearchHost ? researchHost!.outputs.hostSecretReaderIdentityResourceId : ''
 output evidenceAccountId string = deployEvidenceStore ? evidenceStore!.outputs.accountId : ''
 output evidenceContainerUrl string = deployEvidenceStore ? evidenceStore!.outputs.containerUrl : ''
 output fixtureAccountId string = deploySyntheticFixtures ? fixtureStore!.outputs.accountId : ''
 output fixtureBlobEndpoint string = deploySyntheticFixtures ? fixtureStore!.outputs.blobEndpoint : ''
-output vaultSecretReaderAssignmentId string = linkVaultSecretReader ? vaultSecretReader!.outputs.controllerReaderAssignmentId : ''
+output fixtureBlobResourceId string = deploySyntheticFixtures ? '${fixtureStore!.outputs.accountId}/blobServices/default' : ''
+output regionalNetworkSupport object = {
+  evidenceEndpointPrivateIp: evidenceEndpointPrivateIp
+  fixtureEndpointPrivateIp: fixtureEndpointPrivateIp
+  blobPrivateDnsZoneId: deployBlobPrivateDns ? blobPrivateDnsZone.id : ''
+  registryPrivateDnsZoneId: deployRegistryPrivateEndpoint ? registryEndpoint!.outputs.privateDnsZoneId : (createRegionalRegistryDns ? regionalRegistryPrivateDnsZone.id : '')
+  serviceReturnRouteTableId: deployP3Firewall ? serviceReturnRouteTable.id : (deployRegionalP3Support ? serviceReturnRouteTableId : '')
+  privateEndpointReturnRouteTableId: deployP3Firewall ? privateEndpointReturnRouteTable.id : (deployRegionalP3Support ? privateEndpointReturnRouteTableId : '')
+}
 
-// Aggregate for completing config/experiment*.json routes (object IDs only).
-output experimentConfigRoutes object = {
+// Aggregate for completing config/experiment*.json routes (object IDs and public
+// Azure HTTPS endpoints only; Key Vault URIs never contain secret versions/values).
+var vmAndSandboxConfigRoutes = {
   azure_vm: {
-    P1: { principalObjectId: deployVmArm ? vmP1Route!.outputs.workloadPrincipalId : '', resourceId: deployVmArm ? vmP1Route!.outputs.vmId : '' }
-    P2: { principalObjectId: deployVmArm ? vmP2Route!.outputs.workloadPrincipalId : '', resourceId: deployVmArm ? vmP2Route!.outputs.vmId : '' }
-    P3: { principalObjectId: deployVmArm ? vmP3Route!.outputs.workloadPrincipalId : '', resourceId: deployVmArm ? vmP3Route!.outputs.vmId : '' }
-  }
-  aca_jobs: {
-    P1: { principalObjectId: workloadIdentities[3].properties.principalId, clientId: workloadIdentities[3].properties.clientId, resourceId: jobP1.id }
-    P2: { principalObjectId: workloadIdentities[4].properties.principalId, clientId: workloadIdentities[4].properties.clientId, resourceId: jobP2.id }
-    P3: deployP3Firewall ? { principalObjectId: workloadIdentities[5].properties.principalId, clientId: workloadIdentities[5].properties.clientId, resourceId: jobP3.id } : null
+    P1: { principalObjectId: deployVmArm ? vmP1Route!.outputs.workloadPrincipalId : '', clientId: deployVmArm ? vmP1Route!.outputs.workloadIdentityClientId : '', workloadIdentityResourceId: workloadIdentities[0].id, secretReaderClientId: secretReaderIdentities[0].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[0].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[0]}' : '', resourceId: deployVmArm ? vmP1Route!.outputs.vmId : '' }
+    P2: { principalObjectId: deployVmArm ? vmP2Route!.outputs.workloadPrincipalId : '', clientId: deployVmArm ? vmP2Route!.outputs.workloadIdentityClientId : '', workloadIdentityResourceId: workloadIdentities[1].id, secretReaderClientId: secretReaderIdentities[1].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[1].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[1]}' : '', resourceId: deployVmArm ? vmP2Route!.outputs.vmId : '' }
+    P3: { principalObjectId: workloadIdentities[2].properties.principalId, clientId: workloadIdentities[2].properties.clientId, workloadIdentityResourceId: workloadIdentities[2].id, secretReaderClientId: secretReaderIdentities[2].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[2].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[2]}' : '', resourceId: deployVmArm && deployP3VmRoute ? vmP3Route!.outputs.vmId : '' }
   }
   aca_sandboxes: {
-    P1: { principalObjectId: workloadIdentities[6].properties.principalId, clientId: workloadIdentities[6].properties.clientId, sandboxGroupId: deploySandboxGroups ? sandboxGroupP1.id : '' }
-    P2: { principalObjectId: workloadIdentities[7].properties.principalId, clientId: workloadIdentities[7].properties.clientId, sandboxGroupId: deploySandboxGroups ? sandboxGroupP2.id : '' }
-    P3: { principalObjectId: workloadIdentities[8].properties.principalId, clientId: workloadIdentities[8].properties.clientId, sandboxGroupId: deploySandboxGroups ? sandboxGroupP3.id : '' }
+    P1: { principalObjectId: workloadIdentities[6].properties.principalId, clientId: workloadIdentities[6].properties.clientId, workloadIdentityResourceId: workloadIdentities[6].id, secretReaderClientId: secretReaderIdentities[6].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[6].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[6]}' : '', sandboxGroupId: deploySandboxGroups ? sandboxGroupP1.id : '' }
+    P2: { principalObjectId: workloadIdentities[7].properties.principalId, clientId: workloadIdentities[7].properties.clientId, workloadIdentityResourceId: workloadIdentities[7].id, secretReaderClientId: secretReaderIdentities[7].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[7].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[7]}' : '', sandboxGroupId: deploySandboxGroups ? sandboxGroupP2.id : '' }
+    P3: { principalObjectId: workloadIdentities[8].properties.principalId, clientId: workloadIdentities[8].properties.clientId, workloadIdentityResourceId: workloadIdentities[8].id, secretReaderClientId: secretReaderIdentities[8].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[8].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[8]}' : '', sandboxGroupId: deploySandboxGroups && deployP3SandboxGroup ? sandboxGroupP3.id : '' }
   }
 }
+var jobsConfigRoutes = {
+  aca_jobs: {
+    P1: { principalObjectId: workloadIdentities[3].properties.principalId, clientId: workloadIdentities[3].properties.clientId, workloadIdentityResourceId: workloadIdentities[3].id, secretReaderClientId: secretReaderIdentities[3].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[3].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[3]}' : '', resourceId: deployJobs ? jobP1!.id : '' }
+    P2: { principalObjectId: workloadIdentities[4].properties.principalId, clientId: workloadIdentities[4].properties.clientId, workloadIdentityResourceId: workloadIdentities[4].id, secretReaderClientId: secretReaderIdentities[4].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[4].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[4]}' : '', resourceId: deployJobs ? jobP2!.id : '' }
+    P3: { principalObjectId: workloadIdentities[5].properties.principalId, clientId: workloadIdentities[5].properties.clientId, workloadIdentityResourceId: workloadIdentities[5].id, secretReaderClientId: secretReaderIdentities[5].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[5].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[5]}' : '', resourceId: deployP3Firewall && deployJobs ? jobP3!.id : '' }
+  }
+}
+var functionsConfigRoutes = {
+  azure_functions_flex: {
+    P1: { principalObjectId: workloadIdentities[3].properties.principalId, clientId: workloadIdentities[3].properties.clientId, workloadIdentityResourceId: workloadIdentities[3].id, secretReaderClientId: secretReaderIdentities[3].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[3].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[3]}' : '', resourceId: functionsRoutes[0]!.outputs.functionId, agentUrl: functionsRoutes[0]!.outputs.agentUrl }
+    P2: { principalObjectId: workloadIdentities[4].properties.principalId, clientId: workloadIdentities[4].properties.clientId, workloadIdentityResourceId: workloadIdentities[4].id, secretReaderClientId: secretReaderIdentities[4].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[4].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[4]}' : '', resourceId: functionsRoutes[1]!.outputs.functionId, agentUrl: functionsRoutes[1]!.outputs.agentUrl }
+    P3: { principalObjectId: workloadIdentities[5].properties.principalId, clientId: workloadIdentities[5].properties.clientId, workloadIdentityResourceId: workloadIdentities[5].id, secretReaderClientId: secretReaderIdentities[5].properties.clientId, secretReaderIdentityResourceId: secretReaderIdentities[5].id, workloadTokenSecretUri: linkVaultSecretReader ? 'https://${vaultName}${environment().suffixes.keyvaultDns}/secrets/${workloadTokenSecretNames[5]}' : '', resourceId: deployP3Firewall ? functionsRoutes[2]!.outputs.functionId : '', agentUrl: deployP3Firewall ? functionsRoutes[2]!.outputs.agentUrl : '' }
+  }
+}
+output experimentConfigRoutes object = union(vmAndSandboxConfigRoutes, deployFunctionsArm ? functionsConfigRoutes : jobsConfigRoutes)

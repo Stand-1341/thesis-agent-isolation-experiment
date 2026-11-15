@@ -289,6 +289,12 @@ export function createAcaSandboxDataPlaneClient({
     }
   }
 
+  async function getDiskImage(diskImageId) {
+    const id=validateSegment(diskImageId,'diskImageId');
+    const result=await request('GET',`${groupPath}/diskimages/${encodeURIComponent(id)}`,{allowNotFound:true,operation:'getDiskImage'});
+    return result.status===404?undefined:result.body;
+  }
+
   async function writeFile(sandboxId, path, content) {
     const id = validateSegment(sandboxId, 'sandboxId');
     if (typeof path !== 'string' || path.length === 0 || path.includes('\0')) {
@@ -344,5 +350,5 @@ export function createAcaSandboxDataPlaneClient({
     }
   }
 
-  return { createSandbox, createDiskImage, writeFile, executeShellCommand, getEgressDecisions, deleteSandbox };
+  return { createSandbox, createDiskImage, getDiskImage, writeFile, executeShellCommand, getEgressDecisions, deleteSandbox };
 }

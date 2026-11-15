@@ -1,5 +1,13 @@
 # Azure operator handoff — three-arm architecture (read-only)
 
+> **Current deployment note (2026-11-14):** The active deployment revision is
+> `config/protocol-450-flex-sandbox-supported-v3.json` with
+> `azure_vm` + `azure_functions_flex` + `azure_container_apps_sandboxes`.
+> The canonical end-to-end deployment workflow is the repository-root
+> [`DEPLOYMENT.md`](../../../DEPLOYMENT.md). This handoff remains a detailed
+> reference for the v2/ACA Jobs inputs and historical gates; it is not the
+> current deployment instruction set and its v2 measured status is superseded.
+
 **Date: 2026-11-06. Ground truth: this worktree** (`05-DOCKER-STARTER`, branch `azure/supported-runnable-architecture`). Environment-variable names, validator constraints and commands below are taken from the current `scripts/deps-live.mjs`, `scripts/experiment-config.mjs`, `scripts/azure-inventory.mjs` / `azure-inventory-client.mjs`, `scripts/run-experiment-cli.mjs` and `scripts/denial-reader.mjs`; no credential values are included.
 
 **What this is:** the exact inputs an operator (subscription owner) must supply, the read-only checks to run, and the order of work, before *anything* may run against Azure for the selected three-arm architecture (Azure Linux VM + ACA Jobs on a Consumption workload profile + ACA Sandboxes; decision record: [`AZURE-SUPPORTED-THREE-ARM-ARCHITECTURE.md`](AZURE-SUPPORTED-THREE-ARM-ARCHITECTURE.md)).
@@ -156,6 +164,7 @@ If the host has no managed identity and no service principal, set `AZURE_DEVICE_
 - Sandboxes: `subscriptionId` GUID; `region` lowercase region name; `sandboxGroups` and `diskImageIds` distinct safe segments per profile; `agentImage` pinned digest; `imagePullIdentityResourceId` UAI; `resources.cpu` `\d+(m|vCPU)`, `memory`/`disk` `(Mi|Gi)`; `apiVersion` `YYYY-MM-DD-preview` (default `2026-02-01-preview`); `timeoutMs` 1000–3600000.
 - Study shape (U7 and U6/U8 scheduled): every arm needs `restrictedUrl` whose host differs from `collectorUrl`, and `sessionDataStore: "azure_blob_external_namespace"`.
 - Routes: exactly the nine `deployment:profile` keys; `principalObjectId` GUID unique per route; on three-arm selections each route additionally needs `workloadClientId` + `secretReaderClientId` (GUIDs, all distinct, workload ≠ secret-reader) and `workloadIdentityResourceId` + `secretReaderIdentityResourceId` (full UAIs, all distinct, workload ≠ secret-reader) and a `workloadTokenSecretUri` (`https://<vault>.vault.azure.net/secrets/<name>[/<version>]`).
+- If `linkVaultSecretReader` is enabled, bootstrap nine route-specific workload-token secrets in the existing RBAC-enabled vault. Names follow `<namePrefix>-{vm|job|sbx}-p{1|2|3}-workload-token`; generated route URIs and `Key Vault Secrets User` assignments use those same per-secret resource scopes. Seed secret values through the approved operator process. This Bicep composition neither creates nor reads secret values and does not verify their presence or contents. Runtime token retrieval requires the named secret to exist and contain a valid value. Do not use the legacy vault-wide reader module for route identities.
 - The preflight adds its own hard check on top: **any** route from `azure_functions_flex`, `azure_custom_sessions_hyperv` or `azure_container_instances` is a superseded-architecture blocker even if `validateExperimentConfig` alone would accept it.
 
 ---

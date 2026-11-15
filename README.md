@@ -1,55 +1,60 @@
 # Thesis experiment workspace
 
-This private repository contains the experiment protocol, Azure deployment
-templates, source code, tests, and the latest status notes.
+This private repository contains the thesis protocol, Azure deployment
+templates, source code, tests, and operator notes.
 
 ## Current scope and deployment (November 2026)
 
-The latest proposed 400-row revision compares Azure VM and Functions routes;
-it excludes the session/microVM arm and scenarios U6 and U8. It can investigate
-the research questions within that narrower scope, but it cannot answer the
-thesis's three-architecture comparison as originally written. The GPT-5 mini
-prompt-injection extension is a separate study design. See the
-[research question and deployment assessment](Complete_Thesis_Azure_Package/05-DOCKER-STARTER/docs/RESEARCH-AND-DEPLOYMENT-ASSESSMENT.md).
+The active deployment revision is the frozen 450-row v3 matrix:
 
-There is no complete one-click Azure deployment yet. The existing templates
-require pre-existing infrastructure, configuration, workload installation,
-identities and validation. Current Azure permissions also prevent verifying
-the existing controller and evidence store. Do not interpret a template
-deployment or a structural preflight as evidence that the study has run.
+- traditional VM (`azure_vm`)
+- Functions Flex (`azure_functions_flex`)
+- ACA Sandboxes (`azure_container_apps_sandboxes`)
 
-For the original three-architecture plan, run `node scripts/inspect-three-architecture-plan.mjs`
-from `Complete_Thesis_Azure_Package/05-DOCKER-STARTER`. It validates the
-450-row schedule and reports inapplicable and unsupported cells; it does not
-enable execution. For either schedule, the
-[measured-results analysis guide](Complete_Thesis_Azure_Package/05-DOCKER-STARTER/docs/MEASURED-RESULTS-ANALYSIS.md)
-explains how to summarize exported records without treating missing or
-indeterminate rows as results.
+It schedules all ten scenarios, including U6/U8 as gated external-namespace
+fixtures and P3 U5/U7 on every arm. The measured protocol remains frozen with
+`measuredExecutionEnabled: false`; deployment prepares and validates the
+environment but does not authorize or start measured trials.
 
-## Earlier readiness snapshot
+The deployment is a two-stage `azd up` pipeline. It resolves inputs, runs
+subscription preflight, provisions foundation resources, seeds Key Vault
+secrets, publishes the pinned agent image, provisions the full workload stage,
+publishes identical Functions packages, creates Sandbox disk images, installs
+and starts the private research host, then emits validation and readiness
+artifacts. See [DEPLOYMENT.md](DEPLOYMENT.md) for the exact operator workflow
+and current caveats.
 
-**Not ready for measured trials.** The revision-2 400-row matrix is a planned schedule,
-not a result set. Local tests and deployment smoke checks have passed, but the
-full Azure pilot has not.
+A successful deployment is not a completed study. Measured execution is
+separately gated by pilot evidence, externally attributable P3 network-denial
+telemetry, U6/U8 fixture validation, locked evidence retention, independent
+verification, budget monitoring, and a fresh owner authorization bound to the
+exact protocol digest.
 
-Revision 2 withdraws P3 for Azure Container Apps custom sessions because its
-binary egress control cannot meet the study's selective-containment requirement.
-The remaining active P3 network cells are on VM and Functions; they still need
-independent, attributable denial telemetry and a passing pilot before they are
-measurable.
+## Status
 
-Other open gates include end-to-end validation of all eight active
-deployment/profile routes, cloud U4/U5/U7 scenario evidence, U6/U8 lifecycle
-verification, independently protected evidence, and a complete reviewed pilot.
-See [`PILOT-ACCEPTANCE.md`](Complete_Thesis_Azure_Package/05-DOCKER-STARTER/PILOT-ACCEPTANCE.md)
-and [`EXPERIMENT-STATUS.md`](EXPERIMENT-STATUS.md).
+See [DEPLOYMENT-STATUS.md](DEPLOYMENT-STATUS.md) for the dated Azure snapshot and
+remaining deployment/study work. Do not interpret a template deployment,
+structural preflight, or local test pass as evidence that measured trials ran.
+
+For schedule inspection:
+
+```sh
+cd Complete_Thesis_Azure_Package/05-DOCKER-STARTER
+node scripts/inspect-three-architecture-plan.mjs
+```
+
+The measured-results analysis guide explains how to summarize exported records
+without treating missing or indeterminate rows as results.
 
 ## Contents
 
 - `Complete_Thesis_Azure_Package/`: thesis materials, study plan, Azure guide,
   deployment templates, experiment runner, verifier, and tests.
-- `EXPERIMENT-STATUS.md`: chronological progress and cloud observations.
-- `AZURE-QUOTA-DIAGNOSTIC.md`: sanitized notes on session-pool quota behavior.
+- `deploy/`: azd pipeline hooks and deployment orchestration.
+- `infra/`: two-stage azd entry template and parameters.
+- `DEPLOYMENT.md`: canonical deployment instructions.
+- `DEPLOYMENT-STATUS.md`: dated live status and remaining work.
+- `EXPERIMENT-STATUS.md`: chronological experiment observations.
 
 Generated results, local credentials, Azure CLI state, local tool installs,
 screenshots, caches, and dependencies are excluded. No measured-trial results
@@ -57,14 +62,17 @@ are present.
 
 ## Local checks
 
-From `Complete_Thesis_Azure_Package/05-DOCKER-STARTER`:
+From the repository root:
 
-```sh
-npm ci
-npm test
-npm run build
-python3 scripts/validate_supplied_plan.py
+```powershell
+npm.cmd test
 ```
 
-Passing local checks do not qualify the cloud experiment for execution. Keep
-the runner gated until every pilot acceptance item is verified.
+From `Complete_Thesis_Azure_Package/05-DOCKER-STARTER`:
+
+```powershell
+npm.cmd test
+```
+
+Passing local checks do not qualify the cloud experiment for execution. Keep the
+measured runner gated until every pilot acceptance item is verified.

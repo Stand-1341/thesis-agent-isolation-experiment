@@ -17,6 +17,8 @@ param profile string
 param subnetId string
 @description('Name of the pre-created user-assigned identity assigned to this route.')
 param workloadIdentityName string
+@description('Optional separate Key Vault secret-reader identity; required by the selected three-arm configuration.')
+param readerUaiName string = ''
 @description('Exact private CIDRs from the controller network, reachable through an existing VPN or private route.')
 @minLength(1)
 param controllerSourcePrefixes array
@@ -32,6 +34,10 @@ param imageVersion string
 
 resource workloadIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: workloadIdentityName
+}
+
+resource secretReaderIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = if (!empty(readerUaiName)) {
+  name: readerUaiName
 }
 
 resource routeNsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
@@ -102,9 +108,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
   }
   identity: {
     type: 'SystemAssigned, UserAssigned'
-    userAssignedIdentities: {
-      '${workloadIdentity.id}': {}
-    }
+    userAssignedIdentities: union({ '${workloadIdentity.id}': {} }, empty(readerUaiName) ? {} : { '${secretReaderIdentity!.id}': {} })
   }
   properties: {
     hardwareProfile: { vmSize: vmSize }

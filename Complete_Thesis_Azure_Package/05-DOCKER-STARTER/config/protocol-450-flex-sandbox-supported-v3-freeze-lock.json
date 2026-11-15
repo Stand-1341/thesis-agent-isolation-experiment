@@ -1,0 +1,11 @@
+{
+  "status": "frozen_structural_launch_gated",
+  "protocolFile": "config/protocol-450-flex-sandbox-supported-v3.json",
+  "protocolSha256": "1d007cec5062dd8641b604e01fb6b7cea62ca166c44f184f9bae16085c62d266",
+  "matrixFile": "config/plan-450-flex-sandbox-supported-v3.csv",
+  "matrixSha256": "d76cb846e3dc647c6bc7bf589ad6397d03f8a9885ecf42ace11c13e44740834e",
+  "evidence": "docs/AZURE-SUPPORTED-THREE-ARM-ARCHITECTURE.md",
+  "scope": "owner-directed additive three-arm structural revision scheduling all ten thesis scenarios on azure_vm, azure_functions_flex and azure_container_apps_sandboxes (3 x 3 x 10 x 5 = 450 rows); Functions replaces Jobs uniformly on every profile after the live one-ACA-environment quota failure; U6/U8 remain scheduled and fixture-gated; no institutional approval claimed",
+  "measuredExecutionEnabled": false,
+  "note": "Exact-byte digests cover the files on disk. Structural freeze only: live identity, per-arm non-counted pilots, no-op network baseline, Functions source publication/cold start, verifier wiring, evidence retention and a fresh owner measured freeze remain open. No v2 artifact was modified."
+}

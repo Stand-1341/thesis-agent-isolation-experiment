@@ -270,7 +270,7 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
   // clients, a Log Analytics query function, a logs token provider and time
   // controls. Defaults hit the real services only when a caller actually
   // executes against Azure.
-  const {credentialModules,jobsExecutionClient,sandboxDataPlaneClient,
+  const {credentialModules,jobsExecutionClient,sandboxDataPlaneClient,sandboxDataPlaneClientFactory,
     logQuery:injectedLogQuery,clock:injectedClock,wait:injectedWait,
     logsToken:injectedLogsToken}={...(inject??{})};
   const pilotMode=mode==='non_counted_pilot';
@@ -635,9 +635,14 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
     if(route.sandboxGroup!==deployment.sandboxGroups[route.profile] ||
       route.diskImageId!==deployment.diskImageIds[route.profile])
       throw new Error('ACA Sandbox route does not target the configured per-profile group and disk image');
-    const client=sandboxDataPlaneClient??createAcaSandboxDataPlaneClient({region:deployment.region,
+    const region=deployment.profileRegions?.[route.profile]??deployment.region;
+    if(typeof region!=='string') throw new Error(`ACA Sandbox route ${route.profile} has no resolved region`);
+    const client=sandboxDataPlaneClient??(typeof sandboxDataPlaneClientFactory==='function'
+      ?sandboxDataPlaneClientFactory({region,subscriptionId:deployment.subscriptionId,resourceGroup:deployment.resourceGroup,
+        sandboxGroup:route.sandboxGroup,apiVersion:deployment.apiVersion})
+      :createAcaSandboxDataPlaneClient({region,
       subscriptionId:deployment.subscriptionId,resourceGroup:deployment.resourceGroup,
-      sandboxGroup:route.sandboxGroup,getToken:getAcaDataPlaneToken,apiVersion:deployment.apiVersion});
+      sandboxGroup:route.sandboxGroup,getToken:getAcaDataPlaneToken,apiVersion:deployment.apiVersion}));
     return createAcaSandboxPilotAdapter({baseAdapter:acaFixtureAdapter(route,deployment),client,
       sandboxGroup:route.sandboxGroup,diskImageId:route.diskImageId,resources:deployment.resources,
       environmentForTrial:acaWorkloadEnvironmentFor(route,deployment),

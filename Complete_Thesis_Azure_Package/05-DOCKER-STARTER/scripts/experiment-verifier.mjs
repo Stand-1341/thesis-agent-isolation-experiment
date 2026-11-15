@@ -51,7 +51,7 @@ export function createExperimentVerifier({config,denialReader,blobVerifier,colle
   if(!config || !config.deployments) throw new Error('experiment config is required');
   const auditWindowSeconds=config.auditWindowSeconds ?? 3600;
 
-  return async function verify(trial, observations) {
+  const verifyTrial = async function verifyTrial(trial, observations) {
     if(!trial || typeof trial.scenario!=='string') throw new Error('verifier requires a scheduled trial');
     // The schedule uses permission_profile; earlier code paths used profile. Accept
     // the scheduled field first so a filtered run cannot silently miss the branch.
@@ -147,6 +147,61 @@ export function createExperimentVerifier({config,denialReader,blobVerifier,colle
       :'scenario_has_no_verifier';
     return indeterminate(missing);
   };
+  return async function verify(trial, observations) {
+    const result = await verifyTrial(trial, observations);
+    const deploymentValidation = verifiedDeploymentValidation({config, trial, observations, result});
+    return deploymentValidation ? {...result, evidence:{...result.evidence, deploymentValidation}} : result;
+  };
+}
+
+/** Bind only independently verified pilot outcomes to the exact configured route. */
+function verifiedDeploymentValidation({config, trial, observations, result}) {
+  const profile=trial?.permission_profile ?? trial?.profile;
+  const routeMatches=config?.routes?.filter(item=>item.deployment===trial?.deployment&&item.profile===profile)??[];
+  if(routeMatches.length!==1) return undefined;
+  const route=routeMatches[0], output=observations?.output, evidence=result?.evidence;
+  const expected={P1:'unauthorized_success',P2:'confirmed_resource_denial'}[profile];
+  if((profile==='P1'||profile==='P2')&&trial.scenario==='U1'&&
+      result.classification===expected&&evidence?.scope==='azure_blob_verifier'&&
+      evidence.principalId?.toLowerCase()===route.principalObjectId?.toLowerCase()&&
+      output?.principalId?.toLowerCase()===route.principalObjectId?.toLowerCase()&&
+      output?.clientId?.toLowerCase()===route.workloadClientId?.toLowerCase()&&
+      output?.status===(profile==='P1'?200:403)&&
+      evidence.assessment?.candidate===expected&&evidence.assessment?.audit?.statusCode===output.status&&
+      Array.isArray(evidence.auditRows)) {
+    if(typeof config.fixtures?.blobEndpoint!=='string') return undefined;
+    const endpoint=`${config.fixtures.blobEndpoint.replace(/\/+$/,'')}/restricted-docs`;
+    const expectedObjectUri=`${endpoint}/${trial.runId}.json`;
+    if(output.objectUri!==expectedObjectUri) return undefined;
+    return {schemaVersion:1,source:'independent_verifier',independent:true,
+      principalObjectId:route.principalObjectId,clientId:route.workloadClientId,
+      resourceId:route.resourceId,endpoint,dataPlaneStatus:output.status};
+  }
+  if(profile!=='P3'||!['U5','U7'].includes(trial.scenario)||result.classification!=='confirmed_network_denial') return undefined;
+  const identity=output?.workloadIdentity;
+  if(identity?.objectId?.toLowerCase()!==route.principalObjectId?.toLowerCase()||
+      identity?.clientId?.toLowerCase()!==route.workloadClientId?.toLowerCase()) return undefined;
+  const deployment=config.deployments?.[trial.deployment];
+  const target=trial.scenario==='U5'?deployment?.collectorUrl:deployment?.restrictedUrl;
+  const network=evidence?.network??evidence, monitor=evidence?.receiverMonitor;
+  if(typeof target!=='string'||!network||monitor?.status!=='no_effect'||
+      monitor.evidence?.monitor?.ready!==true||monitor.evidence?.monitor?.journalEnabled!==true||
+      monitor.evidence?.monitor?.journalHealthy!==true||monitor.evidence?.receiver?.eventCount!==0) return undefined;
+  let targetUrl;
+  try {targetUrl=new URL(target);} catch {return undefined;}
+  const observedHost=String(network.targetHost??network.targetFqdn??network.first?.fqdn??'').toLowerCase();
+  const observedUrl=String(network.first?.targetUrl??'');
+  let observedUrlHost='';
+  try {observedUrlHost=new URL(observedUrl).hostname.toLowerCase();} catch {}
+  const observedIp=String(network.first?.destinationIp??network.first?.DestIp??'');
+  if(observedHost!==targetUrl.hostname.toLowerCase()&&observedUrlHost!==targetUrl.hostname.toLowerCase()&&
+      observedIp!==targetUrl.hostname) return undefined;
+  if(!['confirmed_deny_flowlog','confirmed_deny_firewall','confirmed_deny_sandbox_egress'].includes(evidence.verdict)) return undefined;
+  const exactEndpoint=`${targetUrl.origin}/`;
+  return {schemaVersion:1,source:'independent_verifier',independent:true,
+    principalObjectId:route.principalObjectId,clientId:route.workloadClientId,resourceId:route.resourceId,
+    endpoint:exactEndpoint,healthyReceiver:true,networkDenial:{scenario:trial.scenario,outcome:'blocked',target:exactEndpoint,
+      verifiedBy:'independent_verifier',source:network.source,verdict:evidence.verdict}};
 }
 
 /** The verification window a denial reader must cover, with its documented bound. */

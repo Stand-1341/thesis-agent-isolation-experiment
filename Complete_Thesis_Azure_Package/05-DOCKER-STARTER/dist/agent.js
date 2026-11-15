@@ -143,8 +143,16 @@ createServer(async (req, res) => {
         if (delegatedFactory && blobScenarios.has(scenario))
             return send(res, 200, await delegatedFactory(body)({ runId, scenario,
                 ...(typeof body.requestId === 'string' ? { requestId: body.requestId } : {}) }));
-        return send(res, 200, await runScenario({ runId, scenario: scenario, u5Marker,
-            ...(typeof body.requestId === 'string' ? { requestId: body.requestId } : {}) }, { workloadToken, resourceUrl, collectorUrl, restrictedUrl }));
+        const output = await runScenario({ runId, scenario: scenario, u5Marker,
+            ...(typeof body.requestId === 'string' ? { requestId: body.requestId } : {}) }, { workloadToken, resourceUrl, collectorUrl, restrictedUrl });
+        if (runId.startsWith('pilot-') && ['U5', 'U7'].includes(scenario)) {
+            if (authMode === 'managed' && managedGetBlobToken && process.env.AZURE_CLIENT_ID) {
+                const { managedIdentityClaims } = await import('./azure-blob-workload.mjs');
+                const identity = managedIdentityClaims(await managedGetBlobToken(), { expectedClientId: process.env.AZURE_CLIENT_ID });
+                return send(res, 200, { ...output, workloadIdentity: { objectId: identity.objectId, clientId: identity.clientId } });
+            }
+        }
+        return send(res, 200, output);
     }
     catch (error) {
         return send(res, 400, { error: error instanceof Error ? error.message : String(error) });

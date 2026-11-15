@@ -8,6 +8,33 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
+    "serverlessRuntime": {
+      "value": "${SERVERLESS_RUNTIME}"
+    },
+    "vnetAddressPrefix": {
+      "value": "${VNET_ADDRESS_PREFIX}"
+    },
+    "useExistingVnetId": {
+      "value": "${USE_EXISTING_VNET_ID}"
+    },
+    "p3RegionLocation": {
+      "value": "${P3_REGION_LOCATION}"
+    },
+    "p3NamePrefix": {
+      "value": "${P3_NAME_PREFIX}"
+    },
+    "researchServicePrivateIp": {
+      "value": "${RESEARCH_SERVICE_PRIVATE_IP}"
+    },
+    "collectorPrivateIp": {
+      "value": "${COLLECTOR_PRIVATE_IP}"
+    },
+    "restrictedServicePrivateIp": {
+      "value": "${RESTRICTED_SERVICE_PRIVATE_IP}"
+    },
+    "sharedPrivateDnsZoneResourceIds": {
+      "value": "${SHARED_PRIVATE_DNS_ZONE_RESOURCE_IDS}"
+    },
     "stage": {
       "value": "${PROVISION_STAGE}"
     },
@@ -17,8 +44,26 @@
     "vmImageVersion": {
       "value": "${VM_IMAGE_VERSION}"
     },
+    "vmVmSize": {
+      "value": "${VM_VM_SIZE}"
+    },
+    "researchHostVmSize": {
+      "value": "${RESEARCH_HOST_VM_SIZE}"
+    },
     "trustedControllerPublicIp": {
       "value": "${TRUSTED_CONTROLLER_IP}"
+    },
+    "controllerSourcePrefixesCsv": {
+      "value": "${CONTROLLER_SOURCE_PREFIXES_CSV}"
+    },
+    "researchSourcePrefixesCsv": {
+      "value": "${RESEARCH_SOURCE_PREFIXES_CSV}"
+    },
+    "collectorSourcePrefixesCsv": {
+      "value": "${COLLECTOR_SOURCE_PREFIXES_CSV}"
+    },
+    "operatorSourcePrefixesCsv": {
+      "value": "${OPERATOR_SOURCE_PREFIXES_CSV}"
     },
     "agentImageDigest": {
       "value": "${AGENT_IMAGE_DIGEST}"
@@ -28,6 +73,21 @@
     },
     "evidenceRetentionDays": {
       "value": "${EVIDENCE_RETENTION_DAYS}"
+    },
+    "workloadTokenVaultName": {
+      "value": "${WORKLOAD_TOKEN_VAULT_NAME}"
+    },
+    "existingBootstrapVaultName": {
+      "value": "${EXISTING_BOOTSTRAP_VAULT_NAME}"
+    },
+    "bootstrapLockStorageAccountName": {
+      "value": "${BOOTSTRAP_LOCK_STORAGE_ACCOUNT_NAME}"
+    },
+    "controllerIdentityResourceName": {
+      "value": "${CONTROLLER_IDENTITY_RESOURCE_NAME}"
+    },
+    "operatorPrincipalId": {
+      "value": "${AZURE_OPERATOR_PRINCIPAL_ID}"
     }
   }
 }

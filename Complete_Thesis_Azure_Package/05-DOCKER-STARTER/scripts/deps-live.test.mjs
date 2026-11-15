@@ -401,7 +401,10 @@ test('ACA Sandbox factory pins the profile group and disk image, deny-by-default
   const env=acaEnv();
   const routeKeys=new Set(['azure_container_apps_sandboxes:P1','azure_container_apps_sandboxes:P3']);
   const config=withAcaCredentials(shape,env,routeKeys);
+  config.deployments.azure_container_apps_sandboxes.profileRegions={P1:'centralus',P2:'centralus',P3:'westus2'};
+  delete config.deployments.azure_container_apps_sandboxes.region;
   const created=[],shell=[],deleted=[];
+  const sandboxClients=[];
   const decisions={networkEgress:{
     allowed:[{host:'resource.example.test',method:'GET',path:'/',timestamp:'2026-03-01T00:00:12Z'}],
     denied:[{host:'collector.example.test',method:'POST',path:'/collect',timestamp:'2026-03-01T00:00:15Z'}]}};
@@ -433,9 +436,10 @@ test('ACA Sandbox factory pins the profile group and disk image, deny-by-default
   try {
     const {modules}=acaCredentialModules();
     const deps=createLiveDeps({config,env,mode:'non_counted_pilot',routeKeys,
-      inject:{credentialModules:modules,sandboxDataPlaneClient:client}});
+      inject:{credentialModules:modules,sandboxDataPlaneClientFactory:options=>{sandboxClients.push(options);return client;}}});
     const p1=config.routes.find(route=>route.deployment==='azure_container_apps_sandboxes'&&route.profile==='P1');
     const adapter=deps.sessionFactory(p1,config.deployments.azure_container_apps_sandboxes);
+    assert.equal(sandboxClients[0].region,'centralus');
     const reset=await adapter.reset(currentTrial);
     assert.equal(reset.sandboxId,'sbx-1');
     assert.equal(reset.azureFixturesSeeded,true);
@@ -469,6 +473,7 @@ test('ACA Sandbox factory pins the profile group and disk image, deny-by-default
     const p3=config.routes.find(route=>route.deployment==='azure_container_apps_sandboxes'&&route.profile==='P3');
     currentTrial={runId:'aca-sbx-u5-p3',scenario:'U5'};
     const p3Adapter=deps.sessionFactory(p3,config.deployments.azure_container_apps_sandboxes);
+    assert.equal(sandboxClients[1].region,'westus2');
     const p3Reset=await p3Adapter.reset(currentTrial);
     assert.equal(p3Reset.sandboxPolicy.sandboxGroup,'thesis-sandbox-p3');
     assert.equal(p3Reset.sandboxPolicy.diskImageId,'disk-image-p3');

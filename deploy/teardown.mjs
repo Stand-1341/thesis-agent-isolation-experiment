@@ -16,6 +16,7 @@
  */
 import {readAzdEnv, makeAzRunner, makeStepLogger, formatFailures} from './common.mjs';
 import {readFile, writeFile, mkdir, cp} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
@@ -50,11 +51,32 @@ export function evaluateTeardownGuard({blobs = [], exportEvidence, force, preser
   };
 }
 
+/** Parse only an unsigned Azure Blob container URL; never send tokens elsewhere. */
+export function parseEvidenceContainerUrl(value) {
+  let url;
+  try { url = new URL(value); } catch { throw new Error('invalid evidence container URL'); }
+  const match = /^([a-z0-9]{3,24})\.blob\.core\.windows\.net$/i.exec(url.hostname);
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (url.protocol !== 'https:' || !match || url.username || url.password || url.port || url.search || url.hash || parts.length !== 1 || !/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(parts[0])) {
+    throw new Error('evidence URL must identify one Azure Blob container without credentials or query');
+  }
+  return {account: match[1], container: parts[0]};
+}
+
+export async function listEvidenceBlobs({az, containerUrl} = {}) {
+  const {account, container} = parseEvidenceContainerUrl(containerUrl);
+  const blobs = await az(['storage', 'blob', 'list', '--account-name', account, '--container-name', container, '--auth-mode', 'login', '--query', '[].name']);
+  if (!Array.isArray(blobs) || blobs.some(name => typeof name !== 'string')) throw new Error('Azure returned an invalid evidence listing');
+  return blobs;
+}
+
 /** Resources that may still incur charges after the managed group is deleted. */
 export function identifyChargedSurvivors({subscriptionResources = [], managedResourceGroup} = {}) {
+  const managedName = /\/resourcegroups\/([^/]+)/i.exec(managedResourceGroup ?? '')?.[1] ?? managedResourceGroup;
   return subscriptionResources
-    .filter(resource => !String(resource.id ?? '').toLowerCase().startsWith(`${managedResourceGroup?.toLowerCase()}/`))
-    .filter(resource => /^(Microsoft\.Storage\/storageAccounts|Microsoft\.Compute\/disks|Microsoft\.Compute\/virtualMachines|Microsoft\.PublicIPInterval|Microsoft\.Network\/publicIPAddresses|Microsoft\.ContainerRegistry\/registries|Microsoft\.Insights\/components)$/i.test(String(resource.type ?? '')) || /Microsoft.Network\/publicIPAddresses/i.test(String(resource.type ?? '')))
+    .filter(resource => String(resource.resourceGroup ?? /\/resourcegroups\/([^/]+)/i.exec(resource.id ?? '')?.[1] ?? '').toLowerCase() !== String(managedName ?? '').toLowerCase())
+    // Keep every remaining resource in this warning: billing can arise from
+    // many provider types and this inventory is not a pricing classifier.
     .map(resource => ({id: resource.id, type: resource.type, name: resource.name}));
 }
 
@@ -76,16 +98,19 @@ export async function main({argv = process.argv.slice(2), env = process.env, az,
   try {
     resolved = JSON.parse(await readFile(path.join(envDir, 'deployment.resolved.json'), 'utf8'));
   } catch {
-    stderr.write('teardown: no deployment.resolved.json — nothing this pipeline deployed; refusing to touch anything\n');
-    return options.guard ? 0 : 5;
+    stderr.write('teardown: no deployment.resolved.json — deployment and evidence state are unknown; refusing to delete anything\n');
+    return 5;
   }
 
   // Guard: check evidence before azd down deletes the storage account.
-  let blobs = [];
-  if (resolved.evidence?.containerUrl) {
-    blobs = blobLister
-      ? await blobLister(resolved.evidence.containerUrl)
-      : await runner(['storage', 'blob', 'list', '--container-url', resolved.evidence.containerUrl, '--query', '[].name']).catch(() => []);
+  let blobs;
+  try {
+    if (!resolved.evidence?.containerUrl) throw new Error('evidence container URL is missing');
+    blobs = blobLister ? await blobLister(resolved.evidence.containerUrl) : await listEvidenceBlobs({az:runner, containerUrl:resolved.evidence.containerUrl});
+    if (!Array.isArray(blobs)) throw new Error('evidence listing is unavailable');
+  } catch (error) {
+    stderr.write(`Teardown refused: could not verify evidence contents (${error.message}).\n`);
+    return 3;
   }
   const decision = evaluateTeardownGuard({blobs, exportEvidence: options.exportEvidence, force: options.force, preserveEvidence: String(values.EVIDENCE_RETENTION_LOCKED ?? '') === 'true'});
 
@@ -96,10 +121,15 @@ export async function main({argv = process.argv.slice(2), env = process.env, az,
 
   if (decision.exports && options.exportEvidence) {
     await mkdir(options.exportEvidence, {recursive: true});
+    const exported = [];
     for (const name of blobs.filter(n => !String(n).startsWith('validation/'))) {
-      const target = path.join(options.exportEvidence, name.replace(/\//g, '__'));
-      await runner(['storage', 'blob', 'download', '--container-url', resolved.evidence.containerUrl, '--name', name, '--file', target], {json: false});
+      const filename = `${createHash('sha256').update(name).digest('hex')}.blob`;
+      const target = path.join(options.exportEvidence, filename);
+      const {account, container} = parseEvidenceContainerUrl(resolved.evidence.containerUrl);
+      await runner(['storage', 'blob', 'download', '--account-name', account, '--container-name', container, '--auth-mode', 'login', '--name', name, '--file', target, '--overwrite', 'false'], {json: false});
+      exported.push({name, filename});
     }
+    await writeFile(path.join(options.exportEvidence, 'evidence-export-index.json'), `${JSON.stringify(exported, null, 2)}\n`, {flag:'wx'});
     log('teardown', 'evidence-exported', {note: `${decision.exports} blob(s) → ${options.exportEvidence}`});
   }
 
@@ -113,7 +143,7 @@ export async function main({argv = process.argv.slice(2), env = process.env, az,
   log('teardown', 'running-azd-down');
   const runDown = down ?? (async () => {
     const {execCommand} = await import('./common.mjs');
-    await execCommand(['azd', 'down', '--force', '--purge'], {timeoutMs: 30 * 60 * 1000});
+    await execCommand(['azd', 'down', '--force'], {timeoutMs: 30 * 60 * 1000});
   });
   try {
     await runDown();
@@ -122,7 +152,14 @@ export async function main({argv = process.argv.slice(2), env = process.env, az,
     return 4;
   }
 
-  const survivors = await runner(['resource', 'list', '--subscription', resolved.subscriptionId]).catch(() => []);
+  let survivors;
+  try {
+    survivors = await runner(['resource', 'list', '--subscription', resolved.subscriptionId]);
+    if (!Array.isArray(survivors)) throw new Error('unexpected resource listing');
+  } catch (error) {
+    stderr.write(`Teardown completed, but remaining Azure resources could not be verified: ${error.message}\n`);
+    return 4;
+  }
   const charged = identifyChargedSurvivors({subscriptionResources: survivors, managedResourceGroup: values.AZURE_RESOURCE_GROUP});
   await writeFile(path.join(envDir, 'TEARDOWN-REPORT.md'),
     `# Teardown report\n\nmanaged group: ${values.AZURE_RESOURCE_GROUP}\n${decision.reason}\n\n## Resources that may still incur charges\n` +

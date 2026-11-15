@@ -7,7 +7,7 @@ import {createGPT5MiniLiveAdapter} from './live-agent-trial.mjs';
 import {verifyImplementationManifest} from './implementation-manifest.mjs';
 import {analyzeTrialScope,classifyTrialScope} from './scenario-scope.mjs';
 
-export async function runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,arm='deterministic',mode='measured',modelEndpoint,getModelToken,maxPhaseSpendUsd=19,implementationSha256,rowFilter,concurrency=1,laneFor=laneByDeployment,networkCapabilities={},sessionCapabilities={},allowRepeatedCellsWithinBlock=false}) {
+export async function runExperiment({planBytes,planSha256,routes,gates,verifier,evidenceStore,arm='deterministic',mode='measured',modelEndpoint,getModelToken,maxPhaseSpendUsd=19,implementationSha256,rowFilter,concurrency=1,laneFor=laneByDeployment,networkCapabilities={},sessionCapabilities={},routeMetadataByRoute={},allowRepeatedCellsWithinBlock=false,onTrialProgress}) {
   if(!['deterministic','gpt5mini_live'].includes(arm)) throw new Error('invalid experiment arm');
   if(!['measured','non_counted_pilot'].includes(mode) || (mode==='non_counted_pilot' && arm!=='deterministic')) throw new Error('invalid run mode for experiment arm');
   if(typeof verifier!=='function' || !evidenceStore || typeof evidenceStore.claim!=='function' || typeof evidenceStore.save!=='function')
@@ -40,23 +40,34 @@ export async function runExperiment({planBytes,planSha256,routes,gates,verifier,
   const selectedRoutes=Object.fromEntries(Object.entries(routes).filter(([key])=>requiredRoutes.has(key)));
   const router=createTrialAdapterRouter(selectedRoutes,{requiredRoutes:[...requiredRoutes]});
   const adapter=arm==='gpt5mini_live'?createGPT5MiniLiveAdapter({baseAdapter:router,endpoint:modelEndpoint,getToken:getModelToken,maxPhaseSpendUsd}):router;
+  const reportTrial = async (trial, classification) => {
+    if (typeof onTrialProgress !== 'function') return;
+    const event = {event:'trial_completed',runId:trial.runId,deployment:trial.deployment,
+      profile:trial.permission_profile ?? trial.profile,scenario:trial.scenario,classification};
+    await onTrialProgress(event);
+  };
   // The in-process model budget counter cannot be safely restored after a
   // crash or an uncertain response. A durable exclusive phase claim prevents
   // an automatic relaunch with a fresh counter; manual reconciliation is required.
   if(arm==='gpt5mini_live') await evidenceStore.claim('phase-gpt5mini-live');
   const runOne=async trial=>{
+    const routeMetadata=routeMetadataByRoute[`${trial.deployment}:${trial.permission_profile ?? trial.profile}`];
+    const evidenceTrial=routeMetadata?{...trial,routeMetadata}:trial;
     const disposition=classifyTrialScope(trial,{networkCapabilities,sessionCapabilities});
     if(disposition.status==='not_applicable') {
       const startedAt=new Date().toISOString();
       await evidenceStore.claim(trial.runId);
-      const record={runId:trial.runId,arm,mode,trial:{...trial,planSha256:plan.sha256},startedAt,
+      const record={runId:trial.runId,arm,mode,trial:{...evidenceTrial,planSha256:plan.sha256},startedAt,
         finishedAt:new Date().toISOString(),classification:'not_applicable',executionAttempted:false,
         evidence:{scope:'preflight_applicability',reason:disposition.reason,deployment:trial.deployment,scenario:trial.scenario}};
       await evidenceStore.save(record);
+      await reportTrial(trial,record.classification);
       return record;
     }
-    return runTrial({trial:{...trial,planSha256:plan.sha256},gates:gateSnapshot,adapter,arm,mode,
+    const record=await runTrial({trial:{...evidenceTrial,planSha256:plan.sha256},gates:gateSnapshot,adapter,arm,mode,
       verifier:(t,observations)=>verifier(t,{...observations,workloadPrincipalId:router.principalObjectId(t),arm}),evidenceStore});
+    await reportTrial(trial,record.classification);
+    return record;
   };
   // Lanes, not raw concurrency: a lane owns the fixture its trials reset, so two
   // trials may only overlap when they cannot observe each other's state.

@@ -21,7 +21,7 @@ for user in thesis-research thesis-collector; do
 done
 useradd --system --user-group --no-create-home --shell /usr/sbin/nologin thesis-research
 useradd --system --user-group --no-create-home --shell /usr/sbin/nologin thesis-collector
-install -d -o root -g root -m 0755 /opt/thesis-research/dist /opt/thesis-runtime/node/bin
+install -d -o root -g root -m 0755 /opt/thesis-research/dist /opt/thesis-research/infra /opt/thesis-research/certs /opt/thesis-runtime/node/bin
 install -d -o root -g root -m 0700 /etc/thesis-research
 for name in resource.js collector.js resource-journal.js collector-journal.js service-config.js helpers.js; do
   install -o root -g root -m 0644 "$package/dist/$name" "/opt/thesis-research/dist/$name"
@@ -29,6 +29,11 @@ done
 install -o root -g root -m 0644 "$package/package.json" /opt/thesis-research/package.json
 install -o root -g root -m 0755 "$package/check-research-data-disk.sh" /opt/thesis-research/check-research-data-disk.sh
 install -o root -g root -m 0644 "$package/research-proxy.nginx.template" /opt/thesis-research/research-proxy.nginx.template
+install -o root -g root -m 0644 "$package/infra/install-three-arm-service-secrets.mjs" /opt/thesis-research/infra/install-three-arm-service-secrets.mjs
+install -o root -g root -m 0644 "$package/infra/install-research-host-ca-key.mjs" /opt/thesis-research/infra/install-research-host-ca-key.mjs
+install -o root -g root -m 0755 "$package/infra/bootstrap-research-host-tls.sh" /opt/thesis-research/infra/bootstrap-research-host-tls.sh
+install -o root -g root -m 0755 "$package/infra/renew-research-host-tls.sh" /opt/thesis-research/infra/renew-research-host-tls.sh
+install -o root -g root -m 0644 "$package/certs/thesis-pilot-ca.pem" /opt/thesis-research/certs/thesis-pilot-ca.pem
 install -o root -g root -m 0755 "$node_binary" /opt/thesis-runtime/node/bin/node
 install -o root -g root -m 0644 "$package/research-service.service" /etc/systemd/system/thesis-research.service
 install -o root -g root -m 0644 "$package/collector-service.service" /etc/systemd/system/thesis-collector.service

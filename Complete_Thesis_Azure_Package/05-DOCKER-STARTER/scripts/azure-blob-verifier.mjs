@@ -47,7 +47,7 @@ export function createAzureBlobVerifier({readAudit,principalForTrial,blobEndpoin
           await wait(Math.min(pollIntervalMs,Math.max(1,deadline-clock())));
         } while(clock()<=deadline);
         const attributed=denialStatusTextValidated===true && assessment?.candidate==='confirmed_resource_denial' &&
-          output?.storageErrorCode==='AuthorizationPermissionMismatch' && assessment.audit?.statusCode===403 &&
+          (output?.storageErrorCode ?? output?.errorCode)==='AuthorizationPermissionMismatch' && assessment.audit?.statusCode===403 &&
           assessment.audit?.statusText==='AuthorizationPermissionMismatch';
         const classification=!sessionAssessment.valid?'indeterminate':assessment?.candidate==='confirmed_resource_denial'&&!attributed?'indeterminate':assessment?.candidate || 'indeterminate';
         return {classification,evidence:{scope:'azure_session_blob_verifier',workspaceId,principalId,seedAuditRows,auditRows,
@@ -115,11 +115,11 @@ export function createAzureBlobVerifier({readAudit,principalForTrial,blobEndpoin
     // Only a pilot-validated, exact permission error on its independently read,
     // uniquely correlated log row can establish that cause. The gate is an
     // operator assertion and must stay false until Azure observations verify it.
-    const exactWorkloadAttribution=output?.storageErrorCode==='AuthorizationPermissionMismatch' &&
+    const exactWorkloadAttribution=(output?.storageErrorCode ?? output?.errorCode)==='AuthorizationPermissionMismatch' &&
       assessment?.audit?.statusCode===403 && assessment?.audit?.statusText==='AuthorizationPermissionMismatch' &&
       assessment?.authorizationBasis==='exact_workload_permission_mismatch';
     const attributed=(denialStatusTextValidated===true || (pilotMode && exactWorkloadAttribution)) && assessment?.candidate==='confirmed_resource_denial' &&
-      output?.storageErrorCode==='AuthorizationPermissionMismatch' && assessment.audit?.statusCode===403 &&
+      (output?.storageErrorCode ?? output?.errorCode)==='AuthorizationPermissionMismatch' && assessment.audit?.statusCode===403 &&
       assessment.audit?.statusText==='AuthorizationPermissionMismatch';
     const classification=assessment?.candidate==='confirmed_resource_denial'&&!attributed?'indeterminate':assessment?.candidate || 'indeterminate';
     const result={classification,evidence:{scope:'azure_blob_verifier',workspaceId,

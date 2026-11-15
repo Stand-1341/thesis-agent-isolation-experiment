@@ -1,9 +1,11 @@
 /** Verify exact package contents against an externally recorded manifest digest. */
-import {createHash} from 'node:crypto';
+import {createHash,X509Certificate} from 'node:crypto';
 import {readFile,readdir,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 const required=['dist/resource.js','dist/collector.js','dist/resource-journal.js','dist/collector-journal.js','dist/service-config.js','dist/helpers.js',
+  'infra/install-three-arm-service-secrets.mjs','infra/install-research-host-ca-key.mjs','infra/bootstrap-research-host-tls.sh','infra/renew-research-host-tls.sh','infra/stage-research-host.sh',
+  'certs/thesis-pilot-ca.pem',
   'research-service.service','collector-service.service','research-proxy.nginx.template','check-research-data-disk.sh','package.json'];
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 export async function verifyResearchPackage(directory,expectedManifestSha256) {
@@ -29,6 +31,11 @@ export async function verifyResearchPackage(directory,expectedManifestSha256) {
   if(!/^[a-f0-9]{64}$/.test(manifest.files[relative] || '') || hash(await readFile(path.join(root,...relative.split('/'))))!==manifest.files[relative])
    throw new Error(`research package checksum mismatch: ${relative}`);
  }
+ const caPem=await readFile(path.join(root,'certs','thesis-pilot-ca.pem'),'utf8');
+ let ca;
+ try { ca=new X509Certificate(caPem); } catch { throw new Error('research package CA certificate is invalid'); }
+ if(!ca.ca || /PRIVATE KEY/.test(caPem) || Date.parse(ca.validTo)<=Date.now()+30*24*60*60*1000)
+  throw new Error('research package must contain only an unexpired public CA certificate');
  return {scope:'package_integrity_only_not_authenticity_or_installation',manifestSha256:expectedManifestSha256,files:required.length};
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href) {

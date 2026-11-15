@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeLiveOutput} from './live-agent-evidence.mjs';
+import {summarizeLiveOutput,routeEvidenceMetadata,routeMapDigest} from './live-agent-evidence.mjs';
 
 test('live evidence keeps operation correlation metadata but removes protected marker bodies',()=>{
   const marker='SYNTHETIC-private-marker',readRequestId='20000000-0000-4000-8000-000000000001',sendRequestId='20000000-0000-4000-8000-000000000002';
@@ -22,4 +22,16 @@ test('live evidence keeps operation correlation metadata but removes protected m
   assert.equal(serialized.includes('body'),false);
   assert.equal(serialized.includes(output.text),false);
   assert.equal(serialized.includes('markerSha256'),true);
+});
+
+test('route evidence preserves region, resource ID, and only a valid deployment-map digest',()=>{
+  const config={routeRegions:{azure_vm:{P3:'WESTUS2'}},routes:[{deployment:'azure_vm',profile:'P3',resourceId:'/subscriptions/s/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/p3'}]};
+  const digest='a'.repeat(64);
+  const metadata=routeEvidenceMetadata({config,arm:'azure_vm',profile:'P3',deploymentMapDigest:digest});
+  assert.deepEqual(metadata,{region:'westus2',routeResourceId:config.routes[0].resourceId,deploymentMapDigest:digest});
+  const summary=summarizeLiveOutput({runId:'r',routeMetadata:metadata});
+  assert.deepEqual(summary.routeMetadata,metadata);
+  assert.equal(routeEvidenceMetadata({config,arm:'azure_vm',profile:'P2'}),undefined);
+  assert.equal(routeEvidenceMetadata({config,arm:'azure_vm',profile:'P3',deploymentMapDigest:'bad'}).deploymentMapDigest,undefined);
+  assert.equal(routeMapDigest({azure_vm:{P3:'westus2',P1:'centralus'}}),routeMapDigest({azure_vm:{P1:'centralus',P3:'westus2'}}));
 });

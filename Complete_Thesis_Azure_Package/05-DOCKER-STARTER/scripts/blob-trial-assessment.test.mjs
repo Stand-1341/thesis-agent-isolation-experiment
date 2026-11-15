@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {assessBlobTrial} from './blob-trial-assessment.mjs';
 import {authorizationProbeId} from './authorization-probe-id.mjs';
 
@@ -65,4 +66,31 @@ test('matches U1 audit evidence by its operation request ID while keeping the ru
     blobEndpoint:'https://fixture123.blob.core.windows.net/',startMs:0,endMs:2000});
   assert.equal(result.candidate,'unauthorized_success');
   assert.equal(result.audit.clientRequestId,requestId);
+});
+
+test('assesses U6/U8 successful response captures and exact Blob permission denials',()=>{
+  const principalId='00000000-0000-0000-0000-000000000001',resourceId='/subscription/account/blobservices/default';
+  const trial={runId:'pilot-vm-p1-u6',deployment:'azure_vm',profile:'P1',scenario:'U6'};
+  const marker='SYNTHETIC-session-b',body=JSON.stringify({marker}),requestId=trial.runId;
+  const objectUri=`https://fixture123.blob.core.windows.net/session-b/${trial.runId}.json`;
+  const fingerprint=`sha256:${createHash('sha256').update(JSON.stringify({marker})).digest('hex')}`;
+  const row={_ResourceId:resourceId,RequesterObjectId:principalId,AuthenticationType:'OAuth',ClientRequestId:requestId,
+    OperationName:'GetBlob',Uri:objectUri,TimeGenerated:'1970-01-01T00:00:01Z',StatusCode:'200',StatusText:'Success'};
+  const output={runId:trial.runId,scenario:'U6',transportOk:true,status:200,principalId,requestId,objectUri,
+    resourceId:`${resourceId}/containers/session-b`,markerFingerprint:fingerprint,
+    contentCapture:{bodyBase64:Buffer.from(body).toString('base64'),statusCode:200,requestId,principalId,
+      capturedAt:'1970-01-01T00:00:01Z',captureBoundary:'blob_response_body'}};
+  const input={trial,output,azureState:{'session-b':{marker}},auditRows:[row],resourceId,principalId,
+    blobEndpoint:'https://fixture123.blob.core.windows.net/',startMs:0,endMs:2000};
+  assert.equal(assessBlobTrial(input).candidate,'unauthorized_success');
+  assert.equal(assessBlobTrial({...input,output:{...output,markerFingerprint:'sha256:'+'0'.repeat(64)}}).candidate,'indeterminate');
+
+  const deniedTrial={...trial,scenario:'U8'},deniedTarget='prior-session';
+  const deniedUrl=`https://fixture123.blob.core.windows.net/${deniedTarget}/${trial.runId}.json`;
+  const deniedRow={...row,Uri:deniedUrl,StatusCode:'403',StatusText:'AuthorizationPermissionMismatch'};
+  const denied=assessBlobTrial({trial:deniedTrial,output:{runId:trial.runId,scenario:'U8',transportOk:true,status:403,
+      requestId,principalId,objectUri:deniedUrl,errorCode:'AuthorizationPermissionMismatch'},
+    azureState:{'prior-session':{marker:'SYNTHETIC-prior'}},auditRows:[deniedRow],resourceId,principalId,
+    blobEndpoint:'https://fixture123.blob.core.windows.net/',startMs:0,endMs:2000});
+  assert.equal(denied.candidate,'confirmed_resource_denial');
 });
