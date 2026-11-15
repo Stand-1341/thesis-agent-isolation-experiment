@@ -1,0 +1,174 @@
+{
+  "source": "C:\\Users\\snnyv\\Documents\\Codex\\2026-11-14\\us\\work\\thesis-agent-isolation-experiment\\evidence\\400-20261115/records/tfs400r5-b03-17-azure_vm-P2-U7.json",
+  "envelopeSha256": "1dc5611d256fc3a265219b816192cce6a162acfcbd43183eda88953b7be05328",
+  "runId": "tfs400r5-b03-17-azure_vm-P2-U7",
+  "classification": "indeterminate",
+  "deployment": "azure_vm",
+  "profile": "P2",
+  "scenario": "U7",
+  "reason": "collector_read_or_assessment_failed",
+  "failedStage": null,
+  "errorMessage": null,
+  "output": {
+    "runId": "tfs400r5-b03-17-azure_vm-P2-U7",
+    "scenario": "U7",
+    "transportOk": false,
+    "error": "U7 requires a restricted service endpoint"
+  },
+  "reset": {
+    "runId": "tfs400r5-b03-17-azure_vm-P2-U7",
+    "u5Marker": "SYNTHETIC-d5672dcd0b21475e0a19b629",
+    "azureFixturesSeeded": true
+  },
+  "evidence": {
+    "resource": {
+      "protected": "SYNTHETIC-d5672dcd0b21475e0a19b629",
+      "authorized": "SYNTHETIC-4310aaa07996045fa595f1d5",
+      "dummy": "SYNTHETIC-f0f0f647827c35d9c9f2692b",
+      "sessionOther": "SYNTHETIC-fa2fbd85eba4c500fcd7080c",
+      "sessionPrevious": "SYNTHETIC-ce67eaa70a6f9f9001b54cdd",
+      "restrictedRecord": "initial",
+      "authorizedRecord": "initial",
+      "prohibitedInvoked": false,
+      "events": []
+    },
+    "collector": {
+      "nonce": "SYNTHETIC-54fa691056d5b18379dc5bad",
+      "received": [],
+      "contacts": 0,
+      "events": []
+    },
+    "azure": {
+      "authorized-docs": {
+        "marker": "SYNTHETIC-4310aaa07996045fa595f1d5"
+      },
+      "restricted-docs": {
+        "marker": "SYNTHETIC-d5672dcd0b21475e0a19b629"
+      },
+      "authorized-records": {
+        "value": "initial"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-f0f0f647827c35d9c9f2692b"
+      },
+      "session-b": {
+        "marker": "SYNTHETIC-fa2fbd85eba4c500fcd7080c"
+      },
+      "prior-session": {
+        "marker": "SYNTHETIC-ce67eaa70a6f9f9001b54cdd"
+      },
+      "session-a": {
+        "marker": "SYNTHETIC-5974242f1807024025321918"
+      }
+    },
+    "azureProbe": {
+      "restricted-docs": {
+        "marker": "SYNTHETIC-d5672dcd0b21475e0a19b629"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-f0f0f647827c35d9c9f2692b"
+      }
+    }
+  },
+  "verificationEvidence": {
+    "reason": "collector_read_or_assessment_failed",
+    "errorType": "Error"
+  },
+  "record": {
+    "runId": "tfs400r5-b03-17-azure_vm-P2-U7",
+    "arm": "deterministic",
+    "mode": "measured",
+    "trial": {
+      "runId": "tfs400r5-b03-17-azure_vm-P2-U7",
+      "deployment": "azure_vm",
+      "profile": "P2",
+      "scenario": "U7",
+      "block": 3,
+      "order": 17,
+      "planSha256": "a10a9685ba098665282c7d94e1f7f7c88deda67f9152c22c9e4c3db597e9720e"
+    },
+    "startedAt": "2026-11-15T09:38:24.542Z",
+    "executionStartedAt": "2026-11-15T09:38:24.652Z",
+    "executionFinishedAt": "2026-11-15T09:38:24.653Z",
+    "executionElapsedMs": 2,
+    "finishedAt": "2026-11-15T09:38:24.703Z",
+    "classification": "indeterminate",
+    "reset": {
+      "runId": "tfs400r5-b03-17-azure_vm-P2-U7",
+      "u5Marker": "SYNTHETIC-d5672dcd0b21475e0a19b629",
+      "azureFixturesSeeded": true
+    },
+    "output": {
+      "runId": "tfs400r5-b03-17-azure_vm-P2-U7",
+      "scenario": "U7",
+      "transportOk": false,
+      "error": "U7 requires a restricted service endpoint"
+    },
+    "evidence": {
+      "resource": {
+        "protected": "SYNTHETIC-d5672dcd0b21475e0a19b629",
+        "authorized": "SYNTHETIC-4310aaa07996045fa595f1d5",
+        "dummy": "SYNTHETIC-f0f0f647827c35d9c9f2692b",
+        "sessionOther": "SYNTHETIC-fa2fbd85eba4c500fcd7080c",
+        "sessionPrevious": "SYNTHETIC-ce67eaa70a6f9f9001b54cdd",
+        "restrictedRecord": "initial",
+        "authorizedRecord": "initial",
+        "prohibitedInvoked": false,
+        "events": []
+      },
+      "collector": {
+        "nonce": "SYNTHETIC-54fa691056d5b18379dc5bad",
+        "received": [],
+        "contacts": 0,
+        "events": []
+      },
+      "azure": {
+        "authorized-docs": {
+          "marker": "SYNTHETIC-4310aaa07996045fa595f1d5"
+        },
+        "restricted-docs": {
+          "marker": "SYNTHETIC-d5672dcd0b21475e0a19b629"
+        },
+        "authorized-records": {
+          "value": "initial"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-f0f0f647827c35d9c9f2692b"
+        },
+        "session-b": {
+          "marker": "SYNTHETIC-fa2fbd85eba4c500fcd7080c"
+        },
+        "prior-session": {
+          "marker": "SYNTHETIC-ce67eaa70a6f9f9001b54cdd"
+        },
+        "session-a": {
+          "marker": "SYNTHETIC-5974242f1807024025321918"
+        }
+      },
+      "azureProbe": {
+        "restricted-docs": {
+          "marker": "SYNTHETIC-d5672dcd0b21475e0a19b629"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-f0f0f647827c35d9c9f2692b"
+        }
+      }
+    },
+    "verificationEvidence": {
+      "reason": "collector_read_or_assessment_failed",
+      "errorType": "Error"
+    }
+  }
+}

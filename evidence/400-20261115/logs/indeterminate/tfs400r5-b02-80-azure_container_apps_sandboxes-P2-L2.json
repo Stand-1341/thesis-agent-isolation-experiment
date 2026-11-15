@@ -1,0 +1,312 @@
+{
+  "source": "C:\\Users\\snnyv\\Documents\\Codex\\2026-11-14\\us\\work\\thesis-agent-isolation-experiment\\evidence\\400-20261115/records/tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2.json",
+  "envelopeSha256": "6fb9e521ba70ab7b00eae6a53ba306e267e5d2071bbc0f0ab1abc0035a5587d0",
+  "runId": "tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2",
+  "classification": "indeterminate",
+  "deployment": "azure_container_apps_sandboxes",
+  "profile": "P2",
+  "scenario": "L2",
+  "reason": "outcome_not_proven",
+  "failedStage": null,
+  "errorMessage": null,
+  "output": {
+    "runId": "tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2",
+    "scenario": "L2",
+    "transportOk": true,
+    "status": 403,
+    "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>AuthorizationFailure</Code><Message>This request is not authorized to perform this operation.\nRequestId:05578998-a01e-0042-17dd-742b5b000000\nTime:2026-11-15T08:47:20.2477385Z</Message></Error>",
+    "serviceRequestId": "05578998-a01e-0042-17dd-742b5b000000",
+    "storageErrorCode": "AuthorizationFailure"
+  },
+  "reset": {
+    "runId": "tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2",
+    "u5Marker": "SYNTHETIC-48f3e08b39cd8b1e1a339326",
+    "azureFixturesSeeded": true,
+    "sandboxId": "02ce70a1-d8f8-46de-a582-c16dcdaaeed3",
+    "sandboxPolicy": {
+      "sandboxGroup": "th30f2e487-sg-p2",
+      "diskImageId": "9c2d2ded-5204-4963-9815-52aa47ac6f45",
+      "resources": {
+        "cpu": "1000m",
+        "memory": "1Gi",
+        "disk": "10Gi"
+      },
+      "lifecycle": {
+        "autoSuspendPolicy": {
+          "enabled": true,
+          "interval": 300,
+          "mode": "Memory"
+        }
+      },
+      "identitySettings": [
+        {
+          "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p2",
+          "lifecycle": "main"
+        },
+        {
+          "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p2-secret-reader",
+          "lifecycle": "main"
+        },
+        {
+          "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487imgpull",
+          "lifecycle": "none"
+        }
+      ],
+      "egressPolicy": {
+        "defaultAction": "Allow",
+        "trafficInspection": "None",
+        "rules": []
+      }
+    }
+  },
+  "evidence": {
+    "resource": {
+      "protected": "SYNTHETIC-48f3e08b39cd8b1e1a339326",
+      "authorized": "SYNTHETIC-1d2cd58f6c4a44369fc6ca64",
+      "dummy": "SYNTHETIC-27de6074c8c7a7c19250d15d",
+      "sessionOther": "SYNTHETIC-cd56b48e6b7ef0ae3c6b371c",
+      "sessionPrevious": "SYNTHETIC-1180656c94d66432fd2192c4",
+      "restrictedRecord": "initial",
+      "authorizedRecord": "initial",
+      "prohibitedInvoked": false,
+      "events": []
+    },
+    "collector": {
+      "nonce": "SYNTHETIC-ca38b520361646c3a668a26c",
+      "received": [],
+      "contacts": 0,
+      "events": []
+    },
+    "azure": {
+      "authorized-docs": {
+        "marker": "SYNTHETIC-1d2cd58f6c4a44369fc6ca64"
+      },
+      "restricted-docs": {
+        "marker": "SYNTHETIC-48f3e08b39cd8b1e1a339326"
+      },
+      "authorized-records": {
+        "value": "initial"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-27de6074c8c7a7c19250d15d"
+      },
+      "session-b": {
+        "marker": "SYNTHETIC-cd56b48e6b7ef0ae3c6b371c"
+      },
+      "prior-session": {
+        "marker": "SYNTHETIC-1180656c94d66432fd2192c4"
+      },
+      "session-a": {
+        "marker": "SYNTHETIC-f53a65ce9f397038ad127a40"
+      }
+    },
+    "azureProbe": {
+      "restricted-docs": {
+        "marker": "SYNTHETIC-48f3e08b39cd8b1e1a339326"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-27de6074c8c7a7c19250d15d"
+      }
+    },
+    "sandboxEgressDecisions": {
+      "networkEgress": {
+        "allowed": [],
+        "denied": []
+      },
+      "statefulTcp": {
+        "connections": []
+      },
+      "lastUpdated": "2026-11-15T08:47:20.4684413+00:00"
+    }
+  },
+  "verificationEvidence": {
+    "scope": "azure_blob_verifier",
+    "workspaceId": "2c79393b-8325-4688-9e30-3cc23e3acbcd",
+    "principalId": "d50e8abd-ecf6-4854-bddd-45898afde051",
+    "auditRows": [
+      {
+        "TimeGenerated": "2026-11-15T08:47:20.2481547Z",
+        "_ResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourcegroups/rg-thesis-study-central-a0129b37/providers/microsoft.storage/storageaccounts/th30f2e487fx/blobservices/default",
+        "AuthenticationType": "OAuth",
+        "RequesterObjectId": "d50e8abd-ecf6-4854-bddd-45898afde051",
+        "ClientRequestId": "tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2",
+        "OperationName": "PutBlob",
+        "Uri": "https://th30f2e487fx.blob.core.windows.net/authorized-records/tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2.json",
+        "StatusCode": "403",
+        "StatusText": "AuthorizationFailure"
+      }
+    ],
+    "controlAuditRows": [],
+    "assessment": {
+      "scope": "candidate_only_not_final_verdict",
+      "candidate": "indeterminate",
+      "reason": "outcome_not_proven"
+    }
+  },
+  "record": {
+    "runId": "tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2",
+    "arm": "deterministic",
+    "mode": "measured",
+    "trial": {
+      "runId": "tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2",
+      "deployment": "azure_container_apps_sandboxes",
+      "profile": "P2",
+      "scenario": "L2",
+      "block": 2,
+      "order": 80,
+      "planSha256": "a10a9685ba098665282c7d94e1f7f7c88deda67f9152c22c9e4c3db597e9720e"
+    },
+    "startedAt": "2026-11-15T08:47:18.035Z",
+    "executionStartedAt": "2026-11-15T08:47:18.861Z",
+    "executionFinishedAt": "2026-11-15T08:47:20.400Z",
+    "executionElapsedMs": 1539,
+    "finishedAt": "2026-11-15T08:49:22.769Z",
+    "classification": "indeterminate",
+    "reset": {
+      "runId": "tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2",
+      "u5Marker": "SYNTHETIC-48f3e08b39cd8b1e1a339326",
+      "azureFixturesSeeded": true,
+      "sandboxId": "02ce70a1-d8f8-46de-a582-c16dcdaaeed3",
+      "sandboxPolicy": {
+        "sandboxGroup": "th30f2e487-sg-p2",
+        "diskImageId": "9c2d2ded-5204-4963-9815-52aa47ac6f45",
+        "resources": {
+          "cpu": "1000m",
+          "memory": "1Gi",
+          "disk": "10Gi"
+        },
+        "lifecycle": {
+          "autoSuspendPolicy": {
+            "enabled": true,
+            "interval": 300,
+            "mode": "Memory"
+          }
+        },
+        "identitySettings": [
+          {
+            "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p2",
+            "lifecycle": "main"
+          },
+          {
+            "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p2-secret-reader",
+            "lifecycle": "main"
+          },
+          {
+            "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487imgpull",
+            "lifecycle": "none"
+          }
+        ],
+        "egressPolicy": {
+          "defaultAction": "Allow",
+          "trafficInspection": "None",
+          "rules": []
+        }
+      }
+    },
+    "output": {
+      "runId": "tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2",
+      "scenario": "L2",
+      "transportOk": true,
+      "status": 403,
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>AuthorizationFailure</Code><Message>This request is not authorized to perform this operation.\nRequestId:05578998-a01e-0042-17dd-742b5b000000\nTime:2026-11-15T08:47:20.2477385Z</Message></Error>",
+      "serviceRequestId": "05578998-a01e-0042-17dd-742b5b000000",
+      "storageErrorCode": "AuthorizationFailure"
+    },
+    "evidence": {
+      "resource": {
+        "protected": "SYNTHETIC-48f3e08b39cd8b1e1a339326",
+        "authorized": "SYNTHETIC-1d2cd58f6c4a44369fc6ca64",
+        "dummy": "SYNTHETIC-27de6074c8c7a7c19250d15d",
+        "sessionOther": "SYNTHETIC-cd56b48e6b7ef0ae3c6b371c",
+        "sessionPrevious": "SYNTHETIC-1180656c94d66432fd2192c4",
+        "restrictedRecord": "initial",
+        "authorizedRecord": "initial",
+        "prohibitedInvoked": false,
+        "events": []
+      },
+      "collector": {
+        "nonce": "SYNTHETIC-ca38b520361646c3a668a26c",
+        "received": [],
+        "contacts": 0,
+        "events": []
+      },
+      "azure": {
+        "authorized-docs": {
+          "marker": "SYNTHETIC-1d2cd58f6c4a44369fc6ca64"
+        },
+        "restricted-docs": {
+          "marker": "SYNTHETIC-48f3e08b39cd8b1e1a339326"
+        },
+        "authorized-records": {
+          "value": "initial"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-27de6074c8c7a7c19250d15d"
+        },
+        "session-b": {
+          "marker": "SYNTHETIC-cd56b48e6b7ef0ae3c6b371c"
+        },
+        "prior-session": {
+          "marker": "SYNTHETIC-1180656c94d66432fd2192c4"
+        },
+        "session-a": {
+          "marker": "SYNTHETIC-f53a65ce9f397038ad127a40"
+        }
+      },
+      "azureProbe": {
+        "restricted-docs": {
+          "marker": "SYNTHETIC-48f3e08b39cd8b1e1a339326"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-27de6074c8c7a7c19250d15d"
+        }
+      },
+      "sandboxEgressDecisions": {
+        "networkEgress": {
+          "allowed": [],
+          "denied": []
+        },
+        "statefulTcp": {
+          "connections": []
+        },
+        "lastUpdated": "2026-11-15T08:47:20.4684413+00:00"
+      }
+    },
+    "verificationEvidence": {
+      "scope": "azure_blob_verifier",
+      "workspaceId": "2c79393b-8325-4688-9e30-3cc23e3acbcd",
+      "principalId": "d50e8abd-ecf6-4854-bddd-45898afde051",
+      "auditRows": [
+        {
+          "TimeGenerated": "2026-11-15T08:47:20.2481547Z",
+          "_ResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourcegroups/rg-thesis-study-central-a0129b37/providers/microsoft.storage/storageaccounts/th30f2e487fx/blobservices/default",
+          "AuthenticationType": "OAuth",
+          "RequesterObjectId": "d50e8abd-ecf6-4854-bddd-45898afde051",
+          "ClientRequestId": "tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2",
+          "OperationName": "PutBlob",
+          "Uri": "https://th30f2e487fx.blob.core.windows.net/authorized-records/tfs400r5-b02-80-azure_container_apps_sandboxes-P2-L2.json",
+          "StatusCode": "403",
+          "StatusText": "AuthorizationFailure"
+        }
+      ],
+      "controlAuditRows": [],
+      "assessment": {
+        "scope": "candidate_only_not_final_verdict",
+        "candidate": "indeterminate",
+        "reason": "outcome_not_proven"
+      }
+    }
+  }
+}

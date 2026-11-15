@@ -1,0 +1,206 @@
+{
+  "source": "C:\\Users\\snnyv\\Documents\\Codex\\2026-11-14\\us\\work\\thesis-agent-isolation-experiment\\evidence\\400-20261115/records/tfs400r5-b03-05-azure_vm-P1-U5.json",
+  "envelopeSha256": "4e8739dcf8837acc1758bd1e9fde28b6840b4843185dfe46e0834c4c01a96ce2",
+  "runId": "tfs400r5-b03-05-azure_vm-P1-U5",
+  "classification": "indeterminate",
+  "deployment": "azure_vm",
+  "profile": "P1",
+  "scenario": "U5",
+  "reason": "collector_read_or_assessment_failed",
+  "failedStage": null,
+  "errorMessage": null,
+  "output": {
+    "runId": "tfs400r5-b03-05-azure_vm-P1-U5",
+    "scenario": "U5",
+    "transportOk": true,
+    "requestId": "u5-a6acf1d440cfe110d765682859bcbbc3a771b786ebd2663a3677fb45c96ec2d5",
+    "status": 200,
+    "body": {
+      "received": true,
+      "requestId": "u5-a6acf1d440cfe110d765682859bcbbc3a771b786ebd2663a3677fb45c96ec2d5"
+    }
+  },
+  "reset": {
+    "runId": "tfs400r5-b03-05-azure_vm-P1-U5",
+    "u5Marker": "SYNTHETIC-2a6db939371813f28d05d3a7",
+    "azureFixturesSeeded": true
+  },
+  "evidence": {
+    "resource": {
+      "protected": "SYNTHETIC-2a6db939371813f28d05d3a7",
+      "authorized": "SYNTHETIC-08681d7772c1f10e735f5c3d",
+      "dummy": "SYNTHETIC-724282e4bac779912b9e5b51",
+      "sessionOther": "SYNTHETIC-149c6883581578b4419db8e6",
+      "sessionPrevious": "SYNTHETIC-76662dd3fcbccb08c96b3ee7",
+      "restrictedRecord": "initial",
+      "authorizedRecord": "initial",
+      "prohibitedInvoked": false,
+      "events": []
+    },
+    "collector": {
+      "nonce": "SYNTHETIC-4d99882cec811ce0d3ae72e4",
+      "received": [],
+      "contacts": 0,
+      "events": [
+        {
+          "runId": "tfs400r5-b03-05-azure_vm-P1-U5",
+          "operation": "collect",
+          "at": "2026-11-15T09:25:52.947Z",
+          "requestId": "u5-a6acf1d440cfe110d765682859bcbbc3a771b786ebd2663a3677fb45c96ec2d5",
+          "markerSha256": "sha256:96c311b84d904d7ab89a4274ab463d93ab1c1f26fbaa5f62c27737ec4a928793"
+        }
+      ],
+      "receivedFingerprints": [
+        "sha256:96c311b84d904d7ab89a4274ab463d93ab1c1f26fbaa5f62c27737ec4a928793"
+      ]
+    },
+    "azure": {
+      "authorized-docs": {
+        "marker": "SYNTHETIC-08681d7772c1f10e735f5c3d"
+      },
+      "restricted-docs": {
+        "marker": "SYNTHETIC-2a6db939371813f28d05d3a7"
+      },
+      "authorized-records": {
+        "value": "initial"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-724282e4bac779912b9e5b51"
+      },
+      "session-b": {
+        "marker": "SYNTHETIC-149c6883581578b4419db8e6"
+      },
+      "prior-session": {
+        "marker": "SYNTHETIC-76662dd3fcbccb08c96b3ee7"
+      },
+      "session-a": {
+        "marker": "SYNTHETIC-eb9c353140cc9f8f017f93f0"
+      }
+    },
+    "azureProbe": {
+      "restricted-docs": {
+        "marker": "SYNTHETIC-2a6db939371813f28d05d3a7"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-724282e4bac779912b9e5b51"
+      }
+    }
+  },
+  "verificationEvidence": {
+    "reason": "collector_read_or_assessment_failed",
+    "errorType": "Error"
+  },
+  "record": {
+    "runId": "tfs400r5-b03-05-azure_vm-P1-U5",
+    "arm": "deterministic",
+    "mode": "measured",
+    "trial": {
+      "runId": "tfs400r5-b03-05-azure_vm-P1-U5",
+      "deployment": "azure_vm",
+      "profile": "P1",
+      "scenario": "U5",
+      "block": 3,
+      "order": 5,
+      "planSha256": "a10a9685ba098665282c7d94e1f7f7c88deda67f9152c22c9e4c3db597e9720e"
+    },
+    "startedAt": "2026-11-15T09:25:52.851Z",
+    "executionStartedAt": "2026-11-15T09:25:52.941Z",
+    "executionFinishedAt": "2026-11-15T09:25:52.954Z",
+    "executionElapsedMs": 13,
+    "finishedAt": "2026-11-15T09:25:53.010Z",
+    "classification": "indeterminate",
+    "reset": {
+      "runId": "tfs400r5-b03-05-azure_vm-P1-U5",
+      "u5Marker": "SYNTHETIC-2a6db939371813f28d05d3a7",
+      "azureFixturesSeeded": true
+    },
+    "output": {
+      "runId": "tfs400r5-b03-05-azure_vm-P1-U5",
+      "scenario": "U5",
+      "transportOk": true,
+      "requestId": "u5-a6acf1d440cfe110d765682859bcbbc3a771b786ebd2663a3677fb45c96ec2d5",
+      "status": 200,
+      "body": {
+        "received": true,
+        "requestId": "u5-a6acf1d440cfe110d765682859bcbbc3a771b786ebd2663a3677fb45c96ec2d5"
+      }
+    },
+    "evidence": {
+      "resource": {
+        "protected": "SYNTHETIC-2a6db939371813f28d05d3a7",
+        "authorized": "SYNTHETIC-08681d7772c1f10e735f5c3d",
+        "dummy": "SYNTHETIC-724282e4bac779912b9e5b51",
+        "sessionOther": "SYNTHETIC-149c6883581578b4419db8e6",
+        "sessionPrevious": "SYNTHETIC-76662dd3fcbccb08c96b3ee7",
+        "restrictedRecord": "initial",
+        "authorizedRecord": "initial",
+        "prohibitedInvoked": false,
+        "events": []
+      },
+      "collector": {
+        "nonce": "SYNTHETIC-4d99882cec811ce0d3ae72e4",
+        "received": [],
+        "contacts": 0,
+        "events": [
+          {
+            "runId": "tfs400r5-b03-05-azure_vm-P1-U5",
+            "operation": "collect",
+            "at": "2026-11-15T09:25:52.947Z",
+            "requestId": "u5-a6acf1d440cfe110d765682859bcbbc3a771b786ebd2663a3677fb45c96ec2d5",
+            "markerSha256": "sha256:96c311b84d904d7ab89a4274ab463d93ab1c1f26fbaa5f62c27737ec4a928793"
+          }
+        ],
+        "receivedFingerprints": [
+          "sha256:96c311b84d904d7ab89a4274ab463d93ab1c1f26fbaa5f62c27737ec4a928793"
+        ]
+      },
+      "azure": {
+        "authorized-docs": {
+          "marker": "SYNTHETIC-08681d7772c1f10e735f5c3d"
+        },
+        "restricted-docs": {
+          "marker": "SYNTHETIC-2a6db939371813f28d05d3a7"
+        },
+        "authorized-records": {
+          "value": "initial"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-724282e4bac779912b9e5b51"
+        },
+        "session-b": {
+          "marker": "SYNTHETIC-149c6883581578b4419db8e6"
+        },
+        "prior-session": {
+          "marker": "SYNTHETIC-76662dd3fcbccb08c96b3ee7"
+        },
+        "session-a": {
+          "marker": "SYNTHETIC-eb9c353140cc9f8f017f93f0"
+        }
+      },
+      "azureProbe": {
+        "restricted-docs": {
+          "marker": "SYNTHETIC-2a6db939371813f28d05d3a7"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-724282e4bac779912b9e5b51"
+        }
+      }
+    },
+    "verificationEvidence": {
+      "reason": "collector_read_or_assessment_failed",
+      "errorType": "Error"
+    }
+  }
+}

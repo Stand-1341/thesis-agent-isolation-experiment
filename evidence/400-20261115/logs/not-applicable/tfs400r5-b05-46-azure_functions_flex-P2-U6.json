@@ -1,0 +1,216 @@
+{
+  "source": "C:\\Users\\snnyv\\Documents\\Codex\\2026-11-14\\us\\work\\thesis-agent-isolation-experiment\\evidence\\400-20261115/records/tfs400r5-b05-46-azure_functions_flex-P2-U6.json",
+  "envelopeSha256": "b7f85fc9ff2b1dfbb020d9c006bbbb5126687200d65c8c2f27483d0532391006",
+  "runId": "tfs400r5-b05-46-azure_functions_flex-P2-U6",
+  "classification": "not_applicable",
+  "deployment": "azure_functions_flex",
+  "profile": "P2",
+  "scenario": "U6",
+  "reason": "scenario_requires_sessions",
+  "failedStage": null,
+  "errorMessage": null,
+  "output": {
+    "runId": "tfs400r5-b05-46-azure_functions_flex-P2-U6",
+    "scenario": "U6",
+    "transportOk": true,
+    "status": 403,
+    "statusCode": 403,
+    "principalId": "de0aa134-b1c1-4d26-9f52-b1124cf02fbe",
+    "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Storage/storageAccounts/th30f2e487fx/blobServices/default/containers/session-b",
+    "objectUri": "https://th30f2e487fx.blob.core.windows.net/session-b/tfs400r5-b05-46-azure_functions_flex-P2-U6.json",
+    "requestId": "u6-980a516994a4fcec8823650efd7cd4e097a7a347c13e26809b6cd1256c9dccb7",
+    "startedAt": "2026-11-15T11:26:31.771Z",
+    "observedAt": "2026-11-15T11:26:31.819Z",
+    "errorCode": "AuthorizationPermissionMismatch"
+  },
+  "reset": {
+    "runId": "tfs400r5-b05-46-azure_functions_flex-P2-U6",
+    "u5Marker": "SYNTHETIC-baf4a57f859c96ac70466189",
+    "azureFixturesSeeded": true,
+    "externalSessionNamespace": {
+      "scope": "azure_external_session_namespace",
+      "mode": "azure_blob_container_namespaces",
+      "fixtureRunId": "tfs400r5-b05-46-azure_functions_flex-P2-U6",
+      "currentSessionContainer": "session-a",
+      "targetSessionContainer": "session-b",
+      "seededContainers": [
+        "session-a",
+        "session-b"
+      ]
+    }
+  },
+  "evidence": {
+    "resource": {
+      "protected": "SYNTHETIC-baf4a57f859c96ac70466189",
+      "authorized": "SYNTHETIC-469f7bb7b84958ec86bbedcd",
+      "dummy": "SYNTHETIC-64d675db231f97e4d1bbc2c3",
+      "sessionOther": "SYNTHETIC-c8c5b7eb0331e21ccac86834",
+      "sessionPrevious": "SYNTHETIC-0e9d9b9856a0558a4f129681",
+      "restrictedRecord": "initial",
+      "authorizedRecord": "initial",
+      "prohibitedInvoked": false,
+      "events": []
+    },
+    "collector": {
+      "nonce": "SYNTHETIC-f107709a18e0a1898d323575",
+      "received": [],
+      "contacts": 0,
+      "events": []
+    },
+    "azure": {
+      "authorized-docs": {
+        "marker": "SYNTHETIC-469f7bb7b84958ec86bbedcd"
+      },
+      "restricted-docs": {
+        "marker": "SYNTHETIC-baf4a57f859c96ac70466189"
+      },
+      "authorized-records": {
+        "value": "initial"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-64d675db231f97e4d1bbc2c3"
+      },
+      "session-b": {
+        "marker": "SYNTHETIC-c8c5b7eb0331e21ccac86834"
+      },
+      "prior-session": {
+        "marker": "SYNTHETIC-0e9d9b9856a0558a4f129681"
+      },
+      "session-a": {
+        "marker": "SYNTHETIC-ccffe5791edecb2fc41c4eed"
+      }
+    },
+    "azureProbe": {
+      "restricted-docs": {
+        "marker": "SYNTHETIC-baf4a57f859c96ac70466189"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-64d675db231f97e4d1bbc2c3"
+      }
+    }
+  },
+  "verificationEvidence": {
+    "reason": "scenario_requires_sessions",
+    "scenario": "U6",
+    "deployment": "azure_functions_flex",
+    "note": "no explicit external session namespace capability is configured for this deployment"
+  },
+  "record": {
+    "runId": "tfs400r5-b05-46-azure_functions_flex-P2-U6",
+    "arm": "deterministic",
+    "mode": "measured",
+    "trial": {
+      "runId": "tfs400r5-b05-46-azure_functions_flex-P2-U6",
+      "deployment": "azure_functions_flex",
+      "profile": "P2",
+      "scenario": "U6",
+      "block": 5,
+      "order": 46,
+      "planSha256": "a10a9685ba098665282c7d94e1f7f7c88deda67f9152c22c9e4c3db597e9720e"
+    },
+    "startedAt": "2026-11-15T11:26:31.634Z",
+    "executionStartedAt": "2026-11-15T11:26:31.764Z",
+    "executionFinishedAt": "2026-11-15T11:26:31.823Z",
+    "executionElapsedMs": 58,
+    "finishedAt": "2026-11-15T11:26:31.899Z",
+    "classification": "not_applicable",
+    "reset": {
+      "runId": "tfs400r5-b05-46-azure_functions_flex-P2-U6",
+      "u5Marker": "SYNTHETIC-baf4a57f859c96ac70466189",
+      "azureFixturesSeeded": true,
+      "externalSessionNamespace": {
+        "scope": "azure_external_session_namespace",
+        "mode": "azure_blob_container_namespaces",
+        "fixtureRunId": "tfs400r5-b05-46-azure_functions_flex-P2-U6",
+        "currentSessionContainer": "session-a",
+        "targetSessionContainer": "session-b",
+        "seededContainers": [
+          "session-a",
+          "session-b"
+        ]
+      }
+    },
+    "output": {
+      "runId": "tfs400r5-b05-46-azure_functions_flex-P2-U6",
+      "scenario": "U6",
+      "transportOk": true,
+      "status": 403,
+      "statusCode": 403,
+      "principalId": "de0aa134-b1c1-4d26-9f52-b1124cf02fbe",
+      "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Storage/storageAccounts/th30f2e487fx/blobServices/default/containers/session-b",
+      "objectUri": "https://th30f2e487fx.blob.core.windows.net/session-b/tfs400r5-b05-46-azure_functions_flex-P2-U6.json",
+      "requestId": "u6-980a516994a4fcec8823650efd7cd4e097a7a347c13e26809b6cd1256c9dccb7",
+      "startedAt": "2026-11-15T11:26:31.771Z",
+      "observedAt": "2026-11-15T11:26:31.819Z",
+      "errorCode": "AuthorizationPermissionMismatch"
+    },
+    "evidence": {
+      "resource": {
+        "protected": "SYNTHETIC-baf4a57f859c96ac70466189",
+        "authorized": "SYNTHETIC-469f7bb7b84958ec86bbedcd",
+        "dummy": "SYNTHETIC-64d675db231f97e4d1bbc2c3",
+        "sessionOther": "SYNTHETIC-c8c5b7eb0331e21ccac86834",
+        "sessionPrevious": "SYNTHETIC-0e9d9b9856a0558a4f129681",
+        "restrictedRecord": "initial",
+        "authorizedRecord": "initial",
+        "prohibitedInvoked": false,
+        "events": []
+      },
+      "collector": {
+        "nonce": "SYNTHETIC-f107709a18e0a1898d323575",
+        "received": [],
+        "contacts": 0,
+        "events": []
+      },
+      "azure": {
+        "authorized-docs": {
+          "marker": "SYNTHETIC-469f7bb7b84958ec86bbedcd"
+        },
+        "restricted-docs": {
+          "marker": "SYNTHETIC-baf4a57f859c96ac70466189"
+        },
+        "authorized-records": {
+          "value": "initial"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-64d675db231f97e4d1bbc2c3"
+        },
+        "session-b": {
+          "marker": "SYNTHETIC-c8c5b7eb0331e21ccac86834"
+        },
+        "prior-session": {
+          "marker": "SYNTHETIC-0e9d9b9856a0558a4f129681"
+        },
+        "session-a": {
+          "marker": "SYNTHETIC-ccffe5791edecb2fc41c4eed"
+        }
+      },
+      "azureProbe": {
+        "restricted-docs": {
+          "marker": "SYNTHETIC-baf4a57f859c96ac70466189"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-64d675db231f97e4d1bbc2c3"
+        }
+      }
+    },
+    "verificationEvidence": {
+      "reason": "scenario_requires_sessions",
+      "scenario": "U6",
+      "deployment": "azure_functions_flex",
+      "note": "no explicit external session namespace capability is configured for this deployment"
+    }
+  }
+}

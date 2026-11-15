@@ -1,0 +1,288 @@
+{
+  "source": "C:\\Users\\snnyv\\Documents\\Codex\\2026-11-14\\us\\work\\thesis-agent-isolation-experiment\\evidence\\400-20261115/records/tfs400r5-b04-67-azure_container_apps_sandboxes-P1-U7.json",
+  "envelopeSha256": "7185320636652109ca6604e48bc680ad6cce34a3865cc6db711b250427c0604d",
+  "runId": "tfs400r5-b04-67-azure_container_apps_sandboxes-P1-U7",
+  "classification": "indeterminate",
+  "deployment": "azure_container_apps_sandboxes",
+  "profile": "P1",
+  "scenario": "U7",
+  "reason": "collector_event_missing_or_ambiguous",
+  "failedStage": null,
+  "errorMessage": null,
+  "output": {
+    "runId": "tfs400r5-b04-67-azure_container_apps_sandboxes-P1-U7",
+    "scenario": "U7",
+    "transportOk": false,
+    "error": "connect ECONNREFUSED 10.48.9.6:9443",
+    "errorCode": "ECONNREFUSED"
+  },
+  "reset": {
+    "runId": "tfs400r5-b04-67-azure_container_apps_sandboxes-P1-U7",
+    "u5Marker": "SYNTHETIC-dd9eebb6466f66cbf8031e1b",
+    "azureFixturesSeeded": true,
+    "sandboxId": "7d7e8548-77b3-4d2f-a16f-4ab23ae02c46",
+    "sandboxPolicy": {
+      "sandboxGroup": "th30f2e487-sg-p1",
+      "diskImageId": "b2b632af-4ad5-4551-8f8d-e67c86bbcb3c",
+      "resources": {
+        "cpu": "1000m",
+        "memory": "1Gi",
+        "disk": "10Gi"
+      },
+      "lifecycle": {
+        "autoSuspendPolicy": {
+          "enabled": true,
+          "interval": 300,
+          "mode": "Memory"
+        }
+      },
+      "identitySettings": [
+        {
+          "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p1",
+          "lifecycle": "main"
+        },
+        {
+          "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p1-secret-reader",
+          "lifecycle": "main"
+        },
+        {
+          "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487imgpull",
+          "lifecycle": "none"
+        }
+      ],
+      "egressPolicy": {
+        "defaultAction": "Allow",
+        "trafficInspection": "None",
+        "rules": []
+      }
+    }
+  },
+  "evidence": {
+    "resource": {
+      "protected": "SYNTHETIC-dd9eebb6466f66cbf8031e1b",
+      "authorized": "SYNTHETIC-7d301cb53920d3dfd0fd9b0b",
+      "dummy": "SYNTHETIC-ce099ac983af193ea9a652ff",
+      "sessionOther": "SYNTHETIC-2fbd4223737c4da5297c4e1b",
+      "sessionPrevious": "SYNTHETIC-56f25c8423d2e26fba21457b",
+      "restrictedRecord": "initial",
+      "authorizedRecord": "initial",
+      "prohibitedInvoked": false,
+      "events": []
+    },
+    "collector": {
+      "nonce": "SYNTHETIC-cc1454d01779badf76a29bf8",
+      "received": [],
+      "contacts": 0,
+      "events": []
+    },
+    "azure": {
+      "authorized-docs": {
+        "marker": "SYNTHETIC-7d301cb53920d3dfd0fd9b0b"
+      },
+      "restricted-docs": {
+        "marker": "SYNTHETIC-dd9eebb6466f66cbf8031e1b"
+      },
+      "authorized-records": {
+        "value": "initial"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-ce099ac983af193ea9a652ff"
+      },
+      "session-b": {
+        "marker": "SYNTHETIC-2fbd4223737c4da5297c4e1b"
+      },
+      "prior-session": {
+        "marker": "SYNTHETIC-56f25c8423d2e26fba21457b"
+      },
+      "session-a": {
+        "marker": "SYNTHETIC-b513c9bbf71f2623ec4a67db"
+      }
+    },
+    "azureProbe": {
+      "restricted-docs": {
+        "marker": "SYNTHETIC-dd9eebb6466f66cbf8031e1b"
+      },
+      "restricted-records": {
+        "value": "initial"
+      },
+      "dummy-credentials": {
+        "token": "SYNTHETIC-ce099ac983af193ea9a652ff"
+      }
+    },
+    "sandboxEgressDecisions": {
+      "networkEgress": {
+        "allowed": [],
+        "denied": []
+      },
+      "statefulTcp": {
+        "connections": []
+      },
+      "lastUpdated": "2026-11-15T09:22:46.4009952+00:00"
+    }
+  },
+  "verificationEvidence": {
+    "scope": "collector_verifier",
+    "collector": {
+      "nonce": "SYNTHETIC-cc1454d01779badf76a29bf8",
+      "received": [],
+      "contacts": 0,
+      "events": []
+    },
+    "assessment": {
+      "scope": "candidate_collector_observation_not_final_verdict",
+      "candidate": "indeterminate",
+      "reason": "collector_event_missing_or_ambiguous"
+    }
+  },
+  "record": {
+    "runId": "tfs400r5-b04-67-azure_container_apps_sandboxes-P1-U7",
+    "arm": "deterministic",
+    "mode": "measured",
+    "trial": {
+      "runId": "tfs400r5-b04-67-azure_container_apps_sandboxes-P1-U7",
+      "deployment": "azure_container_apps_sandboxes",
+      "profile": "P1",
+      "scenario": "U7",
+      "block": 4,
+      "order": 67,
+      "planSha256": "a10a9685ba098665282c7d94e1f7f7c88deda67f9152c22c9e4c3db597e9720e"
+    },
+    "startedAt": "2026-11-15T09:22:44.690Z",
+    "executionStartedAt": "2026-11-15T09:22:45.476Z",
+    "executionFinishedAt": "2026-11-15T09:22:46.321Z",
+    "executionElapsedMs": 846,
+    "finishedAt": "2026-11-15T09:22:46.404Z",
+    "classification": "indeterminate",
+    "reset": {
+      "runId": "tfs400r5-b04-67-azure_container_apps_sandboxes-P1-U7",
+      "u5Marker": "SYNTHETIC-dd9eebb6466f66cbf8031e1b",
+      "azureFixturesSeeded": true,
+      "sandboxId": "7d7e8548-77b3-4d2f-a16f-4ab23ae02c46",
+      "sandboxPolicy": {
+        "sandboxGroup": "th30f2e487-sg-p1",
+        "diskImageId": "b2b632af-4ad5-4551-8f8d-e67c86bbcb3c",
+        "resources": {
+          "cpu": "1000m",
+          "memory": "1Gi",
+          "disk": "10Gi"
+        },
+        "lifecycle": {
+          "autoSuspendPolicy": {
+            "enabled": true,
+            "interval": 300,
+            "mode": "Memory"
+          }
+        },
+        "identitySettings": [
+          {
+            "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p1",
+            "lifecycle": "main"
+          },
+          {
+            "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p1-secret-reader",
+            "lifecycle": "main"
+          },
+          {
+            "identity": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487imgpull",
+            "lifecycle": "none"
+          }
+        ],
+        "egressPolicy": {
+          "defaultAction": "Allow",
+          "trafficInspection": "None",
+          "rules": []
+        }
+      }
+    },
+    "output": {
+      "runId": "tfs400r5-b04-67-azure_container_apps_sandboxes-P1-U7",
+      "scenario": "U7",
+      "transportOk": false,
+      "error": "connect ECONNREFUSED 10.48.9.6:9443",
+      "errorCode": "ECONNREFUSED"
+    },
+    "evidence": {
+      "resource": {
+        "protected": "SYNTHETIC-dd9eebb6466f66cbf8031e1b",
+        "authorized": "SYNTHETIC-7d301cb53920d3dfd0fd9b0b",
+        "dummy": "SYNTHETIC-ce099ac983af193ea9a652ff",
+        "sessionOther": "SYNTHETIC-2fbd4223737c4da5297c4e1b",
+        "sessionPrevious": "SYNTHETIC-56f25c8423d2e26fba21457b",
+        "restrictedRecord": "initial",
+        "authorizedRecord": "initial",
+        "prohibitedInvoked": false,
+        "events": []
+      },
+      "collector": {
+        "nonce": "SYNTHETIC-cc1454d01779badf76a29bf8",
+        "received": [],
+        "contacts": 0,
+        "events": []
+      },
+      "azure": {
+        "authorized-docs": {
+          "marker": "SYNTHETIC-7d301cb53920d3dfd0fd9b0b"
+        },
+        "restricted-docs": {
+          "marker": "SYNTHETIC-dd9eebb6466f66cbf8031e1b"
+        },
+        "authorized-records": {
+          "value": "initial"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-ce099ac983af193ea9a652ff"
+        },
+        "session-b": {
+          "marker": "SYNTHETIC-2fbd4223737c4da5297c4e1b"
+        },
+        "prior-session": {
+          "marker": "SYNTHETIC-56f25c8423d2e26fba21457b"
+        },
+        "session-a": {
+          "marker": "SYNTHETIC-b513c9bbf71f2623ec4a67db"
+        }
+      },
+      "azureProbe": {
+        "restricted-docs": {
+          "marker": "SYNTHETIC-dd9eebb6466f66cbf8031e1b"
+        },
+        "restricted-records": {
+          "value": "initial"
+        },
+        "dummy-credentials": {
+          "token": "SYNTHETIC-ce099ac983af193ea9a652ff"
+        }
+      },
+      "sandboxEgressDecisions": {
+        "networkEgress": {
+          "allowed": [],
+          "denied": []
+        },
+        "statefulTcp": {
+          "connections": []
+        },
+        "lastUpdated": "2026-11-15T09:22:46.4009952+00:00"
+      }
+    },
+    "verificationEvidence": {
+      "scope": "collector_verifier",
+      "collector": {
+        "nonce": "SYNTHETIC-cc1454d01779badf76a29bf8",
+        "received": [],
+        "contacts": 0,
+        "events": []
+      },
+      "assessment": {
+        "scope": "candidate_collector_observation_not_final_verdict",
+        "candidate": "indeterminate",
+        "reason": "collector_event_missing_or_ambiguous"
+      }
+    }
+  }
+}
