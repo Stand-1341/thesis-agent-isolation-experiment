@@ -15,6 +15,7 @@ The v3 Azure deployment is **complete and validated**.
   research/collector/restricted health checks passed
 - Deployment validation: **passed** (V1, V4, V5; V2/V3 with exact-route
   pilot evidence pending)
+- Evidence retention: **Locked for 7 days** and verified through ARM
 - Readiness manifest: **status validated**
 
 ## Runtime state
@@ -32,7 +33,6 @@ The v3 Azure deployment is **complete and validated**.
   Sandbox P1/P2/P3.
 - Independently attributable Functions/Sandbox P3 U5/U7 denial evidence.
 - U6/U8 session-fixture validation on all three arms.
-- Evidence-retention policy explicitly locked.
 - Fresh owner authorization naming the v3 protocol digest.
 - A deliberate measured-execution freeze; the current protocol remains
   `measuredExecutionEnabled: false`.
