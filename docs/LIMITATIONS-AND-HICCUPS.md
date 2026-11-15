@@ -238,6 +238,18 @@ Cost data can lag and does not include all subscription spend. This is the actua
 - The deployment manifest was created before the measured run and was not regenerated afterward.
 - The 400 evidence records are complete, but the overall study is not publication-ready without a new, corrected protocol and a clean pilot.
 
+## Firewall evidence
+
+Azure Firewall logs for the measured window were exported to `evidence/400-20261115/firewall/`.
+
+- 31,313 `AzureFirewallNetworkRule` records in the window.
+- 105 P3 collector/restricted deny records.
+- All 105 are `Deny`; no allow record exists for the collector or restricted service.
+- VM P3 `10.48.8.4` produced 35 collector denies under `p3-deny-collector`.
+- Functions P3 produced 70 denies under `functions-p3-deny-collector` and `functions-p3-deny-restricted-service`.
+
+These logs prove that the named deny rules fired. They do not by themselves prove a trial's outcome: the independent receiver-effect monitor is still required, and several P3 rows remain indeterminate for that reason.
+
 ## Recommended next steps
 
 1. Rotate all exposed function keys and review temporary access.
