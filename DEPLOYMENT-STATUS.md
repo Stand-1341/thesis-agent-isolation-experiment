@@ -1,66 +1,41 @@
 # Azure deployment status
 
-**Snapshot:** 2026-11-14/15 live Azure query  
-**Subscription:** `a0129b37-1075-48a4-82f9-bbc6d96d8eb3`  
-**Resource group:** `rg-thesis-study-central-a0129b37`  
-**Environment:** `thesis-study`
+**Snapshot:** 2026-11-15 live Azure verification  
+**Environment:** `thesis-study`  
+**Resource group:** `rg-thesis-study-central-a0129b37`
 
 ## Current outcome
 
-The full ARM deployment `thesis-three-arm-full` is **Succeeded**. All compute,
-network, storage, identity, firewall, Functions, Sandbox-group, and research-host
-resources are provisioned.
+The v3 Azure deployment is **complete and validated**.
 
-The post-provision hook is **not complete**. Functions P1 and P2 packages are
-published and trigger-verified. Functions P3 package publication failed because
-the P3 Function host is not resolving its platform/storage endpoints through
-the P3 firewall:
- 
-- P3 main and SCM endpoints time out.
-- Firewall `p3-default-deny` records show P3 subnet `10.48.6.235` being denied
-  to destinations including `20.44.13.224:443`, `52.182.143.192:443`, and
-  `185.125.190.106:443`.
-- P1/P2 SCM endpoints answer correctly.
+- Full ARM deployment: **Succeeded**
+- Functions Flex P1/P2/P3: deployed, triggers verified, keys secured
+- Sandbox disk images P1/P2/P3: created, Ready, runtime smoke passed
+- Research host: data disk mounted, TLS installed, services active,
+  research/collector/restricted health checks passed
+- Deployment validation: **passed** (V1, V4, V5; V2/V3 with exact-route
+  pilot evidence pending)
+- Readiness manifest: **status validated**
 
-## Valid now
+## Runtime state
 
-- Azure resource deployment: valid and succeeded.
-- Generated experiment config: 9 routes resolved.
-- Key Vault/bootstrap/image checkpoints: valid.
-- Functions P1 package: published and trigger-verified.
-- Functions P2 package: published and trigger-verified.
-- P3 firewall rule groups: applied.
-- Evidence, fixture, registry private endpoints: provisioned; DNS/round-trip
-  validation not yet run.
-- Sandbox groups: provisioned; disk-image bootstrap not yet run.
-- Research host VM and data disk: provisioned; host software/TLS/services not
-  yet installed.
+- Agent image: `th30f2e487acr.azurecr.io/thesis/agent@sha256:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141`
+- Functions package: `abcdb557810666979cd3d3a4ead13c44ea6fbad29933f5efc6c58851131e1ba0`
+- Sandbox disk images: P1 `b2b632af-4ad5-4551-8f8d-e67c86bbcb3c`,
+  P2 `9c2d2ded-5204-4963-9815-52aa47ac6f45`,
+  P3 `fecfb27f-61aa-4652-82aa-9e195f9b4a7e`
+- Research-host package: `5172bfe26dd8bea740500cf7d027cc462940d84e48d24c399a2e15446fb890f4`
 
-## Not valid yet
+## What remains before the measured experiment
 
-- P3 Functions app: unreachable; no package.
-- Sandbox disk-image/runtime bootstrap: not run.
-- Research-host bootstrap: not run.
-- Deployment validation V1–V5: not run.
-- Deployment/reporting manifest: not emitted.
-- Evidence retention policy: not locked.
-- Pilot evidence, P3 denial telemetry, U6/U8 fixtures: not established.
-- Measured execution: not authorized and not run.
+- Seven exact-route non-counted pilot records: VM P3, Functions P1/P2/P3,
+  Sandbox P1/P2/P3.
+- Independently attributable Functions/Sandbox P3 U5/U7 denial evidence.
+- U6/U8 session-fixture validation on all three arms.
+- Evidence-retention policy explicitly locked.
+- Fresh owner authorization naming the v3 protocol digest.
+- A deliberate measured-execution freeze; the current protocol remains
+  `measuredExecutionEnabled: false`.
 
-## Why the official experiment is not running
-
-The frozen v3 protocol requires all three arms, including Functions P3, and has
-`measuredExecutionEnabled: false`. Running a subset would be a separate
-non-counted smoke/pilot, not the measured experiment. The current route data is
-therefore preparation only.
-
-## Next fixes
-
-1. Add the exact missing Functions P3 platform egress endpoints/service tags to
-   the P3 allowlist, based on live firewall denials.
-2. Republish the P3 Functions package and verify its triggers.
-3. Run Sandbox bootstrap.
-4. Run research-host bootstrap.
-5. Run V1–V5 validation and emit readiness.
-6. Resolve evidence retention, pilot evidence, and owner authorization before
-   any measured study launch.
+The deployment is ready for non-counted pilot work. It is not yet authorized
+for measured trials.
