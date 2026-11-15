@@ -136,7 +136,7 @@ export function resolveConfiguration({outputs, env, sourceTreeDigest} = {}) {
       secretReader: {objectId: outputs?.secretReaderIdentityObjectId},
       fixtureOwner: {objectId: outputs?.fixtureOwnerIdentityObjectId},
       sandboxControl: {clientId: outputs?.sandboxControlIdentityClientId},
-      imagePull: {resourceId: outputs?.imagePullIdentityResourceId}
+      imagePull: {resourceId: outputs?.imagePullIdentityResourceId, clientId: outputs?.imagePullIdentityClientId}
     },
     evidence: {accountId: outputs?.evidenceAccountId, containerUrl: outputs?.evidenceContainerUrl},
     fixtures: {accountId: outputs?.fixtureAccountId, blobEndpoint: outputs?.fixtureBlobEndpoint,
@@ -288,6 +288,14 @@ export async function main({env = process.env, stdout = process.stdout, stderr =
     } catch (error) {
       stderr.write(`configure: could not resolve VM agent NIC addresses: ${error.message}\n`);
       armOutputs = {...armOutputs, vmAgentPrivateIps: {}};
+    }
+  }
+  if (!armOutputs.imagePullIdentityClientId && armOutputs.imagePullIdentityResourceId) {
+    try {
+      const clientId=String(await makeAzRunner()(['identity','show','--ids',armOutputs.imagePullIdentityResourceId,'--query','clientId','-o','tsv'])).trim();
+      if(clientId) armOutputs={...armOutputs,imagePullIdentityClientId:clientId};
+    } catch (error) {
+      stderr.write(`configure: could not resolve image-pull identity client ID: ${error.message}\n`);
     }
   }
 

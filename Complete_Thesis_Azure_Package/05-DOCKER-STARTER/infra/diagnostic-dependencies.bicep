@@ -21,7 +21,8 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
     adminUserEnabled: false
     publicNetworkAccess: 'Enabled'
     networkRuleSet: {
-      defaultAction: 'Deny'
+      bypass: 'AzureServices'
+      defaultAction: 'Allow'
       ipRules: [{ action: 'Allow', value: trustedControllerPublicIp }]
     }
   }
@@ -48,5 +49,6 @@ resource pullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 }
 output registryServer string = registry.properties.loginServer
 output pullIdentityId string = pullIdentity.id
+output pullIdentityClientId string = pullIdentity.properties.clientId
 output logWorkspaceId string = logs.id
 output logCustomerId string = logs.properties.customerId

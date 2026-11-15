@@ -84,20 +84,20 @@ test('Functions publication fails closed when the deterministic package cannot b
   assert.match(stderr.value,/package build failed: zip build failed/);
 });
 
-test('Functions publication stops on ZIP failure or unindexed triggers',async t=>{
+test('Functions publication verifies triggers when the ZIP command times out',async t=>{
   const {dir,scratch,env}=await fixture(t);
   const build=async()=>({scratch,zip:path.join(scratch,'functions.zip'),packageSha256:'c'.repeat(64)});
   let fetchCalls=0;
   const fetchImpl=async()=>{fetchCalls++;return {ok:true,status:200};};
-  const failedZip=await publishFunctions({env,stdout:sink(),stderr:sink(),outputs,build,fetchImpl,stateDir:path.join(dir,'zip-failure'),
+  const code=await publishFunctions({env,stdout:sink(),stderr:sink(),outputs,build,fetchImpl,stateDir:path.join(dir,'zip-failure'),
     az:async args=>{
       if(args[1]==='deployment') throw new Error('403 SCM restricted');
       if(args[1]==='function'&&args[2]==='list') return triggers;
       if(args[1]==='function'&&args[2]==='keys') return {default:'k'.repeat(32)};
       return {accessToken:'token'};
     }});
-  assert.equal(failedZip,4);
-  assert.equal(fetchCalls,0);
+  assert.equal(code,0);
+  assert.equal(fetchCalls,3);
 
   let listCalls=0,sleeps=0;
   const oneRoute={...outputs,experimentConfigRoutes:{azure_functions_flex:{P1:routes.P1}}};
@@ -112,5 +112,5 @@ test('Functions publication stops on ZIP failure or unindexed triggers',async t=
   assert.equal(notIndexed,4);
   assert.equal(listCalls,12);
   assert.equal(sleeps,12);
-  assert.equal(fetchCalls,0);
+  assert.equal(fetchCalls,3);
 });

@@ -1206,10 +1206,18 @@ resource jobsExecutionControllerAssignment 'Microsoft.Authorization/roleAssignme
 // condition + for-expression is not valid Bicep).
 // ---------------------------------------------------------------------------
 
+resource imagePullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: imagePullIdentityName
+}
+
 resource sandboxGroupP1 'Microsoft.App/sandboxGroups@2026-07-01' = if (deploySandboxGroups) {
   name: '${namePrefix}-sg-p1'
   location: location
   tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: { '${imagePullIdentity.id}': {} }
+  }
   properties: {}
 }
 
@@ -1217,6 +1225,10 @@ resource sandboxGroupP2 'Microsoft.App/sandboxGroups@2026-07-01' = if (deploySan
   name: '${namePrefix}-sg-p2'
   location: location
   tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: { '${imagePullIdentity.id}': {} }
+  }
   properties: {}
 }
 
@@ -1224,6 +1236,10 @@ resource sandboxGroupP3 'Microsoft.App/sandboxGroups@2026-07-01' = if (deploySan
   name: '${namePrefix}-sg-p3'
   location: location
   tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: { '${imagePullIdentity.id}': {} }
+  }
   properties: {}
 }
 
@@ -1520,6 +1536,7 @@ output jobsP3EnvironmentId string = deployP3Firewall && deployJobs ? jobsP3Envir
 output registryServer string = dependencies.outputs.registryServer
 output logWorkspaceId string = dependencies.outputs.logWorkspaceId
 output imagePullIdentityResourceId string = dependencies.outputs.pullIdentityId
+output imagePullIdentityClientId string = dependencies.outputs.pullIdentityClientId
 output imagePullIdentityName string = imagePullIdentityName
 
 output controllerIdentityObjectId string = controllerIdentity.properties.principalId

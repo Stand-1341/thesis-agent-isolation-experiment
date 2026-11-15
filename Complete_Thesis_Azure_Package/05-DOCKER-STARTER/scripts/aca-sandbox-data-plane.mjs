@@ -230,20 +230,27 @@ export function createAcaSandboxDataPlaneClient({
 
   async function createDiskImage(baseImage, {
     name,
-    managedIdentityResourceId,
+    managedIdentityClientId,
     registryCredentials,
     timeoutMs = requestTimeoutMs,
   } = {}) {
     const safeBaseImage = validateOciReference(baseImage);
     validateDuration(timeoutMs, 'timeoutMs');
 
-    const requestBody = { image: { base: safeBaseImage } };
-    if (name !== undefined) requestBody.labels = { name: validateSegment(name, 'name') };
+    const source = { kind: 'registry', imageUrl: safeBaseImage };
+    if (managedIdentityClientId !== undefined) {
+      if (typeof managedIdentityClientId !== 'string' || !GUID_PATTERN.test(managedIdentityClientId))
+        throw new TypeError('managedIdentityClientId must be a GUID');
+      source.managedIdentityClientId = managedIdentityClientId;
+    }
+    const requestBody = { source };
+    if (name !== undefined) {
+      const safeName = validateSegment(name, 'name');
+      requestBody.name = safeName;
+      requestBody.labels = { name: safeName };
+    }
     if (registryCredentials !== undefined) {
       requestBody.registryCredentials = validateRegistryCredentials(registryCredentials);
-    }
-    if (managedIdentityResourceId !== undefined) {
-      requestBody.managedIdentityResourceId = validateManagedIdentityResourceId(managedIdentityResourceId);
     }
 
     const deadline = Date.now() + timeoutMs;
@@ -259,7 +266,7 @@ export function createAcaSandboxDataPlaneClient({
         throw error;
       }
     };
-    const created = await requestDiskImage('POST', `${groupPath}/diskimages`, {
+    const created = await requestDiskImage('PUT', `${groupPath}/diskimages/v2`, {
       body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
       deadline,
@@ -287,6 +294,11 @@ export function createAcaSandboxDataPlaneClient({
         await pollDelay(deadline, 'createDiskImage');
       }
     }
+  }
+
+  async function listDiskImages() {
+    const result = await request('GET', `${groupPath}/diskimages`, {operation: 'listDiskImages'});
+    return Array.isArray(result.body) ? result.body : [];
   }
 
   async function getDiskImage(diskImageId) {
@@ -350,5 +362,5 @@ export function createAcaSandboxDataPlaneClient({
     }
   }
 
-  return { createSandbox, createDiskImage, getDiskImage, writeFile, executeShellCommand, getEgressDecisions, deleteSandbox };
+  return { createSandbox, createDiskImage, listDiskImages, getDiskImage, writeFile, executeShellCommand, getEgressDecisions, deleteSandbox };
 }

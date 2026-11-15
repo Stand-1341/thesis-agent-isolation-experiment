@@ -13,14 +13,15 @@ node_sha256='94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90'
 [ "$(sha256sum "$node_binary" | cut -d ' ' -f 1)" = "$node_sha256" ] || { echo 'Node checksum mismatch' >&2; exit 1; }
 [ "$(sha256sum "$verifier" | cut -d ' ' -f 1)" = "$verifier_digest" ] || { echo 'Verifier checksum mismatch' >&2; exit 1; }
 "$node_binary" "$verifier" "$package" "$manifest_digest"
-for target in /opt/thesis-research /opt/thesis-runtime/node /etc/thesis-research /etc/systemd/system/thesis-research.service /etc/systemd/system/thesis-collector.service; do
+for target in /opt/thesis-research /etc/thesis-research /etc/systemd/system/thesis-research.service /etc/systemd/system/thesis-collector.service; do
   [ ! -e "$target" ] && [ ! -L "$target" ] || { echo 'Existing installation requires manual reconciliation' >&2; exit 1; }
 done
 for user in thesis-research thesis-collector; do
-  if getent passwd "$user" >/dev/null || getent group "$user" >/dev/null; then echo 'Existing service identity requires manual reconciliation' >&2; exit 1; fi
+  if ! getent group "$user" >/dev/null; then groupadd --system "$user"; fi
+  if ! getent passwd "$user" >/dev/null; then
+    useradd --system --gid "$user" --no-create-home --shell /usr/sbin/nologin "$user"
+  fi
 done
-useradd --system --user-group --no-create-home --shell /usr/sbin/nologin thesis-research
-useradd --system --user-group --no-create-home --shell /usr/sbin/nologin thesis-collector
 install -d -o root -g root -m 0755 /opt/thesis-research/dist /opt/thesis-research/infra /opt/thesis-research/certs /opt/thesis-runtime/node/bin
 install -d -o root -g root -m 0700 /etc/thesis-research
 for name in resource.js collector.js resource-journal.js collector-journal.js service-config.js helpers.js; do
@@ -34,7 +35,9 @@ install -o root -g root -m 0644 "$package/infra/install-research-host-ca-key.mjs
 install -o root -g root -m 0755 "$package/infra/bootstrap-research-host-tls.sh" /opt/thesis-research/infra/bootstrap-research-host-tls.sh
 install -o root -g root -m 0755 "$package/infra/renew-research-host-tls.sh" /opt/thesis-research/infra/renew-research-host-tls.sh
 install -o root -g root -m 0644 "$package/certs/thesis-pilot-ca.pem" /opt/thesis-research/certs/thesis-pilot-ca.pem
-install -o root -g root -m 0755 "$node_binary" /opt/thesis-runtime/node/bin/node
+if [ "$node_binary" != "/opt/thesis-runtime/node/bin/node" ]; then
+  install -o root -g root -m 0755 "$node_binary" /opt/thesis-runtime/node/bin/node
+fi
 install -o root -g root -m 0644 "$package/research-service.service" /etc/systemd/system/thesis-research.service
 install -o root -g root -m 0644 "$package/collector-service.service" /etc/systemd/system/thesis-collector.service
 echo 'Research files staged. No service was enabled or started.'

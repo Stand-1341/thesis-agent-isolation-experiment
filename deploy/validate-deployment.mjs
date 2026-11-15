@@ -275,6 +275,7 @@ export async function main({env = process.env, az, stdout = process.stdout, stde
 
   const failures = [];
   const checks = {V1: false, V2: false, V3: false, V4: false, V5: false};
+  let evidenceDeleteBlocked = false;
 
   // V1 — resource presence.
   const resourceIds = await retried(['resource', 'list', '--subscription', resolved.subscriptionId, '--query', '[].id']).catch(() => undefined);
@@ -319,10 +320,11 @@ export async function main({env = process.env, az, stdout = process.stdout, stde
   ];
   const missingListeners = serviceListeners.filter(([, ip]) => !ip);
   const researchHostName=String(resolved.network?.researchHostResourceId??'').split('/').filter(Boolean).at(-1)||'research-host';
-  const listenerResults = await Promise.all(serviceListeners.map(async ([name, ip, port]) => {
-    if (!ip) return {name, reachable: false};
-    return {name, reachable: await probeEndpoint({az: retried, ip, port, resourceGroup: values.AZURE_RESOURCE_GROUP,vmName:researchHostName}).catch(() => false)};
-  }));
+  const listenerResults=[];
+  for(const [name,ip,port] of serviceListeners) {
+    if(!ip) listenerResults.push({name,reachable:false});
+    else listenerResults.push({name,reachable:await probeEndpoint({az:retried,ip,port,resourceGroup:values.AZURE_RESOURCE_GROUP,vmName:researchHostName}).catch(()=>false)});
+  }
   checks.V4 = missingListeners.length === 0 && listenerResults.every(listener => listener.reachable);
   for (const listener of listenerResults) {
     if (!listener.reachable) failures.push({check: 'V4', problem: `${listener.name} health endpoint is missing or not answering`, fix: 'check the research-host VM, listener IP/port, service process, and TLS certificate setup, then rerun deployment validation'});
@@ -334,9 +336,10 @@ export async function main({env = process.env, az, stdout = process.stdout, stde
       .catch(error => ({ok: false, error: String(error.message).slice(0, 200)}));
     checks.V5 = roundTrip?.ok === true;
     if (!checks.V5) failures.push({check: 'V5', problem: `evidence write/read/delete round-trip failed: ${roundTrip?.error ?? 'unknown'}`, fix: 'verify exact-container Blob Data Contributor for the operator and the operator /32 network rule; the validation prefix is non-counted'});
+    evidenceDeleteBlocked = roundTrip?.deleteBlocked === true;
   } else failures.push({check: 'V5', problem: 'evidence container URL is missing from resolved deployment', fix: 'rerun configure and provide the evidence container URL'});
 
-  const validationReport = createValidationReport({resolvedBytes, checks, failures, pendingPilotEvidence});
+  const validationReport = createValidationReport({resolvedBytes, checks, failures, pendingPilotEvidence, evidenceDeleteBlocked});
   await writeFile(path.join(process.cwd(), '.azure', envName, 'deployment-validation.json'), `${JSON.stringify(validationReport, null, 2)}\n`);
 
   if (failures.length) {
@@ -351,14 +354,14 @@ export async function main({env = process.env, az, stdout = process.stdout, stde
 }
 
 /** Build a persisted validation result bound to the exact resolved deployment bytes. */
-export function createValidationReport({resolvedBytes, checks = {}, failures = [], pendingPilotEvidence = [], validatedAt = new Date().toISOString()} = {}) {
+export function createValidationReport({resolvedBytes, checks = {}, failures = [], pendingPilotEvidence = [], evidenceDeleteBlocked = false, validatedAt = new Date().toISOString()} = {}) {
   return {
     schemaVersion: 1,
     validatedAt,
     resolvedSha256: createHash('sha256').update(resolvedBytes ?? '').digest('hex'),
     status: Object.values(checks).length === 5 && ['V1', 'V2', 'V3', 'V4', 'V5'].every(key => checks[key] === true) && failures.length === 0 ? 'validated' : 'validation-failed',
     checks: Object.fromEntries(['V1', 'V2', 'V3', 'V4', 'V5'].map(key => [key, checks[key] === true])),
-    evidence: {V5: {roundTripPassed: checks.V5 === true}},
+    evidence: {V5: {roundTripPassed: checks.V5 === true, deleteBlockedByPolicy: evidenceDeleteBlocked}},
     pendingPilotEvidence: [...new Set(pendingPilotEvidence)],
     failures
   };
@@ -387,7 +390,8 @@ export async function probeEndpoint({az, ip, port = 443, resourceGroup, vmName =
   }
 }
 
-export async function evidenceRoundTrip({az, containerUrl}) {  const name = `validation/non-counted-${Date.now()}.txt`;
+export async function evidenceRoundTrip({az, containerUrl}) {
+  const name = `validation/non-counted-${Date.now()}.txt`;
   const blobUrl = `${containerUrl.replace(/\/$/, '')}/${name}`;
   const dir = await mkdtemp(path.join(tmpdir(), 'azure-validation-'));
   const source = path.join(dir, 'payload.txt');
@@ -397,8 +401,15 @@ export async function evidenceRoundTrip({az, containerUrl}) {  const name = `val
     await az(['storage', 'blob', 'upload', '--blob-url', blobUrl, '--file', source, '--overwrite', '--auth-mode', 'login'], {json: false});
     await az(['storage', 'blob', 'download', '--blob-url', blobUrl, '--file', destination, '--auth-mode', 'login'], {json: false});
     const ok = (await readFile(destination, 'utf8')).includes('non-counted validation');
-    await az(['storage', 'blob', 'delete', '--blob-url', blobUrl, '--auth-mode', 'login'], {json: false});
-    return {ok};
+    let deleteBlocked = false;
+    try {
+      await az(['storage', 'blob', 'delete', '--blob-url', blobUrl, '--auth-mode', 'login'], {json: false});
+    } catch (error) {
+      const message = String(error?.stderr ?? error?.message ?? error);
+      if (!/BlobImmutableDueToPolicy|immutable due to a policy/i.test(message)) throw error;
+      deleteBlocked = true;
+    }
+    return {ok, deleteBlocked};
   } finally {
     await rm(dir, {recursive: true, force: true});
   }

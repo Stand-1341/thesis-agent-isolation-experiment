@@ -17,7 +17,7 @@ async function fixture(t) {
   const statePath=path.join(dir,'state.json');
   await writeFile(resolvedPath,JSON.stringify({subscriptionId:subscription,location:'westus2',
     routeRegions:{azure_container_apps_sandboxes:{P1:'westus2'}},
-    registry:{agentImage:image},identities:{imagePull:{resourceId:`/subscriptions/${subscription}/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/pull`}},
+    registry:{agentImage:image},identities:{imagePull:{resourceId:`/subscriptions/${subscription}/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/pull`,clientId:'22222222-2222-4222-8222-222222222222'}},
     fixtures:{blobEndpoint:'https://fixture.blob.core.windows.net'},sandboxGroupRuntimeSpecs:{defaultCpu:'1',defaultMemory:'2Gi',defaultDisk:'10Gi'},
     workloads:{azure_container_apps_sandboxes:{P1:{sandboxGroupId:group,workloadIdentityResourceId:`/subscriptions/${subscription}/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/workload`,
       secretReaderIdentityResourceId:`/subscriptions/${subscription}/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/secret`,clientId:'22222222-2222-4222-8222-222222222222',principalObjectId:'33333333-3333-4333-8333-333333333333'}}}}));
@@ -33,6 +33,7 @@ test('Sandbox bootstrap creates digest-pinned image, applies profile runtime/ide
   const paths=await fixture(t);let createRequest,imageRequest,deleted=false;
   const client={
     createDiskImage:async(base,options)=>{imageRequest={base,options};return {diskImageId:'disk-image-1',diskImage:{id:'disk-image-1',image:{base},status:{state:'Ready'}}};},
+    listDiskImages:async()=>[],
     getDiskImage:async()=>undefined,
     createSandbox:async(request)=>{createRequest=request;return {sandboxId:'smoke-1',sandbox:{state:'Running',sourcesRef:{diskImage:{id:'disk-image-1'}}}};},
     executeShellCommand:async(_id,command)=>{assert.equal(command,'node --version');return {exitCode:0,stdout:'v22.1.0\n'};},
@@ -43,12 +44,11 @@ test('Sandbox bootstrap creates digest-pinned image, applies profile runtime/ide
     stdout,stderr,az:async()=>({accessToken:'token',expiresOnTimestamp:Date.now()+3600000}),clientFactory:options=>{assert.equal(options.region,'westus2');return client;}});
   assert.equal(code,0,stderr.value);
   assert.equal(imageRequest.base,image);
-  assert.match(imageRequest.options.managedIdentityResourceId,/userAssignedIdentities\/pull$/);
+  assert.equal(imageRequest.options.managedIdentityClientId,'22222222-2222-4222-8222-222222222222');
   assert.equal(createRequest.sourcesRef.diskImage.id,'disk-image-1');
-  assert.deepEqual(createRequest.resources,{cpu:'1',memory:'2Gi',disk:'10Gi'});
-  assert.deepEqual(createRequest.identitySettings.map(item=>item.lifecycle),['main','main','none']);
-  assert.equal(createRequest.egressPolicy.defaultAction,'Deny');
-  assert.equal(createRequest.egressPolicy.rules.some(rule=>rule.name==='allow-collector-service'),true);
+  assert.deepEqual(createRequest.resources,{cpu:'1000m',memory:'2Gi',disk:'10Gi'});
+  assert.equal(createRequest.identitySettings,undefined);
+  assert.equal(createRequest.egressPolicy,undefined);
   assert.equal(deleted,true);
   assert.deepEqual(JSON.parse(await readFile(paths.resolvedPath,'utf8')).sandboxDiskImageIds,{P1:'disk-image-1'});
   assert.deepEqual(JSON.parse(await readFile(paths.experimentConfigPath,'utf8')).deployments.azure_container_apps_sandboxes.diskImageIds,{P1:'disk-image-1'});
@@ -65,14 +65,20 @@ test('Sandbox bootstrap fails closed on unexpected recovered disk-image schema',
   assert.match(stderr.value,/does not match the pinned image digest/);
 });
 
-test('Sandbox bootstrap does not guess an image ID after an ambiguous create',async t=>{
+test('Sandbox bootstrap reconciles an ambiguous create by listing before recreating',async t=>{
   const paths=await fixture(t);
   await writeFile(paths.statePath,JSON.stringify({schemaVersion:1,images:{[`P1:${'a'.repeat(64)}`]:{
     imageName:`agent-p1-${'a'.repeat(16)}`,groupId:group,image,digest:'a'.repeat(64),status:'creating'}}}));
-  const stderr={value:'',write(value){this.value+=value;}};let requests=0;
+  const stderr={value:'',write(value){this.value+=value;}};let listed=0,created=0,deleted=false;
+  const client={listDiskImages:async()=>{listed++;return [];},
+    createDiskImage:async()=>{created++;return {diskImageId:'disk-image-1',diskImage:{id:'disk-image-1',status:{state:'Ready'}}};},
+    createSandbox:async()=>({sandboxId:'smoke-1',sandbox:{state:'Running'}}),
+    executeShellCommand:async()=>({exitCode:0,stdout:'v22.1.0\n'}),
+    deleteSandbox:async()=>{deleted=true;}};
   const code=await bootstrapSandboxImages({env:{AZURE_ENV_NAME:'test'},resolvedPath:paths.resolvedPath,experimentConfigPath:paths.experimentConfigPath,statePath:paths.statePath,
-    stdout:{write:()=>{}},stderr,az:async()=>({accessToken:'token'}),clientFactory:()=>({getDiskImage:async()=>{requests++;}})});
-  assert.equal(code,4);
-  assert.equal(requests,0);
-  assert.match(stderr.value,/outcome is ambiguous/);
+    stdout:{write:()=>{}},stderr,az:async()=>({accessToken:'token'}),clientFactory:()=>client});
+  assert.equal(code,0,stderr.value);
+  assert.equal(listed,1);
+  assert.equal(created,1);
+  assert.equal(deleted,true);
 });

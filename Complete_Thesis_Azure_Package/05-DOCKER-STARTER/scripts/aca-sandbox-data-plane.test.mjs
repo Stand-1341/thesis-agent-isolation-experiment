@@ -134,7 +134,7 @@ test('writeFile encodes the file query and uploads string content as bytes', asy
     calls.push({ url: String(url), options });
     return makeResponse(204);
   } });
-  await client.writeFile('sandbox-123', '/tmp/a file & b.txt', 'snowman ☃');
+  await client.writeFile('sandbox-123', '/tmp/a file & b.txt', 'snowman â˜ƒ');
 
   const call = calls[0];
   const url = new URL(call.url);
@@ -144,7 +144,7 @@ test('writeFile encodes the file query and uploads string content as bytes', asy
   assert.equal(url.searchParams.get('createDirs'), 'true');
   assert.equal(url.searchParams.get('api-version'), API_VERSION);
   assert.equal(call.options.headers['Content-Type'], 'application/octet-stream');
-  assert.equal(Buffer.from(call.options.body).toString('utf8'), 'snowman ☃');
+  assert.equal(Buffer.from(call.options.body).toString('utf8'), 'snowman â˜ƒ');
 });
 
 test('writeFile preserves Uint8Array bytes', async () => {
@@ -233,7 +233,7 @@ test('createDiskImage scopes requests to the ACA group and polls the returned im
     },
     fetchImpl: async (url, options) => {
       calls.push({ url: String(url), options });
-      if (options.method === 'POST') {
+      if (options.method === 'PUT') {
         return makeResponse(202, { id: 'image-123', status: { state: 'Building' } });
       }
       return makeResponse(200, { id: 'image-123', status: { state: 'rEaDy' } });
@@ -245,14 +245,15 @@ test('createDiskImage scopes requests to the ACA group and polls the returned im
   assert.deepEqual(tokenScopes, [SCOPE, SCOPE]);
   assert.equal(calls.length, 2);
   assert.equal(new URL(calls[0].url).origin, 'https://management.westus2.azuredevcompute.io');
-  assert.equal(new URL(calls[0].url).pathname, `${expectedGroupPath()}/diskimages`);
+  assert.equal(new URL(calls[0].url).pathname, `${expectedGroupPath()}/diskimages/v2`);
   assert.equal(new URL(calls[0].url).searchParams.get('api-version'), API_VERSION);
-  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.method, 'PUT');
   assert.equal(calls[0].options.headers['Content-Type'], 'application/json');
   assert.equal(calls[0].options.headers.Authorization, `Bearer ${TOKEN}`);
   assert.deepEqual(JSON.parse(calls[0].options.body), {
-    image: { base: 'ghcr.io/acme/node-agent:22' },
+    name: 'node-agent',
     labels: { name: 'node-agent' },
+    source: { kind: 'registry', imageUrl: 'ghcr.io/acme/node-agent:22' },
   });
   assert.equal(calls[1].options.method, 'GET');
   assert.equal(new URL(calls[1].url).pathname, `${expectedGroupPath()}/diskimages/image-123`);
@@ -263,28 +264,28 @@ test('createDiskImage scopes requests to the ACA group and polls the returned im
   });
 });
 
-test('createDiskImage sends registry credentials and a full managed identity resource ID for private images', async () => {
+test('createDiskImage sends registry credentials and a managed identity client ID for private images', async () => {
   const calls = [];
   const credentials = { username: 'pull-user', token: 'private-registry-secret' };
-  const managedIdentityResourceId = `/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/disk-pull`;
+  const managedIdentityClientId = '22222222-2222-4222-8222-222222222222';
   const { client } = makeClient({ fetchImpl: async (url, options) => {
     calls.push({ url: String(url), options });
-    return options.method === 'POST'
+    return options.method === 'PUT'
       ? makeResponse(202, { id: 'private-image', status: { state: 'Building' } })
       : makeResponse(200, { id: 'private-image', status: { state: 'Succeeded' } });
   } });
 
   await client.createDiskImage('registry.example/team/agent:22', {
     name: 'private-node-agent',
-    managedIdentityResourceId,
+    managedIdentityClientId,
     registryCredentials: credentials,
   });
 
   assert.deepEqual(JSON.parse(calls[0].options.body), {
-    image: { base: 'registry.example/team/agent:22' },
+    name: 'private-node-agent',
     labels: { name: 'private-node-agent' },
+    source: { kind: 'registry', imageUrl: 'registry.example/team/agent:22', managedIdentityClientId },
     registryCredentials: credentials,
-    managedIdentityResourceId,
   });
 });
 
@@ -292,7 +293,7 @@ test('createDiskImage omits absent optional fields and accepts Succeeded as term
   const calls = [];
   const { client } = makeClient({ fetchImpl: async (url, options) => {
     calls.push({ url: String(url), options });
-    return options.method === 'POST'
+    return options.method === 'PUT'
       ? makeResponse(202, { id: 'image-succeeded', status: { state: 'Building' } })
       : makeResponse(200, { id: 'image-succeeded', status: { state: 'sUcCeEdEd' } });
   } });
@@ -300,14 +301,14 @@ test('createDiskImage omits absent optional fields and accepts Succeeded as term
   const result = await client.createDiskImage('node:22');
   const body = JSON.parse(calls[0].options.body);
 
-  assert.deepEqual(body, { image: { base: 'node:22' } });
-  assert.equal(Object.hasOwn(body, 'managedIdentityResourceId'), false);
+  assert.deepEqual(body, { source: { kind: 'registry', imageUrl: 'node:22' } });
+  assert.equal(Object.hasOwn(body.source, 'managedIdentityClientId'), false);
   assert.equal(Object.hasOwn(body, 'registryCredentials'), false);
   assert.equal(result.diskImage.status.state, 'sUcCeEdEd');
 });
 
 test('createDiskImage treats Failed as terminal without exposing server details', async () => {
-  const { client } = makeClient({ fetchImpl: async (_url, options) => options.method === 'POST'
+  const { client } = makeClient({ fetchImpl: async (_url, options) => options.method === 'PUT'
     ? makeResponse(202, { id: 'failed-image', status: { state: 'Building' } })
     : makeResponse(200, {
       id: 'failed-image',
@@ -333,7 +334,7 @@ test('createDiskImage times out before the image reaches a successful state', as
     pollIntervalMs: 1,
     sleep: () => delay(25),
     fetchImpl: async (_url, options) => {
-      if (options.method === 'POST') return makeResponse(202, { id: 'slow-image', status: { state: 'Building' } });
+      if (options.method === 'PUT') return makeResponse(202, { id: 'slow-image', status: { state: 'Building' } });
       getCount += 1;
       return makeResponse(200, { id: 'slow-image', status: { state: 'Building' } });
     },
@@ -362,18 +363,16 @@ test('createDiskImage rejects invalid OCI references before making a request', a
   assert.equal(calls.length, 0);
 });
 
-test('createDiskImage rejects invalid names and managed identity resource IDs before network', async () => {
+test('createDiskImage rejects invalid names and managed identity client IDs before network', async () => {
   const { client, calls } = makeClient();
-  const validIdentity = `/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/disk-pull`;
   await assert.rejects(client.createDiskImage('node:22', { name: 'bad/name' }), { name: 'TypeError' });
-  for (const managedIdentityResourceId of [
+  for (const managedIdentityClientId of [
     'disk-pull',
-    `/subscriptions/not-a-guid/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/disk-pull`,
-    `/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/rg-test/providers/Microsoft.Compute/identities/disk-pull`,
-    `${validIdentity}?api-version=evil`,
+    '/subscriptions/not-a-guid/resourceGroups/rg-test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/disk-pull',
+    `${SUBSCRIPTION_ID}?api-version=evil`,
   ]) {
     await assert.rejects(
-      client.createDiskImage('registry.example/team/agent:22', { name: 'private-node', managedIdentityResourceId }),
+      client.createDiskImage('registry.example/team/agent:22', { name: 'private-node', managedIdentityClientId }),
       { name: 'TypeError' },
     );
   }

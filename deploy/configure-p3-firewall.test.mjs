@@ -12,10 +12,12 @@ test('Functions P3 firewall groups contain exact platform allows and named recei
   ]);
   assert.deepEqual(groups[0].properties.ruleCollections[0].rules[0].targetFqdns,[
     'studyfnp3.blob.core.windows.net','studyfnp3.queue.core.windows.net','studyfnp3.table.core.windows.net',
-    'login.microsoftonline.com','login.microsoft.com','study-vault.vault.azure.net'
+    '*.store.core.windows.net','login.microsoftonline.com','login.microsoft.com','study-vault.vault.azure.net'
   ]);
   assert.deepEqual(groups[1].properties.ruleCollections[0].rules.map(rule=>[rule.name,rule.destinationAddresses]),
     [['functions-p3-deny-collector',['10.48.9.5']],['functions-p3-deny-restricted-service',['10.48.9.6']]]);
+  assert.deepEqual(groups[0].properties.ruleCollections[1].rules[0].destinationAddresses,
+    ['AzureKeyVault','AzureActiveDirectory','AzureFrontDoorFirstParty','AzureContainerRegistry','MicrosoftContainerRegistry','Storage']);
 });
 
 test('Functions P3 firewall skips when the deployment has no Functions P3 route',async()=>{

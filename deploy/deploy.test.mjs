@@ -259,6 +259,7 @@ test('regional P3 direct preview binds fixed service IPs and actual foundation o
   const foundationOutputs={
     logWorkspaceId:id('Microsoft.OperationalInsights/workspaces','study-logs'),registryServer:'studyacr.azurecr.io',
     virtualNetworkId:id('Microsoft.Network/virtualNetworks','study-vnet'),imagePullIdentityResourceId:id('Microsoft.ManagedIdentity/userAssignedIdentities','study-pull'),
+    imagePullIdentityClientId:guid,
     sandboxControlIdentityResourceId:id('Microsoft.ManagedIdentity/userAssignedIdentities','study-sandbox-control'),sandboxControlIdentityObjectId:guid,
     jobP3WorkloadIdentityResourceId:id('Microsoft.ManagedIdentity/userAssignedIdentities','study-job-p3'),jobP3WorkloadClientId:guid,jobP3WorkloadObjectId:guid,
     experimentConfigRoutes:{azure_vm:{P3:{workloadIdentityResourceId:id('Microsoft.ManagedIdentity/userAssignedIdentities','study-vm-p3'),secretReaderIdentityResourceId:id('Microsoft.ManagedIdentity/userAssignedIdentities','study-vm-p3-reader')}}},
@@ -478,6 +479,7 @@ const GOOD_OUTPUTS = {
   fixtureOwnerIdentityObjectId: '55555555-5555-5555-5555-555555555555',
   sandboxControlIdentityClientId: '66666666-6666-6666-6666-666666666666',
   imagePullIdentityResourceId: '/subscriptions/x/resourceGroups/y/providers/Microsoft.ManagedIdentity/userAssignedIdentities/imgpull',
+  imagePullIdentityClientId: '77777777-7777-4777-8777-777777777777',
   virtualNetworkId: '/subscriptions/x/resourceGroups/y/providers/Microsoft.Network/virtualNetworks/vnet',
   researchServicePrivateIp: '10.48.9.4',
   collectorPrivateIp: '10.48.9.5',

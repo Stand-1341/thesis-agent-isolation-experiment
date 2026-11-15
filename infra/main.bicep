@@ -192,6 +192,7 @@ output virtualNetworkId string = threeArm.outputs.virtualNetworkId
 output registryServer string = threeArm.outputs.registryServer
 output logWorkspaceId string = threeArm.outputs.logWorkspaceId
 output imagePullIdentityResourceId string = threeArm.outputs.imagePullIdentityResourceId
+output imagePullIdentityClientId string = threeArm.outputs.imagePullIdentityClientId
 output controllerIdentityClientId string = threeArm.outputs.controllerIdentityClientId
 output controllerIdentityObjectId string = threeArm.outputs.controllerIdentityObjectId
 output verifierIdentityObjectId string = threeArm.outputs.verifierIdentityObjectId

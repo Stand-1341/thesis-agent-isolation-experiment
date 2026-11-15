@@ -26,6 +26,7 @@ export function buildFunctionsFirewallRuleGroups({namePrefix,vaultName,storageSu
       throw new Error(`Functions P3 firewall: invalid ${name} IP`);
   const platformFqdns=[
     `${namePrefix}fnp3.blob.${suffix}`,`${namePrefix}fnp3.queue.${suffix}`,`${namePrefix}fnp3.table.${suffix}`,
+    '*.store.core.windows.net',
     'login.microsoftonline.com','login.microsoft.com',`${vaultName}.vault.azure.net`
   ];
   return [
@@ -34,10 +35,13 @@ export function buildFunctionsFirewallRuleGroups({namePrefix,vaultName,storageSu
         ruleType:'ApplicationRule',name:'functions-p3-required-fqdns',sourceAddresses:[P3_FUNCTIONS_SUBNET],
         protocols:[{protocolType:'Https',port:443}],targetFqdns:platformFqdns
       }]},
-      {name:'functions-p3-platform-network',ruleCollectionType:'FirewallPolicyFilterRuleCollection',priority:110,action:{type:'Allow'},rules:[{
-        ruleType:'NetworkRule',name:'functions-p3-azure-dns',ipProtocols:['TCP','UDP'],sourceAddresses:[P3_FUNCTIONS_SUBNET],
-        destinationAddresses:['AzurePlatformDNS'],destinationPorts:['53']
-      }]}
+      {name:'functions-p3-platform-network',ruleCollectionType:'FirewallPolicyFilterRuleCollection',priority:110,action:{type:'Allow'},rules:[
+        {ruleType:'NetworkRule',name:'functions-p3-platform-service-tags',ipProtocols:['TCP'],sourceAddresses:[P3_FUNCTIONS_SUBNET],
+          destinationAddresses:['AzureKeyVault','AzureActiveDirectory','AzureFrontDoorFirstParty','AzureContainerRegistry','MicrosoftContainerRegistry','Storage'],
+          destinationPorts:['443']},
+        {ruleType:'NetworkRule',name:'functions-p3-azure-dns',ipProtocols:['TCP','UDP'],sourceAddresses:[P3_FUNCTIONS_SUBNET],
+          destinationAddresses:['AzurePlatformDNS'],destinationPorts:['53']}
+      ]}
     ]}},
     {name:'functions-p3-denied-receivers',priority:180,properties:{priority:180,ruleCollections:[{
       name:'functions-p3-named-denies',ruleCollectionType:'FirewallPolicyFilterRuleCollection',priority:100,action:{type:'Deny'},rules:[

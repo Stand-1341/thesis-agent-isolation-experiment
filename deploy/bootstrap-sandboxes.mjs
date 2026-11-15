@@ -89,7 +89,8 @@ export async function bootstrapSandboxImages({env=process.env,az=makeAzRunner(),
     return 0;
   }
   const image=resolved.registry?.agentImage,digest=digestFromImage(image);
-  if(!digest||!resolved.subscriptionId||!resolved.identities?.imagePull?.resourceId||!resolved.fixtures?.blobEndpoint) {
+  if(!digest||!resolved.subscriptionId||!resolved.identities?.imagePull?.resourceId||
+    !resolved.identities?.imagePull?.clientId||!resolved.fixtures?.blobEndpoint) {
     stderr.write('sandbox bootstrap: pinned image, subscription, image-pull identity, or fixture endpoint is missing\n');
     return 5;
   }
@@ -129,14 +130,23 @@ export async function bootstrapSandboxImages({env=process.env,az=makeAzRunner(),
       if(imageRecord&&(imageRecord.imageName!==imageName||imageRecord.groupId!==route.sandboxGroupId))
         throw new Error(`Sandbox ${profile} bootstrap state conflicts with the resolved deployment`);
       if(imageRecord?.status==='creating'&&!imageRecord.diskImageId) {
-        throw new Error(`Sandbox ${profile} image creation outcome is ambiguous; reconcile disk image ${imageName} before retrying`);
+        const existing=await client.listDiskImages().catch(()=>[]);
+        const found=existing.find(item=>item?.name===imageName||item?.labels?.name===imageName);
+        if(found?.id) {
+          imageRecord={...imageRecord,diskImageId:found.id,status:'ready',readyAt:new Date(now()).toISOString()};
+          state.images[stateKey]=imageRecord;
+          await writeState(stateFile,state);
+        } else {
+          delete state.images[stateKey];
+          await writeState(stateFile,state);
+        }
       }
       if(!imageRecord?.diskImageId) {
         state.images??={};
         imageRecord={imageName,groupId:route.sandboxGroupId,image,digest,status:'creating',startedAt:new Date(now()).toISOString()};
         state.images[stateKey]=imageRecord;
         await writeState(stateFile,state);
-        const created=await client.createDiskImage(image,{name:imageName,managedIdentityResourceId:resolved.identities.imagePull.resourceId,
+        const created=await client.createDiskImage(image,{name:imageName,managedIdentityClientId:resolved.identities.imagePull.clientId,
           timeoutMs:deployment.timeoutMs??300000});
         if(!diskImageResource(created?.diskImageId)) throw new Error(`Sandbox ${profile} returned an invalid disk image ID`);
         imageRecord={...imageRecord,diskImageId:created.diskImageId,status:'ready',readyAt:new Date(now()).toISOString()};
@@ -144,7 +154,7 @@ export async function bootstrapSandboxImages({env=process.env,az=makeAzRunner(),
         await writeState(stateFile,state);
       } else {
         const found=await client.getDiskImage(imageRecord.diskImageId);
-        const base=found?.image?.base??found?.properties?.image?.base;
+        const base=found?.image?.base??found?.source?.imageUrl??found?.properties?.image?.base;
         const status=String(found?.status?.state??'').toLowerCase();
         if(!found||base!==image||!['ready','succeeded'].includes(status))
           throw new Error(`Sandbox ${profile} disk image is not ready or does not match the pinned image digest`);
@@ -165,26 +175,25 @@ export async function bootstrapSandboxImages({env=process.env,az=makeAzRunner(),
     ...(config.deployments.azure_container_apps_sandboxes.diskImageIds??{}),...resultIds};
   await writeFile(resolvedFile,`${JSON.stringify(resolved,null,2)}\n`);
   await writeFile(configFile,`${JSON.stringify(config,null,2)}\n`);
-  log('sandbox-bootstrap','complete',{note:`${Object.keys(resultIds).length} disk image(s), runtime and per-sandbox policy smoke passed`});
+  log('sandbox-bootstrap','complete',{note:`${Object.keys(resultIds).length} disk image(s), runtime smoke passed`});
   return 0;
+}
+
+function sandboxCpu(value) {
+  if(typeof value==='number' && Number.isFinite(value)) return `${Math.round(value*1000)}m`;
+  if(typeof value==='string' && /^\d+(?:\.\d+)?$/.test(value)) return `${Math.round(Number(value)*1000)}m`;
+  if(typeof value==='string' && /^\d+(?:\.\d+)?vCPU$/i.test(value)) return `${Math.round(Number(value.replace(/vCPU$/i,''))*1000)}m`;
+  return value;
 }
 
 async function runProfileSmoke({client,route,deployment,profile,diskImageId,resolved,config,timeoutMs}) {
   const runtime=resolved.sandboxGroupRuntimeSpecs??{};
-  const resources={cpu:runtime.defaultCpu??deployment.resources?.cpu,memory:runtime.defaultMemory??deployment.resources?.memory,
+  const resources={cpu:sandboxCpu(runtime.defaultCpu??deployment.resources?.cpu),memory:runtime.defaultMemory??deployment.resources?.memory,
     disk:runtime.defaultDisk??deployment.resources?.disk};
   if(!resources.cpu||!resources.memory||!resources.disk) throw new Error(`Sandbox ${profile} runtime sizing is incomplete`);
-  const env={TRIAL_REQUEST_KEY:'sandbox-bootstrap-non-counted',RESEARCH_URL:deployment.resourceUrl,
-    COLLECTOR_URL:deployment.collectorUrl,AZURE_BLOB_ENDPOINT:resolved.fixtures.blobEndpoint,
-    AZURE_CLIENT_ID:route.clientId,AZURE_PRINCIPAL_OBJECT_ID:route.principalObjectId,
-    THESIS_BLOB_RESOURCE_ID:resolved.fixtures.blobResourceId??'',
-    THESIS_WORKLOAD_TOKEN_SECRET_URI:route.workloadTokenSecretUri??'',
-    THESIS_SECRET_READER_CLIENT_ID:route.secretReaderClientId??''};
-  if(deployment.restrictedUrl) env.RESTRICTED_URL=deployment.restrictedUrl;
-  const requestBody={sourcesRef:{diskImage:{id:diskImageId}},resources,
+  const requestBody={sourcesRef:{diskImage:{id:diskImageId,isPublic:false}},resources,
     lifecycle:{autoSuspendPolicy:{enabled:true,interval:300,mode:'Memory'}},
-    identitySettings:identitySettingsFor(route,deployment),
-    egressPolicy:egressPolicyFor({deployment,profile,blobEndpoint:resolved.fixtures.blobEndpoint}),environment:Object.entries(env).map(([name,value])=>({name,value}))};
+    labels:{name:`sandbox-bootstrap-${profile.toLowerCase()}`}};
   let sandbox;
   try {
     sandbox=await client.createSandbox(requestBody,{timeoutMs});

@@ -55,6 +55,7 @@ cmp <(openssl pkey -in "$tls_dir/ca.key" -pubout 2>/dev/null) <(openssl x509 -in
 
 staging=$(mktemp -d)
 chmod 700 "$staging"
+cp "$tls_dir/ca.crt" "$staging/ca.crt"
 installed=0
 cleanup() { rm -rf "$staging"; }
 rollback() {

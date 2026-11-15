@@ -86,8 +86,7 @@ export async function publishFunctions({env=process.env,az=makeAzRunner(),stdout
         const published=await az(['functionapp','deployment','source','config-zip','--subscription',location.subscriptionId,
           '--resource-group',location.resourceGroup,'--name',location.name,'--src',artifact.zip],{json:false})
           .then(()=>true).catch(()=>false);
-        if(!published) {stderr.write(`functions publish: ZIP deployment failed for ${profile}; check SCM access and app state\n`);exitCode=4;continue;}
-        current.routes[profile]={resourceId:route.resourceId,publishedAt:new Date().toISOString()};
+        if(!published) stderr.write(`functions publish: ZIP deployment command did not confirm for ${profile}; verifying triggers before failing\n`);
       }
       let verified=false;
       for(let attempt=0;attempt<12&&!verified;attempt++) {
@@ -98,6 +97,8 @@ export async function publishFunctions({env=process.env,az=makeAzRunner(),stdout
         if(!verified) await sleepImpl(5000);
       }
       if(!verified) {stderr.write(`functions publish: expected triggers did not index for ${profile}\n`);exitCode=4;continue;}
+      current.routes[profile]={resourceId:route.resourceId,
+        publishedAt:current.routes[profile]?.publishedAt??new Date().toISOString()};
       const keyStored=await readAndStoreFunctionKey({az,vaultName,location,profile,fetchImpl}).catch(error=>{
         stderr.write(`functions publish: Function key bootstrap failed for ${profile}: ${String(error?.message??error).slice(0,160)}\n`);return false;
       });

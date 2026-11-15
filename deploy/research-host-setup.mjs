@@ -65,7 +65,14 @@ export async function buildResearchPackage({values,work=mkdtemp(path.join(tmpdir
       await copyFile(source,destination);
     }
     const hashes={};
-    for(const relative of REQUIRED_FILES) hashes[relative]=sha256(await readFile(path.join(packageDir,...relative.split('/'))));
+    for(const relative of REQUIRED_FILES) {
+      const destination=path.join(packageDir,...relative.split('/'));
+      if(/\.(sh|service|template)$/i.test(relative)) {
+        const normalized=(await readFile(destination,'utf8')).replace(/\r\n/g,'\n');
+        await writeFile(destination,normalized,'utf8');
+      }
+      hashes[relative]=sha256(await readFile(destination));
+    }
     const manifest=JSON.stringify({scope:'research-service-package-only',files:hashes,
       note:'Includes root-only host TLS bootstrap/renewal and secret-delivery code; no credentials, TLS keys, runtime, deployment, identity attachment or Azure role assignments included.'});
     const manifestBytes=Buffer.from(`${manifest}\n`,'utf8');
@@ -192,8 +199,11 @@ export async function setupResearchHost({env=process.env,az=makeAzRunner(),stdou
   const run=runCommand??(async script=>{
     const result=await az(['vm','run-command','invoke','--ids',armOutputs.researchHostResourceId,
       '--command-id','RunShellScript','--scripts',`@${script}`],{json:true,timeoutMs:60*60*1000});
-    if(!JSON.stringify(result??{}).includes('RESEARCH_HOST_SETUP_OK'))
-      throw new Error('remote setup did not return its success marker');
+    if(!JSON.stringify(result??{}).includes('RESEARCH_HOST_SETUP_OK')) {
+      const message=(result?.value??[]).map(item=>String(item?.message??'')).join('\n')
+        .replace(/Bearer\s+\S+/gi,'Bearer [redacted]').slice(-1600);
+      throw new Error(`remote setup did not return its success marker${message?`: ${message}`:''}`);
+    }
     return result;
   });
   try {
@@ -213,7 +223,7 @@ export async function setupResearchHost({env=process.env,az=makeAzRunner(),stdou
     log('research-host','ready',{note:'data mount, TLS, credentials, services, and health checks verified'});
     return 0;
   } catch(error) {
-    stderr.write(`research-host: setup failed: ${String(error?.message??error).replace(/Bearer\s+\S+/gi,'Bearer [redacted]').slice(0,300)}\n`);
+    stderr.write(`research-host: setup failed: ${String(error?.message??error).replace(/Bearer\s+\S+/gi,'Bearer [redacted]').slice(0,1600)}\n`);
     return 4;
   } finally {
     await rm(artifact.scratch,{recursive:true,force:true}).catch(()=>{});

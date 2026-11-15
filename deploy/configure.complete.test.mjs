@@ -28,6 +28,7 @@ function completeOutputs() {
     controllerIdentityClientId: guid(301), controllerIdentityObjectId: guid(302), verifierIdentityObjectId: guid(303),
     virtualNetworkId: `/subscriptions/${subscription}/resourceGroups/network-east/providers/Microsoft.Network/virtualNetworks/study-vnet`,
     imagePullIdentityResourceId: identityId('image-pull'),
+    imagePullIdentityClientId: guid(350),
     researchServicePrivateIp: '10.48.9.4', collectorPrivateIp: '10.48.9.5',
     restrictedServicePrivateIp: '10.48.9.6',
     evidenceAccountId: `/subscriptions/${subscription}/resourceGroups/study/providers/Microsoft.Storage/storageAccounts/studievd`,
