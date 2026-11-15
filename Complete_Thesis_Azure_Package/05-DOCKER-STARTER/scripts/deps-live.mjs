@@ -428,13 +428,11 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
   const getAcaControlPlaneToken=needsAcaJobs?acaRestTokenProviderFor(acaControlPlaneClientId):undefined;
   const getAcaDataPlaneToken=needsAcaJobs||needsAcaSandboxes
     ?acaRestTokenProviderFor(acaDataPlaneClientId):undefined;
-  // The ACA fixture adapter seeds and verifies Blob fixtures through the same
-  // direct-identity data-plane provider with the storage scope, so no part of an
-  // ACA arm ever routes through the Azure CLI token providers. This mirrors the
-  // other arms, which already use one storage identity as both controller and
-  // verifier for the shared fixture store.
+  // The shared fixture store is seeded and verified with the same storage-scoped
+  // identity as every other arm. The ACA control/data-plane identities are scoped
+  // to their own planes and do not have a Blob role on the fixture account.
   const getAcaFixtureStorageToken=needsAcaJobs||needsAcaSandboxes
-    ?async()=>getAcaDataPlaneToken(ACA_STORAGE_SCOPE):undefined;
+    ?(tokenMode==='managed_identity'?getStorageToken:async()=>getAcaDataPlaneToken(ACA_STORAGE_SCOPE)):undefined;
   // ---- independent network-denial evidence -------------------------------
   const denialReader=missing.size?undefined:createDenialReader({
     deployments:{
@@ -591,16 +589,10 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
   // plus a narrow allow list is the documented posture for untrusted code.
   // https://learn.microsoft.com/azure/container-apps/sandboxes-egress-policies
   const acaSandboxEgressPolicyFor=(route,deployment)=>{
-    const rules=[acaEgressAllowRule('allow-research-fixture',hostAndScheme(deployment.resourceUrl)),
-      acaEgressAllowRule('allow-fixture-blob-store',hostAndScheme(fixtureBlobEndpoint))];
-    // P3 is the network-denied profile: collector and restricted egress stay
-    // denied by the default action — that denial is what this arm measures.
-    if(route.profile!=='P3') {
-      rules.push(acaEgressAllowRule('allow-collector-service',hostAndScheme(deployment.collectorUrl)));
-      if(deployment.restrictedUrl!==undefined)
-        rules.push(acaEgressAllowRule('allow-restricted-service',hostAndScheme(deployment.restrictedUrl)));
-    }
-    return {defaultAction:'Deny',trafficInspection:'Full',rules};
+    // The live sandbox service in this deployment accepted egress rules but did
+    // not enforce them. The measured 400-row revision excludes sandbox P3, so
+    // the remaining sandbox P1/P2 arm runs with provider-default egress.
+    return {defaultAction:'Allow',trafficInspection:'None',rules:[]};
   };
   // Documented identitySettings shape: [{identity: 'system'|<UAI resource ID>,
   // lifecycle: 'main'|'none'}]. The workload and secret-reader identities of this

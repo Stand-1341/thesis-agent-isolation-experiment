@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "images": {
+    "P1:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141": {
+      "imageName": "agent-p1-87b23a4247c71523",
+      "groupId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.App/sandboxGroups/th30f2e487-sg-p1",
+      "image": "th30f2e487acr.azurecr.io/thesis/agent@sha256:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141",
+      "digest": "87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141",
+      "status": "ready",
+      "startedAt": "2026-11-15T02:14:29.652Z",
+      "diskImageId": "b2b632af-4ad5-4551-8f8d-e67c86bbcb3c",
+      "readyAt": "2026-11-15T02:21:57.902Z"
+    },
+    "P2:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141": {
+      "imageName": "agent-p2-87b23a4247c71523",
+      "groupId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.App/sandboxGroups/th30f2e487-sg-p2",
+      "image": "th30f2e487acr.azurecr.io/thesis/agent@sha256:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141",
+      "digest": "87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141",
+      "status": "ready",
+      "startedAt": "2026-11-15T02:23:12.576Z",
+      "diskImageId": "9c2d2ded-5204-4963-9815-52aa47ac6f45",
+      "readyAt": "2026-11-15T02:23:32.060Z"
+    },
+    "P3:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141": {
+      "imageName": "agent-p3-87b23a4247c71523",
+      "groupId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.App/sandboxGroups/th30f2e487-sg-p3",
+      "image": "th30f2e487acr.azurecr.io/thesis/agent@sha256:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141",
+      "digest": "87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141",
+      "status": "ready",
+      "startedAt": "2026-11-15T02:23:34.626Z",
+      "diskImageId": "fecfb27f-61aa-4652-82aa-9e195f9b4a7e",
+      "readyAt": "2026-11-15T02:23:55.354Z"
+    }
+  }
+}

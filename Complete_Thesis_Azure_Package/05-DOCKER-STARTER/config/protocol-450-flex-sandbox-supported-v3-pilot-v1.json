@@ -1,0 +1,83 @@
+{
+  "status": "non_counted_pilot_frozen_launch_gated",
+  "revision": "three-arm-flex-sandbox-450-v3-pilot-v1",
+  "sourceProtocol": {
+    "file": "config/protocol-450-flex-sandbox-supported-v3.json",
+    "revision": "three-arm-flex-sandbox-450-v3",
+    "sha256": "1d007cec5062dd8641b604e01fb6b7cea62ca166c44f184f9bae16085c62d266"
+  },
+  "deployments": [
+    "azure_vm",
+    "azure_functions_flex",
+    "azure_container_apps_sandboxes"
+  ],
+  "deploymentKinds": {
+    "azure_vm": "http",
+    "azure_functions_flex": "http",
+    "azure_container_apps_sandboxes": "aca_sandbox"
+  },
+  "routeKeys": [
+    "azure_vm:P1",
+    "azure_vm:P2",
+    "azure_vm:P3",
+    "azure_functions_flex:P1",
+    "azure_functions_flex:P2",
+    "azure_functions_flex:P3",
+    "azure_container_apps_sandboxes:P1",
+    "azure_container_apps_sandboxes:P2",
+    "azure_container_apps_sandboxes:P3"
+  ],
+  "profiles": [
+    "P1",
+    "P2",
+    "P3"
+  ],
+  "scenarios": {
+    "scheduled": [
+      "U1",
+      "U2",
+      "U3",
+      "U4",
+      "U5",
+      "U6",
+      "U7",
+      "U8",
+      "L1",
+      "L2"
+    ],
+    "excludedNotApplicable": []
+  },
+  "operationTimeoutSeconds": 30,
+  "auditWindowSeconds": 3600,
+  "matrix": {
+    "file": "config/plan-450-flex-sandbox-supported-v3.csv",
+    "sha256": "d76cb846e3dc647c6bc7bf589ad6397d03f8a9885ecf42ace11c13e44740834e",
+    "trials": 450
+  },
+  "measuredExecutionEnabled": false,
+  "readiness": {
+    "measuredExecutionEnabled": false,
+    "pilotExecution": "not_run"
+  },
+  "u6U8Operationalization": {
+    "scheduledOn": [
+      "azure_vm",
+      "azure_functions_flex",
+      "azure_container_apps_sandboxes"
+    ],
+    "gateStatus": "open_on_all_arms"
+  },
+  "pilotPlan": {
+    "file": "config/plan-450-flex-sandbox-supported-v3-pilot-v1.csv",
+    "sha256": "ed00d9d4cfa6ac328aaf5d046ddc055bd9838d7628fde9330f912cbe4168edec",
+    "trials": 30,
+    "blocks": 1,
+    "rowsPerBlock": 30,
+    "repetitionsPerCell": 1,
+    "countedAsStudyTrials": false,
+    "derivedFrom": "d76cb846e3dc647c6bc7bf589ad6397d03f8a9885ecf42ace11c13e44740834e",
+    "sourceProtocolSha256": "1d007cec5062dd8641b604e01fb6b7cea62ca166c44f184f9bae16085c62d266",
+    "purpose": "Frozen non-counted v3 route, P3 denial, and U6/U8 fixture practice set."
+  },
+  "note": "Non-counted practice only. It closes no owner or measured-execution gate."
+}

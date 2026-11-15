@@ -1,0 +1,28 @@
+{
+  "scope": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37",
+  "timeframe": {
+    "from": "2026-11-01T00:00:00Z",
+    "to": "2026-11-16T00:00:00Z"
+  },
+  "currency": "USD",
+  "billingLagWarning": "ActualCost can lag; values are as returned at run time.",
+  "daily": [
+    {"date": "2026-11-14", "cost": 0.565600196657348},
+    {"date": "2026-11-15", "cost": 7.32533027257849}
+  ],
+  "total": 7.890930469235838,
+  "byService": [
+    {"service": "Azure App Service", "cost": 0.0},
+    {"service": "Azure Container Apps", "cost": 0.1191621752568},
+    {"service": "Azure DNS", "cost": 0.0192917702508961},
+    {"service": "Azure Firewall", "cost": 3.74787064468927},
+    {"service": "Bandwidth", "cost": 0.000337680913507939},
+    {"service": "Container Registry", "cost": 1.0464181416},
+    {"service": "Functions", "cost": 0.0},
+    {"service": "Key Vault", "cost": 0.002319},
+    {"service": "Log Analytics", "cost": 0.0},
+    {"service": "Storage", "cost": 0.2617471376},
+    {"service": "Virtual Machines", "cost": 2.3187886882},
+    {"service": "Virtual Network", "cost": 0.374995230725366}
+  ]
+}

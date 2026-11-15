@@ -1,4 +1,4 @@
-/** Candidate HTTP adapter for the research fixtures. Not validated for cloud use. */
+﻿/** Candidate HTTP adapter for the research fixtures. Not validated for cloud use. */
 import {requestIdForScenario} from '../dist/request-id.js';
 function baseUrl(value) {
   const url = new URL(value);
@@ -39,7 +39,7 @@ export function createHttpPilotAdapter({resourceUrl,collectorUrl,restrictedUrl,a
     const response=await fetch(url,{method,redirect:'error',headers:{'content-type':'application/json',[header]:token,
       ...(agentRequest && functionKey ? {'x-functions-key':functionKey} : {})},
       body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
-    if (!response.ok) throw new Error(`pilot endpoint HTTP ${response.status}`);
+    if (!response.ok) { let detail=""; try { detail=(await response.text()).slice(0,500); } catch {} throw new Error(`pilot endpoint HTTP ${response.status}${detail?`: ${detail}`:""}`); }
     return response.json();
   }
   return {
@@ -76,3 +76,4 @@ export function createHttpPilotAdapter({resourceUrl,collectorUrl,restrictedUrl,a
     }
   };
 }
+

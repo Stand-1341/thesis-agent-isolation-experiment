@@ -1,0 +1,17 @@
+{
+  "type": "ActualCost",
+  "timeframe": "Custom",
+  "timePeriod": {
+    "from": "2026-11-01T00:00:00Z",
+    "to": "2026-11-16T00:00:00Z"
+  },
+  "dataset": {
+    "granularity": "Daily",
+    "aggregation": {
+      "totalCost": {
+        "name": "Cost",
+        "function": "Sum"
+      }
+    }
+  }
+}

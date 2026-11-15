@@ -1,0 +1,79 @@
+{
+  "checkpoints": {
+    "publishImages": {
+      "completedAt": "2026-11-14T19:59:15.906Z",
+      "registry": "th30f2e487acr",
+      "digest": "sha256:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141",
+      "sourceKey": "sha256:a69a2c6f4772c6acbce7b81dd1f1e5ed2dfd70066ae48838cd138e6779edc6bb"
+    },
+    "configured": {
+      "completedAt": "2026-11-15T00:38:03.357Z"
+    },
+    "p3FirewallConfigured": {
+      "completedAt": "2026-11-15T00:38:09.081Z"
+    },
+    "fullStageProvisioned": {
+      "completedAt": "2026-11-15T02:55:43.630Z"
+    },
+    "functionsPublished": {
+      "completedAt": "2026-11-15T02:55:43.635Z",
+      "packageSha256": "abcdb557810666979cd3d3a4ead13c44ea6fbad29933f5efc6c58851131e1ba0",
+      "verifiedRoutes": 3
+    },
+    "sandboxBootstrapped": {
+      "completedAt": "2026-11-15T02:55:43.638Z",
+      "diskImages": 3
+    },
+    "researchHostBootstrapped": {
+      "completedAt": "2026-11-15T02:55:43.640Z",
+      "packageSha256": "5172bfe26dd8bea740500cf7d027cc462940d84e48d24c399a2e15446fb890f4"
+    },
+    "deploymentValidated": {
+      "completedAt": "2026-11-15T02:55:43.641Z",
+      "status": "validated"
+    },
+    "evidenceRetentionLocked": {
+      "completedAt": "2026-11-15T03:01:52.303Z",
+      "days": 7,
+      "state": "Locked"
+    }
+  },
+  "steps": [
+    {
+      "step": "publishImages",
+      "at": "2026-11-14T19:59:15.906Z"
+    },
+    {
+      "step": "configured",
+      "at": "2026-11-15T00:38:03.357Z"
+    },
+    {
+      "step": "p3FirewallConfigured",
+      "at": "2026-11-15T00:38:09.081Z"
+    },
+    {
+      "step": "fullStageProvisioned",
+      "at": "2026-11-15T02:55:43.631Z"
+    },
+    {
+      "step": "functionsPublished",
+      "at": "2026-11-15T02:55:43.635Z"
+    },
+    {
+      "step": "sandboxBootstrapped",
+      "at": "2026-11-15T02:55:43.638Z"
+    },
+    {
+      "step": "researchHostBootstrapped",
+      "at": "2026-11-15T02:55:43.640Z"
+    },
+    {
+      "step": "deploymentValidated",
+      "at": "2026-11-15T02:55:43.641Z"
+    },
+    {
+      "step": "evidenceRetentionLocked",
+      "at": "2026-11-15T03:01:52.305Z"
+    }
+  ]
+}

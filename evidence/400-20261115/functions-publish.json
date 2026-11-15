@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "packages": {
+    "abcdb557810666979cd3d3a4ead13c44ea6fbad29933f5efc6c58851131e1ba0": {
+      "packageSha256": "abcdb557810666979cd3d3a4ead13c44ea6fbad29933f5efc6c58851131e1ba0",
+      "routes": {
+        "P1": {
+          "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Web/sites/th30f2e487-fn-p1",
+          "publishedAt": "2026-11-15T01:49:10.485Z",
+          "verifiedAt": "2026-11-15T01:49:13.299Z"
+        },
+        "P2": {
+          "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Web/sites/th30f2e487-fn-p2",
+          "publishedAt": "2026-11-15T01:50:41.113Z",
+          "verifiedAt": "2026-11-15T01:50:43.823Z"
+        },
+        "P3": {
+          "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Web/sites/th30f2e487-fn-p3",
+          "publishedAt": "2026-11-15T01:57:28.475Z",
+          "verifiedAt": "2026-11-15T01:57:32.317Z"
+        }
+      }
+    }
+  }
+}

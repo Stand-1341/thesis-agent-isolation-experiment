@@ -1,0 +1,12 @@
+{
+  "status": "frozen_structural_launch_gated",
+  "revision": "three-arm-flex-sandbox-400-v1-sandbox-p3-excluded",
+  "protocolFile": "protocol-400-flex-sandbox-no-sandbox-p3-v1.json",
+  "protocolSha256": "1272d4330edd67aea20c770c2c0d24467a8a1b55bdf883baa2406fc646d4e4e6",
+  "matrixFile": "plan-400-flex-sandbox-no-sandbox-p3-v1.csv",
+  "matrixSha256": "864e8f02e20f741f9dd96fbd5653fd8f24b6e299f019f762c8dea6aade62e508",
+  "scope": "Measured 400-row revision: sandbox P3 excluded; VM/Functions P3 retained",
+  "measuredExecutionEnabled": true,
+  "countedAsStudyTrials": true,
+  "note": "Owner-directed measured freeze. Sandbox P3 is absent from the matrix and cannot be claimed."
+}

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Read-only assessment of a selected, frozen three-arm schedule. This command
  * never starts trials. It separates the immutable legacy-plan inspection from
  * the candidate protocol/matrix pair, and it always refuses measured launch:
@@ -34,7 +34,42 @@ const APPROVED_FROZEN_CANDIDATES=Object.freeze({
     revision:'three-arm-flex-sandbox-450-v3',protocolSha256:'1d007cec5062dd8641b604e01fb6b7cea62ca166c44f184f9bae16085c62d266',
     matrixFile:'plan-450-flex-sandbox-supported-v3.csv',matrixSha256:'d76cb846e3dc647c6bc7bf589ad6397d03f8a9885ecf42ace11c13e44740834e',
     deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
-    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'})})
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'})}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v1.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v1-sandbox-p3-excluded',protocolSha256:'1272d4330edd67aea20c770c2c0d24467a8a1b55bdf883baa2406fc646d4e4e6',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v1.csv',matrixSha256:'864e8f02e20f741f9dd96fbd5653fd8f24b6e299f019f762c8dea6aade62e508',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v2-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v2-sandbox-p3-excluded-fresh-ids',protocolSha256:'49dd1ed72b6e9f1696e6785dd2749cd8107654d27e51ebe7d7c47ecf3aa90312',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v2-fresh-ids.csv',matrixSha256:'9676a99957476f5892e9166dc5069685fc0bfd19782a371a2045249ae4eca699',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v3-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v3-sandbox-p3-excluded-fresh-ids',protocolSha256:'4f8307da47d6696e257566832d0fd9d9a9117c27caaa9cbc5e556f57a2aa342c',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v3-fresh-ids.csv',matrixSha256:'e26cb22a60319271e106932c07d047a00bd6b3610922b2c32a61e3991dd8097a',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v4-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v4-sandbox-p3-excluded-fresh-ids',protocolSha256:'c2da55dd9a900f15343a5ec83352cadbb3716208f0a92d04dbe261c21148e77b',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v4-fresh-ids.csv',matrixSha256:'bebda9fc145607878cf93f0c2b21e249b50175edd24385cbcc48cb74f661dd5f',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v5-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v5-sandbox-p3-excluded-fresh-ids',protocolSha256:'f45a60340eb8e7b74c6880ed7e5a51abd3e26f64998b072b3a732ebf272b7d4b',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v5-fresh-ids.csv',matrixSha256:'a10a9685ba098665282c7d94e1f7f7c88deda67f9152c22c9e4c3db597e9720e',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true})
 });
 const APPROVED_FROZEN_PILOTS=Object.freeze({
   'protocol-450-three-arm-supported-v2-pilot-v1.json':Object.freeze({
@@ -43,9 +78,30 @@ const APPROVED_FROZEN_PILOTS=Object.freeze({
     matrixFile:'plan-450-three-arm-supported-v2-pilot-v1.csv',
     matrixSha256:'d1369ae19d84d3c47de0c28d913d0ede4d8dc435d7e1c659fa51fa816e849780',
     sourceProtocolFile:'protocol-450-three-arm-supported-v2.json',
+    sourceProtocolRevision:'three-arm-supported-450-v2',
     sourceProtocolSha256:'fdb135628361b17347f91df7099d48afc25d6366803b498fae545ae9c2c5d2bc',
     sourceMatrixFile:'plan-450-three-arm-supported-v2.csv',
-    sourceMatrixSha256:'3e9d26641b190eba202984c88234794fa480bb7ddbed2fd5ebc3188d269e40d6'})
+    sourceMatrixSha256:'3e9d26641b190eba202984c88234794fa480bb7ddbed2fd5ebc3188d269e40d6',
+    deployments:Object.freeze(['azure_vm','azure_container_apps_jobs','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_container_apps_jobs:'aca_job',azure_container_apps_sandboxes:'aca_sandbox'}),
+    pilotScenarios:Object.freeze({P1:Object.freeze(ALL_SCENARIOS),P2:Object.freeze(['U5','U6','U7','U8','L1','L2']),
+      P3:Object.freeze(['U5','U6','U7','U8','L1','L2'])}),
+    pilotTrials:66,runIdPrefix:'pilot-450v2',unauthorized:48,legitimate:18}),
+  'protocol-450-flex-sandbox-supported-v3-pilot-v1.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-450-v3-pilot-v1',
+    protocolSha256:'eb75d10c07a70593ad5798d0a703647a1d7af565424a81295614aecbf25cefa5',
+    matrixFile:'plan-450-flex-sandbox-supported-v3-pilot-v1.csv',
+    matrixSha256:'ed00d9d4cfa6ac328aaf5d046ddc055bd9838d7628fde9330f912cbe4168edec',
+    sourceProtocolFile:'protocol-450-flex-sandbox-supported-v3.json',
+    sourceProtocolRevision:'three-arm-flex-sandbox-450-v3',
+    sourceProtocolSha256:'1d007cec5062dd8641b604e01fb6b7cea62ca166c44f184f9bae16085c62d266',
+    sourceMatrixFile:'plan-450-flex-sandbox-supported-v3.csv',
+    sourceMatrixSha256:'d76cb846e3dc647c6bc7bf589ad6397d03f8a9885ecf42ace11c13e44740834e',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    pilotScenarios:Object.freeze({P1:Object.freeze(['U1','U6','U8']),P2:Object.freeze(['U1','U6','U8']),
+      P3:Object.freeze(['U5','U6','U7','U8'])}),
+    pilotTrials:30,runIdPrefix:'pilot-v3',unauthorized:30,legitimate:0})
 });
 
 /**
@@ -107,7 +163,11 @@ export function validateSelectedProtocol({protocolBytes,matrixBytes,lock,paths={
   catch { throw new Error('selected protocol is not valid UTF-8 JSON'); }
   if(!protocol||typeof protocol!=='object'||Array.isArray(protocol))
     throw new Error('selected protocol must be a JSON object');
-  if(protocol.measuredExecutionEnabled!==false||lock.measuredExecutionEnabled!==false)
+  const measuredRequested=['protocol-400-flex-sandbox-no-sandbox-p3-v1.json','protocol-400-flex-sandbox-no-sandbox-p3-v2-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v3-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v4-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v5-fresh-ids.json'].includes(normalizedFilename(paths.protocolFile));
+  if(measuredRequested) {
+    if(protocol.measuredExecutionEnabled!==true||lock.measuredExecutionEnabled!==true)
+      throw new Error('measured execution must be enabled in both protocol and freeze lock for the approved 400 revision');
+  } else if(protocol.measuredExecutionEnabled!==false||lock.measuredExecutionEnabled!==false)
     throw new Error('measured execution must remain disabled in both protocol and freeze lock');
   const protocolFile=paths.protocolFile;
   const matrixFile=paths.matrixFile??protocol.matrix?.file;
@@ -178,7 +238,8 @@ export function validateSelectedProtocol({protocolBytes,matrixBytes,lock,paths={
     if(cellKeys.has(cellKey)) throw new Error('selected matrix shape contains a duplicate cell');
     cellKeys.add(cellKey);
   }
-  const rowsPerBlock=expectedDeployments.length*PROFILES.length*scenarios.length;
+  const profilesFor=deployment=>approvedCandidate.profilesByDeployment?.[deployment]??PROFILES;
+  const rowsPerBlock=expectedDeployments.reduce((count,deployment)=>count+profilesFor(deployment).length*scenarios.length,0);
   const expectedTrials=rowsPerBlock*blocks;
   if(rows.length!==expectedTrials||protocol.expectedTrials!==expectedTrials||
     [...rowsByBlock.keys()].length!==blocks||[...rowsByBlock.values()].some(count=>count!==rowsPerBlock)||
@@ -186,7 +247,7 @@ export function validateSelectedProtocol({protocolBytes,matrixBytes,lock,paths={
     throw new Error('selected matrix shape does not match its declared factorial schedule');
   for(let block=1;block<=blocks;block++) {
     if(!rowsByBlock.has(block)) throw new Error('selected matrix shape has a missing block');
-    for(const deployment of expectedDeployments) for(const profile of PROFILES) for(const scenario of scenarios)
+    for(const deployment of expectedDeployments) for(const profile of profilesFor(deployment)) for(const scenario of scenarios)
       if(!cellKeys.has(`${block}|${deployment}|${profile}|${scenario}`))
         throw new Error('selected matrix shape is missing a declared cell');
   }
@@ -228,46 +289,45 @@ export function validateFrozenPilotProtocol({protocolBytes,matrixBytes,lock,path
     protocol.measuredExecutionEnabled!==false||protocol.readiness?.measuredExecutionEnabled!==false||
     lock.measuredExecutionEnabled!==false||lock.countedAsStudyTrials!==false||pilotPlan.countedAsStudyTrials!==false)
     throw new Error('pilot protocol and lock must remain frozen, launch-gated, and explicitly non-counted');
-  if(!sameSet(protocol.deployments??[],THREE_ARM_DEPLOYMENTS)||
-    !protocol.deploymentKinds||protocol.deploymentKinds.azure_vm!=='http'||
-    protocol.deploymentKinds.azure_container_apps_jobs!=='aca_job'||
-    protocol.deploymentKinds.azure_container_apps_sandboxes!=='aca_sandbox'||
-    !sameSet(protocol.routeKeys??[],THREE_ARM_ROUTES)||!sameSet(protocol.profiles??[],PROFILES)||
+  if(!sameSet(protocol.deployments??[],approved.deployments)||
+    !protocol.deploymentKinds||
+    Object.entries(approved.deploymentKinds).some(([deployment,kind])=>protocol.deploymentKinds[deployment]!==kind)||
+    !sameSet(protocol.routeKeys??[],approved.deployments.flatMap(deployment=>PROFILES.map(profile=>`${deployment}:${profile}`)))||
+    !sameSet(protocol.profiles??[],PROFILES)||
     !sameSet(protocol.scenarios?.scheduled??[],ALL_SCENARIOS))
     throw new Error('pilot protocol does not preserve the selected three-arm route/scenario contract');
   if(normalizedFilename(protocol.sourceProtocol?.file)!==approved.sourceProtocolFile||
-    protocol.sourceProtocol?.revision!=='three-arm-supported-450-v2'||
+    protocol.sourceProtocol?.revision!==approved.sourceProtocolRevision||
     protocol.sourceProtocol?.sha256!==approved.sourceProtocolSha256||
     normalizedFilename(protocol.matrix?.file)!==approved.sourceMatrixFile||
     protocol.matrix?.sha256!==approved.sourceMatrixSha256||
     protocol.u6U8Operationalization?.gateStatus!=='open_on_all_arms'||
-    !sameSet(protocol.u6U8Operationalization?.scheduledOn??[],THREE_ARM_DEPLOYMENTS)||
+    !sameSet(protocol.u6U8Operationalization?.scheduledOn??[],approved.deployments)||
     pilotPlan.derivedFrom!==approved.sourceMatrixSha256||
     pilotPlan.sourceProtocolSha256!==approved.sourceProtocolSha256||
     normalizedFilename(lock.sourceProtocolFile)!==approved.sourceProtocolFile||
     lock.sourceProtocolSha256!==approved.sourceProtocolSha256||
     lock.sourceMatrixSha256!==approved.sourceMatrixSha256)
-    throw new Error('pilot protocol or lock is not bound to the selected measured v2 protocol and matrix');
+    throw new Error('pilot protocol or lock is not bound to the selected measured protocol and matrix');
   const protocolDigest=sha256(protocolBytes);
   const matrixDigest=sha256(matrixBytes);
   if(protocolDigest!==approved.protocolSha256||protocolDigest!==lock.protocolSha256||
     matrixDigest!==approved.matrixSha256||matrixDigest!==lock.matrixSha256||
     matrixDigest!==pilotPlan.sha256)
     throw new Error('pilot protocol or matrix digest does not match its independent code-side pins and freeze lock');
-  if(pilotPlan.trials!==66||pilotPlan.blocks!==1||pilotPlan.rowsPerBlock!==66||pilotPlan.repetitionsPerCell!==1)
+  if(pilotPlan.trials!==approved.pilotTrials||pilotPlan.blocks!==1||
+    pilotPlan.rowsPerBlock!==approved.pilotTrials||pilotPlan.repetitionsPerCell!==1)
     throw new Error('pilot plan counts do not match the approved one-attempt schedule');
   const rows=parseCandidateMatrix(matrixBytes);
   const expected=[];
-  for(const deployment of THREE_ARM_DEPLOYMENTS) for(const profile of PROFILES) {
-    const scenarios=profile==='P1'?ALL_SCENARIOS:['U5','U6','U7','U8','L1','L2'];
-    for(const scenario of scenarios) expected.push({deployment,profile,scenario});
-  }
+  for(const deployment of approved.deployments) for(const profile of PROFILES)
+    for(const scenario of approved.pilotScenarios[profile]) expected.push({deployment,profile,scenario});
   if(rows.length!==expected.length||rows.length!==pilotPlan.trials)
     throw new Error('pilot matrix row count does not match the approved coverage');
   const ids=new Set();
   for(let index=0;index<expected.length;index++) {
     const row=rows[index],cell=expected[index],order=index+1;
-    const runId=`pilot-450v2-b1-${String(order).padStart(3,'0')}-${cell.deployment}-${cell.profile}-${cell.scenario}`;
+    const runId=`${approved.runIdPrefix}-b1-${String(order).padStart(3,'0')}-${cell.deployment}-${cell.profile}-${cell.scenario}`;
     if(row.planned_run_id!==runId||ids.has(row.planned_run_id)||Number(row.block)!==1||Number(row.order_in_block)!==order||
       row.deployment!==cell.deployment||row.permission_profile!==cell.profile||row.scenario_id!==cell.scenario||
       row.scenario_type!==(cell.scenario.startsWith('U')?'unauthorized':'legitimate')||
@@ -278,7 +338,7 @@ export function validateFrozenPilotProtocol({protocolBytes,matrixBytes,lock,path
   const summary={trials:rows.length,blocks:1,rowsPerBlock:rows.length,
     unauthorized:rows.filter(row=>row.scenario_type==='unauthorized').length,
     legitimate:rows.filter(row=>row.scenario_type==='legitimate').length};
-  if(summary.unauthorized!==48||summary.legitimate!==18)
+  if(summary.unauthorized!==approved.unauthorized||summary.legitimate!==approved.legitimate)
     throw new Error('pilot matrix unauthorized/legitimate composition is invalid');
   return {protocol,rows,summary,protocolDigest,matrixDigest};
 }
@@ -375,7 +435,7 @@ export function preflightThreeArchitecture({legacyPlanBytes,legacyProtocol,candi
     blockers.push(`Selected schedule has ${scheduleScope.notApplicable} not-applicable rows because a declared session capability is absent; the schedule itself was not reduced.`);
   for(const [route,count] of Object.entries(scheduleScope.unsupportedByRoute))
     blockers.push(`Scope unsupported (${route}): ${count} scheduled rows lack the required attributable denial capability.`);
-  for(const gate of gates) blockers.push(`Gate pending (${gate.kind}): ${gate.gate} — ${gate.detail}`);
+  for(const gate of gates) blockers.push(`Gate pending (${gate.kind}): ${gate.gate} â€” ${gate.detail}`);
   blockers.push('Offline structural evidence cannot establish live Azure resources, credentials, pilot success, protected evidence, identity binding, quota, or absence of charges.');
 
   return {schema:'three_architecture_preflight_v3',ready:false,launchEnabled:false,
@@ -426,3 +486,11 @@ async function main(args) {
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)
   main(process.argv.slice(2)).catch(error=>{console.error(`Preflight failed: ${error.message}`);process.exitCode=3;});
+
+
+
+
+
+
+
+

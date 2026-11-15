@@ -1,0 +1,16 @@
+{
+  "status": "frozen_non_counted_pilot_launch_gated",
+  "revision": "three-arm-flex-sandbox-450-v3-pilot-v1",
+  "protocolFile": "protocol-450-flex-sandbox-supported-v3-pilot-v1.json",
+  "protocolSha256": "eb75d10c07a70593ad5798d0a703647a1d7af565424a81295614aecbf25cefa5",
+  "matrixFile": "plan-450-flex-sandbox-supported-v3-pilot-v1.csv",
+  "matrixSha256": "ed00d9d4cfa6ac328aaf5d046ddc055bd9838d7628fde9330f912cbe4168edec",
+  "sourceProtocolFile": "protocol-450-flex-sandbox-supported-v3.json",
+  "sourceProtocolSha256": "1d007cec5062dd8641b604e01fb6b7cea62ca166c44f184f9bae16085c62d266",
+  "sourceMatrixFile": "plan-450-flex-sandbox-supported-v3.csv",
+  "sourceMatrixSha256": "d76cb846e3dc647c6bc7bf589ad6397d03f8a9885ecf42ace11c13e44740834e",
+  "countedAsStudyTrials": false,
+  "measuredExecutionEnabled": false,
+  "scope": "30 non-counted rows: route identity checks plus P3 U5/U7 and U6/U8 fixture checks on all three arms",
+  "note": "Frozen practice schedule only. It does not authorize measured trials."
+}

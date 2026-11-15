@@ -1,0 +1,190 @@
+{
+  "resolvedAt": "2026-11-15T02:21:45.240Z",
+  "source": "ARM deployment outputs",
+  "subscriptionId": "a0129b37-1075-48a4-82f9-bbc6d96d8eb3",
+  "location": "centralus",
+  "routeRegions": {
+    "azure_container_apps_sandboxes": {
+      "P1": "centralus",
+      "P2": "centralus",
+      "P3": "centralus"
+    },
+    "azure_functions_flex": {
+      "P1": "centralus",
+      "P2": "centralus",
+      "P3": "centralus"
+    },
+    "azure_vm": {
+      "P1": "centralus",
+      "P2": "centralus",
+      "P3": "centralus"
+    }
+  },
+  "hasMultiRegionMarker": true,
+  "registry": {
+    "server": "th30f2e487acr.azurecr.io",
+    "agentImage": "th30f2e487acr.azurecr.io/thesis/agent@sha256:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141"
+  },
+  "network": {
+    "virtualNetworkId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Network/virtualNetworks/th30f2e487-vnet",
+    "researchServicePrivateIp": "10.48.9.4",
+    "collectorPrivateIp": "10.48.9.5",
+    "restrictedServicePrivateIp": "10.48.9.6",
+    "restrictedServicePolicyIp": "10.48.9.6",
+    "researchHostResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Compute/virtualMachines/th30f2e487-research"
+  },
+  "identities": {
+    "controller": {
+      "clientId": "e5604ed5-730f-4bed-8019-1606f640266a",
+      "objectId": "981e38da-4526-48f3-8287-914aa0aabd26"
+    },
+    "verifier": {
+      "objectId": "a138aa85-8a70-4e0e-9dd7-86b356354b85"
+    },
+    "secretReader": {
+      "objectId": "0c9ad10f-de74-4a25-b41c-3aa5a3d18a78"
+    },
+    "fixtureOwner": {
+      "objectId": "ce3edfd9-8aa1-4663-b2a1-f1eec5088499"
+    },
+    "sandboxControl": {
+      "clientId": "fac1f521-f5e3-439e-b7f4-b86382a5d141"
+    },
+    "imagePull": {
+      "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487imgpull",
+      "clientId": "28cf645d-faeb-408e-a261-31f36a8b77c6"
+    }
+  },
+  "evidence": {
+    "accountId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Storage/storageAccounts/th30f2e487evd",
+    "containerUrl": "https://th30f2e487evd.blob.core.windows.net/trial-evidence"
+  },
+  "fixtures": {
+    "accountId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Storage/storageAccounts/th30f2e487fx",
+    "blobEndpoint": "https://th30f2e487fx.blob.core.windows.net/",
+    "blobResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Storage/storageAccounts/th30f2e487fx/blobServices/default"
+  },
+  "workloads": {
+    "azure_container_apps_sandboxes": {
+      "P1": {
+        "clientId": "839821a9-7878-4962-a91b-299a47540ad9",
+        "principalObjectId": "124b4a45-fafb-4123-aeb1-687b2c336e53",
+        "sandboxGroupId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.App/sandboxGroups/th30f2e487-sg-p1",
+        "secretReaderClientId": "4b4ea0a9-bce4-4cf4-bc5d-9a599cd8e1c2",
+        "secretReaderIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p1-secret-reader",
+        "workloadIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p1",
+        "workloadTokenSecretUri": "https://th30f2e4o74kdox47hsyykv.vault.azure.net/secrets/th30f2e487-sbx-p1-workload-token"
+      },
+      "P2": {
+        "clientId": "eb3a9a24-a20e-4b18-a3e1-56f05582a93c",
+        "principalObjectId": "d50e8abd-ecf6-4854-bddd-45898afde051",
+        "sandboxGroupId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.App/sandboxGroups/th30f2e487-sg-p2",
+        "secretReaderClientId": "5bf53ded-013d-4db3-8dba-a402b9f10602",
+        "secretReaderIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p2-secret-reader",
+        "workloadIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p2",
+        "workloadTokenSecretUri": "https://th30f2e4o74kdox47hsyykv.vault.azure.net/secrets/th30f2e487-sbx-p2-workload-token"
+      },
+      "P3": {
+        "clientId": "02a9c026-109f-465c-a7da-151f2be4a275",
+        "principalObjectId": "3d3055f2-4cd5-4246-9869-ff3da55bd234",
+        "sandboxGroupId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.App/sandboxGroups/th30f2e487-sg-p3",
+        "secretReaderClientId": "e9dc5ca0-462a-4b9a-a61a-49a15a013bb1",
+        "secretReaderIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p3-secret-reader",
+        "workloadIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-sbx-p3",
+        "workloadTokenSecretUri": "https://th30f2e4o74kdox47hsyykv.vault.azure.net/secrets/th30f2e487-sbx-p3-workload-token"
+      }
+    },
+    "azure_functions_flex": {
+      "P1": {
+        "agentUrl": "https://th30f2e487-fn-p1.azurewebsites.net/api",
+        "clientId": "88053e9a-2c5d-483b-92f2-7d27f8cf95a5",
+        "principalObjectId": "a797c538-c8e0-44e5-8656-134aa8c804c3",
+        "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Web/sites/th30f2e487-fn-p1",
+        "secretReaderClientId": "d8929a09-f6e0-40fb-8675-c59e62c91ccb",
+        "secretReaderIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-job-p1-secret-reader",
+        "workloadIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-job-p1",
+        "workloadTokenSecretUri": "https://th30f2e4o74kdox47hsyykv.vault.azure.net/secrets/th30f2e487-job-p1-workload-token"
+      },
+      "P2": {
+        "agentUrl": "https://th30f2e487-fn-p2.azurewebsites.net/api",
+        "clientId": "6af736ac-8c20-47ef-b21e-0a7907703337",
+        "principalObjectId": "de0aa134-b1c1-4d26-9f52-b1124cf02fbe",
+        "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Web/sites/th30f2e487-fn-p2",
+        "secretReaderClientId": "2dba68a9-f87c-4eda-acca-1378fb413950",
+        "secretReaderIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-job-p2-secret-reader",
+        "workloadIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-job-p2",
+        "workloadTokenSecretUri": "https://th30f2e4o74kdox47hsyykv.vault.azure.net/secrets/th30f2e487-job-p2-workload-token"
+      },
+      "P3": {
+        "agentUrl": "https://th30f2e487-fn-p3.azurewebsites.net/api",
+        "clientId": "658fa460-848e-4ebc-aef6-5afc0ab3df5e",
+        "principalObjectId": "a4777739-b8b1-4736-ac95-9ed176c9e2ef",
+        "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Web/sites/th30f2e487-fn-p3",
+        "secretReaderClientId": "08bc16c6-18f7-4978-a85a-d74a40ce419e",
+        "secretReaderIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-job-p3-secret-reader",
+        "workloadIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-job-p3",
+        "workloadTokenSecretUri": "https://th30f2e4o74kdox47hsyykv.vault.azure.net/secrets/th30f2e487-job-p3-workload-token"
+      }
+    },
+    "azure_vm": {
+      "P1": {
+        "clientId": "64770c5d-99a6-4d5f-bec2-7b5be46c8b46",
+        "principalObjectId": "15118489-828a-4f8d-a8b2-8dca232cdd3d",
+        "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Compute/virtualMachines/th30f2e487-vm-p1",
+        "secretReaderClientId": "61bfcc45-8918-4199-bd54-2d8eeb2b95f1",
+        "secretReaderIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-vm-p1-secret-reader",
+        "workloadIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-vm-p1",
+        "workloadTokenSecretUri": "https://th30f2e4o74kdox47hsyykv.vault.azure.net/secrets/th30f2e487-vm-p1-workload-token"
+      },
+      "P2": {
+        "clientId": "441df460-ce13-416e-9bda-9ab0d1c2b191",
+        "principalObjectId": "1e0c5d14-37e2-4cad-8c9a-5b503569a903",
+        "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Compute/virtualMachines/th30f2e487-vm-p2",
+        "secretReaderClientId": "9db0a85a-1264-493c-8ebc-1f366116c118",
+        "secretReaderIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-vm-p2-secret-reader",
+        "workloadIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-vm-p2",
+        "workloadTokenSecretUri": "https://th30f2e4o74kdox47hsyykv.vault.azure.net/secrets/th30f2e487-vm-p2-workload-token"
+      },
+      "P3": {
+        "clientId": "3e393412-8878-455c-801c-02239cb2979b",
+        "principalObjectId": "db7994f6-293b-4a5d-ac9b-795959f36e12",
+        "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Compute/virtualMachines/th30f2e487-vm-p3",
+        "secretReaderClientId": "0769f75a-bf96-417c-ab5e-33e85274124f",
+        "secretReaderIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-vm-p3-secret-reader",
+        "workloadIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487-vm-p3",
+        "workloadTokenSecretUri": "https://th30f2e4o74kdox47hsyykv.vault.azure.net/secrets/th30f2e487-vm-p3-workload-token"
+      }
+    }
+  },
+  "sandboxDiskImageNames": {
+    "P1": "agent-p1",
+    "P2": "agent-p2",
+    "P3": "agent-p3",
+    "note": "Data-plane-created disk images (sandboxes.azure.com/docs/sandboxes/disk-images) from the pinned OCI agent images; not ARM resources."
+  },
+  "sandboxGroupRuntimeSpecs": {
+    "defaultCpu": "1",
+    "defaultDisk": "10Gi",
+    "defaultMemory": "1Gi",
+    "defaultTimeoutSeconds": 1800,
+    "maxSandboxCount": 1,
+    "note": "Apply via the preview sandbox-group API (2026-02-01-preview quickstart properties) or the data-plane client; NOT settable on stable 2026-07-01."
+  },
+  "vmAgentPrivateIps": {
+    "P1": "10.48.0.4",
+    "P2": "10.48.7.4",
+    "P3": "10.48.8.4"
+  },
+  "environments": {
+    "jobs": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.App/managedEnvironments/th30f2e487-jobs-env",
+    "jobsP3": ""
+  },
+  "observability": {
+    "logWorkspaceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.OperationalInsights/workspaces/th30f2e487logs"
+  },
+  "sandboxDiskImageIds": {
+    "P1": "b2b632af-4ad5-4551-8f8d-e67c86bbcb3c",
+    "P2": "9c2d2ded-5204-4963-9815-52aa47ac6f45",
+    "P3": "fecfb27f-61aa-4652-82aa-9e195f9b4a7e"
+  }
+}

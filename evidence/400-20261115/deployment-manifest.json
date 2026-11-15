@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-11-15T03:01:41.390Z",
+  "environment": "thesis-study",
+  "subscriptionId": "a0129b37-1075-48a4-82f9-bbc6d96d8eb3",
+  "location": "centralus",
+  "status": "validated",
+  "validation": {
+    "status": "validated",
+    "validatedAt": "2026-11-15T02:53:16.995Z",
+    "resolvedSha256": "3d05576299058cbdee78858f3a71d8b7f6bdcb7c6b45a1f2bc3b61f4d0d53137",
+    "checks": {
+      "V1": true,
+      "V2": true,
+      "V3": true,
+      "V4": true,
+      "V5": true
+    },
+    "evidence": {
+      "V5": {
+        "roundTripPassed": true,
+        "deleteBlockedByPolicy": true
+      }
+    },
+    "pendingPilotEvidence": [
+      "azure_container_apps_sandboxes/P1",
+      "azure_container_apps_sandboxes/P2",
+      "azure_container_apps_sandboxes/P3",
+      "azure_functions_flex/P1",
+      "azure_functions_flex/P2",
+      "azure_functions_flex/P3",
+      "azure_vm/P3"
+    ]
+  },
+  "runtime": {
+    "functionsPublication": {
+      "status": "ready",
+      "packageSha256": "abcdb557810666979cd3d3a4ead13c44ea6fbad29933f5efc6c58851131e1ba0",
+      "verifiedRoutes": 3,
+      "publishedAt": "2026-11-15T01:57:28.475Z"
+    },
+    "sandboxBootstrap": {
+      "status": "ready",
+      "readyImages": 3,
+      "totalImages": 3,
+      "readyAt": "2026-11-15T02:23:55.354Z"
+    },
+    "researchHost": {
+      "status": "ready",
+      "verifiedAt": "2026-11-15T02:38:51.980Z",
+      "packageSha256": "5172bfe26dd8bea740500cf7d027cc462940d84e48d24c399a2e15446fb890f4"
+    }
+  },
+  "measuredStudyReady": false,
+  "image": "th30f2e487acr.azurecr.io/thesis/agent@sha256:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141",
+  "routes": [
+    "azure_container_apps_sandboxes/P1",
+    "azure_container_apps_sandboxes/P2",
+    "azure_container_apps_sandboxes/P3",
+    "azure_functions_flex/P1",
+    "azure_functions_flex/P2",
+    "azure_functions_flex/P3",
+    "azure_vm/P1",
+    "azure_vm/P2",
+    "azure_vm/P3"
+  ],
+  "identities": {
+    "controller": {
+      "clientId": "e5604ed5-730f-4bed-8019-1606f640266a",
+      "objectId": "981e38da-4526-48f3-8287-914aa0aabd26"
+    },
+    "verifier": {
+      "objectId": "a138aa85-8a70-4e0e-9dd7-86b356354b85"
+    },
+    "secretReader": {
+      "objectId": "0c9ad10f-de74-4a25-b41c-3aa5a3d18a78"
+    },
+    "fixtureOwner": {
+      "objectId": "ce3edfd9-8aa1-4663-b2a1-f1eec5088499"
+    },
+    "sandboxControl": {
+      "clientId": "fac1f521-f5e3-439e-b7f4-b86382a5d141"
+    },
+    "imagePull": {
+      "resourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487imgpull",
+      "clientId": "28cf645d-faeb-408e-a261-31f36a8b77c6"
+    }
+  },
+  "evidence": {
+    "account": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Storage/storageAccounts/th30f2e487evd",
+    "containerUrl": "https://th30f2e487evd.blob.core.windows.net/trial-evidence",
+    "retentionDays": 7,
+    "retentionLocked": true,
+    "retentionPolicy": {
+      "state": "locked",
+      "locked": true,
+      "periodDays": 7,
+      "policyResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.Storage/storageAccounts/th30f2e487evd/blobServices/default/containers/trial-evidence/immutabilityPolicies/default"
+    },
+    "note": "read-only ARM check confirms a locked 7-day container policy"
+  },
+  "checkpoints": [
+    "publishImages",
+    "configured",
+    "p3FirewallConfigured",
+    "fullStageProvisioned",
+    "functionsPublished",
+    "sandboxBootstrapped",
+    "researchHostBootstrapped",
+    "deploymentValidated"
+  ],
+  "designBlockers": [
+    {
+      "id": "p3-network-denial-telemetry",
+      "detail": "Ten Functions Flex P3 trials remain unsupported: independently attributable network-denial telemetry is unproven.",
+      "required": "cloud pilot demonstrating per-trial denial attribution, or a protocol revision freezing a reduced scope"
+    },
+    {
+      "id": "u6-u8-fixture-validation",
+      "detail": "Ninety U6/U8 trials need fixture validation.",
+      "required": "validated fixtures recorded in the pilot index"
+    }
+  ],
+  "nextCommand": "npm run study:execute  (separately authorized; runs no trials until its own gates pass)"
+}

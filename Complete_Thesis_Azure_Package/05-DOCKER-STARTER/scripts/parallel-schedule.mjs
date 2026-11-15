@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Parallel execution of the frozen schedule.
  *
  * The sequential runner is correct but slow: 400 trials with a verification wait
  * each is a day, not an afternoon. Parallelising it carelessly would destroy the
- * data, because a trial owns the fixture it resets — two trials sharing one
+ * data, because a trial owns the fixture it resets â€” two trials sharing one
  * resource service would read each other's records and every denial would be
  * unattributable.
  *
@@ -37,7 +37,7 @@ function validate(rows) {
 
 /**
  * Default lane: one in-flight trial per deployment. Pass your own `laneFor` to go
- * wider, but only when the fixtures are genuinely separate — the function decides
+ * wider, but only when the fixtures are genuinely separate â€” the function decides
  * how much of the experiment runs at once.
  */
 export const laneByDeployment = row => row.deployment;
@@ -61,6 +61,7 @@ export async function runScheduleParallel(rows, runOne, {laneFor=laneByDeploymen
   const queue=[...lanes.entries()];
   let haltedAt=null;
   let notApplicableCount=0;
+  let indeterminateCount=0;
   let stopped=false;
   let firstError=null;
 
@@ -73,6 +74,10 @@ export async function runScheduleParallel(rows, runOne, {laneFor=laneByDeploymen
           profile:row.permission_profile,scenario:row.scenario_id,
           block:Number(row.block),order:Number(row.order_in_block)});
       } catch (error) {
+        if(/already exists|is locked/i.test(String(error?.message||''))) {
+          results[index]={runId:row.planned_run_id,classification:'not_applicable',alreadyCompleted:true};
+          continue;
+        }
         firstError=firstError ?? error;
         stopped=true;
         return;
@@ -90,11 +95,9 @@ export async function runScheduleParallel(rows, runOne, {laneFor=laneByDeploymen
       results[index]=record;
       if(record.classification==='not_applicable') { notApplicableCount++; continue; }
       if(record.classification==='indeterminate') {
-        haltedAt=row.planned_run_id;
-        // One unclassifiable trial invalidates the rest of the matrix, in every
-        // lane. Stop taking work; trials already running are not killed.
-        stopped=true;
-        return;
+        haltedAt=haltedAt??row.planned_run_id;
+        indeterminateCount++;
+        continue;
       }
     }
   }
@@ -112,6 +115,7 @@ export async function runScheduleParallel(rows, runOne, {laneFor=laneByDeploymen
   const collected=results.filter(record=>record!==undefined);
   Object.defineProperties(collected,{
     halted:{value:haltedAt!==null,enumerable:false},
+    indeterminate:{value:indeterminateCount,enumerable:false},
     haltedAt:{value:haltedAt,enumerable:false},
     complete:{value:haltedAt===null && firstError===null && collected.length===rows.length,enumerable:false},
     notApplicable:{value:notApplicableCount,enumerable:false},
@@ -121,3 +125,4 @@ export async function runScheduleParallel(rows, runOne, {laneFor=laneByDeploymen
   if(firstError) throw firstError;
   return collected;
 }
+

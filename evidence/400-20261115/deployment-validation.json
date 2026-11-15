@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "validatedAt": "2026-11-15T02:53:16.995Z",
+  "resolvedSha256": "3d05576299058cbdee78858f3a71d8b7f6bdcb7c6b45a1f2bc3b61f4d0d53137",
+  "status": "validated",
+  "checks": {
+    "V1": true,
+    "V2": true,
+    "V3": true,
+    "V4": true,
+    "V5": true
+  },
+  "evidence": {
+    "V5": {
+      "roundTripPassed": true,
+      "deleteBlockedByPolicy": true
+    }
+  },
+  "pendingPilotEvidence": [
+    "azure_container_apps_sandboxes/P1",
+    "azure_container_apps_sandboxes/P2",
+    "azure_container_apps_sandboxes/P3",
+    "azure_functions_flex/P1",
+    "azure_functions_flex/P2",
+    "azure_functions_flex/P3",
+    "azure_vm/P3"
+  ],
+  "failures": []
+}

@@ -1,0 +1,12 @@
+{
+  "status": "frozen_structural_launch_gated",
+  "revision": "three-arm-flex-sandbox-400-v2-sandbox-p3-excluded-fresh-ids",
+  "protocolFile": "protocol-400-flex-sandbox-no-sandbox-p3-v2-fresh-ids.json",
+  "protocolSha256": "49dd1ed72b6e9f1696e6785dd2749cd8107654d27e51ebe7d7c47ecf3aa90312",
+  "matrixFile": "plan-400-flex-sandbox-no-sandbox-p3-v2-fresh-ids.csv",
+  "matrixSha256": "9676a99957476f5892e9166dc5069685fc0bfd19782a371a2045249ae4eca699",
+  "scope": "Measured 400-row fresh-ID revision; sandbox P3 excluded",
+  "measuredExecutionEnabled": true,
+  "countedAsStudyTrials": true,
+  "note": "Owner-directed measured freeze. New IDs avoid claims from the two completed trials in the prior launch."
+}
