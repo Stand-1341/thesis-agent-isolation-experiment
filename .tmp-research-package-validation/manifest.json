@@ -1,0 +1,18 @@
+{
+  "scope": "research-service-package-only",
+  "files": {
+    "dist/resource.js": "ba1eb89cc0e754973c12e1fe148ec78fad890b7314aee3daf96d0b86265d296d",
+    "dist/collector.js": "05bbe15ffa8d1e4a09dfd71417f0a2297a35059bac430f005eafde50be079d23",
+    "dist/resource-journal.js": "9db12a1e73a32ae8c43e7b1697578a589a6042636db26219c64ea3aa61fad40d",
+    "dist/collector-journal.js": "e5fa76584288ea62e665501875ae9601a782605494e1c4e3164af0121e15cb90",
+    "dist/service-config.js": "ad4e7432ace7cea40db331e67f03f032d6204c28ed1aea7964c3fb5b354a564c",
+    "dist/helpers.js": "61dd4d39ab8abe6ad67dc554579213ab7466e29950c3bbc885e4e60d6740b7ce",
+    "infra/install-three-arm-service-secrets.mjs": "199c269220ba6544c1625d776b23e7eec480af109eb032f0d557f88784a54b66",
+    "research-service.service": "31e39cafdc05f98e49b148396ce00724af73d75391883008c355060bb47d778c",
+    "collector-service.service": "6ca909becef73ed462c922b6485d323574e2173f0cf8f6840fa78cc3d27d953e",
+    "research-proxy.nginx.template": "6be58d07543b77f841b7e98b18935673294d29859d2dcf99e0448c2fcb1bf9eb",
+    "check-research-data-disk.sh": "5f99ce4b481c11a5d3b5bad653c2d71293fc7e2d8babf74f082d60a628e190f5",
+    "package.json": "5bc74a6a42f7bf6ee23915c2884018fa1aaae98b7eb5628df7bd03eff9018c2b"
+  },
+  "note": "Includes root-only host secret-delivery code; no credentials, TLS keys, runtime, deployment, identity attachment or Azure role assignments included."
+}

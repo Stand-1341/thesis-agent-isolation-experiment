@@ -1,0 +1,332 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.48.1.52935",
+      "templateHash": "3574493257645587412"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "functionName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 60
+    },
+    "planName": {
+      "type": "string"
+    },
+    "hostStorageName": {
+      "type": "string"
+    },
+    "integrationSubnetId": {
+      "type": "string",
+      "metadata": {
+        "description": "Dedicated delegated Flex integration subnet ID. Use one subnet per profile and apply its tested egress policy separately."
+      }
+    },
+    "controllerIpCidr": {
+      "type": "string",
+      "metadata": {
+        "description": "Trusted controller public IPv4 CIDR; never a workload address."
+      }
+    },
+    "profile": {
+      "type": "string",
+      "allowedValues": [
+        "P1",
+        "P2",
+        "P3"
+      ]
+    },
+    "workloadIdentityName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the existing dedicated workload UAI in this resource group for this profile."
+      }
+    },
+    "secretReaderIdentityName": {
+      "type": "string",
+      "metadata": {
+        "description": "Separate identity permitted to read only this route's workload and trial-request secrets."
+      }
+    },
+    "researchUrl": {
+      "type": "string"
+    },
+    "collectorUrl": {
+      "type": "string"
+    },
+    "restrictedUrl": {
+      "type": "string"
+    },
+    "fixtureBlobEndpoint": {
+      "type": "string"
+    },
+    "fixtureBlobResourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Fixture storage account resource ID followed by /blobServices/default."
+      }
+    },
+    "workloadTokenSecretUri": {
+      "type": "string",
+      "metadata": {
+        "description": "Versionless HTTPS Key Vault URI for this route's workload token. Resolved by Azure, never supplied as a template value."
+      }
+    },
+    "trialRequestKeySecretUri": {
+      "type": "string",
+      "metadata": {
+        "description": "Versionless HTTPS Key Vault URI for this route's distinct trial-request key. Resolved by Azure, never supplied as a template value."
+      }
+    }
+  },
+  "variables": {
+    "hostRoleIds": [
+      "b7e6dc6d-f1e8-4753-8033-0f276bb0955b",
+      "974c5e8b-45b9-4653-ba55-5f855dd0fb88",
+      "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('hostStorageName')]",
+      "location": "[parameters('location')]",
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "allowBlobPublicAccess": false,
+        "allowSharedKeyAccess": false,
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "publicNetworkAccess": "Enabled",
+        "networkAcls": {
+          "defaultAction": "Allow",
+          "bypass": "AzureServices"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}', parameters('hostStorageName'), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}/{2}', parameters('hostStorageName'), 'default', 'deployment-packages')]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('hostStorageName'), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2023-12-01",
+      "name": "[parameters('planName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp",
+      "sku": {
+        "name": "FC1",
+        "tier": "FlexConsumption"
+      },
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2023-12-01",
+      "name": "[parameters('functionName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp,linux",
+      "identity": {
+        "type": "SystemAssigned, UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('workloadIdentityName')))]": {},
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('secretReaderIdentityName')))]": {}
+        }
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('planName'))]",
+        "httpsOnly": true,
+        "virtualNetworkSubnetId": "[parameters('integrationSubnetId')]",
+        "publicNetworkAccess": "Enabled",
+        "keyVaultReferenceIdentity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('secretReaderIdentityName'))]",
+        "siteConfig": {
+          "minTlsVersion": "1.2",
+          "ipSecurityRestrictionsDefaultAction": "Deny",
+          "scmIpSecurityRestrictionsUseMain": true,
+          "ipSecurityRestrictions": [
+            {
+              "name": "trusted-controller",
+              "priority": 100,
+              "action": "Allow",
+              "ipAddress": "[parameters('controllerIpCidr')]"
+            }
+          ],
+          "appSettings": [
+            {
+              "name": "AzureWebJobsStorage__credential",
+              "value": "managedidentity"
+            },
+            {
+              "name": "AzureWebJobsStorage__blobServiceUri",
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName')), '2023-05-01').primaryEndpoints.blob]"
+            },
+            {
+              "name": "AzureWebJobsStorage__queueServiceUri",
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName')), '2023-05-01').primaryEndpoints.queue]"
+            },
+            {
+              "name": "AzureWebJobsStorage__tableServiceUri",
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName')), '2023-05-01').primaryEndpoints.table]"
+            },
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~4"
+            },
+            {
+              "name": "RESEARCH_URL",
+              "value": "[parameters('researchUrl')]"
+            },
+            {
+              "name": "COLLECTOR_URL",
+              "value": "[parameters('collectorUrl')]"
+            },
+            {
+              "name": "RESTRICTED_URL",
+              "value": "[parameters('restrictedUrl')]"
+            },
+            {
+              "name": "AZURE_BLOB_ENDPOINT",
+              "value": "[parameters('fixtureBlobEndpoint')]"
+            },
+            {
+              "name": "THESIS_BLOB_RESOURCE_ID",
+              "value": "[parameters('fixtureBlobResourceId')]"
+            },
+            {
+              "name": "AZURE_CLIENT_ID",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('workloadIdentityName')), '2023-01-31').clientId]"
+            },
+            {
+              "name": "AZURE_PRINCIPAL_OBJECT_ID",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('workloadIdentityName')), '2023-01-31').principalId]"
+            },
+            {
+              "name": "NODE_EXTRA_CA_CERTS",
+              "value": "/home/site/wwwroot/certs/thesis-pilot-ca.pem"
+            },
+            {
+              "name": "SCENARIO_PROFILE",
+              "value": "[parameters('profile')]"
+            },
+            {
+              "name": "WORKLOAD_TOKEN",
+              "value": "[format('@Microsoft.KeyVault(SecretUri={0})', parameters('workloadTokenSecretUri'))]"
+            },
+            {
+              "name": "TRIAL_REQUEST_KEY",
+              "value": "[format('@Microsoft.KeyVault(SecretUri={0})', parameters('trialRequestKeySecretUri'))]"
+            }
+          ]
+        },
+        "functionAppConfig": {
+          "deployment": {
+            "storage": {
+              "type": "blobContainer",
+              "value": "[format('{0}{1}', reference(resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName')), '2023-05-01').primaryEndpoints.blob, 'deployment-packages')]",
+              "authentication": {
+                "type": "SystemAssignedIdentity"
+              }
+            }
+          },
+          "runtime": {
+            "name": "node",
+            "version": "22"
+          },
+          "scaleAndConcurrency": {
+            "maximumInstanceCount": 1,
+            "instanceMemoryMB": 2048,
+            "triggers": {
+              "http": {
+                "perInstanceConcurrency": 1
+              }
+            }
+          }
+        }
+      },
+      "tags": {
+        "experimentRoute": "azure_functions_flex",
+        "experimentProfile": "[parameters('profile')]",
+        "role": "workload-route"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('hostStorageName'), 'default', 'deployment-packages')]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', parameters('planName'))]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "hostRoles",
+        "count": "[length(variables('hostRoleIds'))]"
+      },
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName')), resourceId('Microsoft.Web/sites', parameters('functionName')), variables('hostRoleIds')[copyIndex()])]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('hostRoleIds')[copyIndex()])]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('functionName')), '2023-12-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('functionName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "functionId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Web/sites', parameters('functionName'))]"
+    },
+    "agentUrl": {
+      "type": "string",
+      "value": "[format('https://{0}.azurewebsites.net/api', parameters('functionName'))]"
+    },
+    "workloadPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('workloadIdentityName')), '2023-01-31').principalId]"
+    },
+    "systemPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', parameters('functionName')), '2023-12-01', 'full').identity.principalId]"
+    },
+    "workloadIdentityClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('workloadIdentityName')), '2023-01-31').clientId]"
+    },
+    "hostStorageId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Storage/storageAccounts', parameters('hostStorageName'))]"
+    }
+  }
+}
