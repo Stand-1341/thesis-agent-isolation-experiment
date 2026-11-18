@@ -1,0 +1,67 @@
+{
+  "scope": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37",
+  "timeframe": {
+    "from": "2026-11-17T00:00:00Z",
+    "to": "2026-11-19T00:00:00Z"
+  },
+  "currency": "USD",
+  "source": "Microsoft.CostManagement/query (ActualCost, Daily, grouped by ServiceName)",
+  "billingLagWarning": "ActualCost can lag; values are as returned at run time.",
+  "daily": [
+    {
+      "date": "2026-11-17",
+      "cost": 2.8190905781161284
+    },
+    {
+      "date": "2026-11-18",
+      "cost": 2.0964739099240495
+    }
+  ],
+  "total": 4.915564488040178,
+  "byService": [
+    {
+      "service": "Container Registry",
+      "cost": 2.2221511104
+    },
+    {
+      "service": "Virtual Network",
+      "cost": 1.014381632533256
+    },
+    {
+      "service": "Azure Firewall",
+      "cost": 0.906715370049141
+    },
+    {
+      "service": "Storage",
+      "cost": 0.5725561736
+    },
+    {
+      "service": "Virtual Machines",
+      "cost": 0.1149736929
+    },
+    {
+      "service": "Azure DNS",
+      "cost": 0.043140752688171996
+    },
+    {
+      "service": "Azure Container Apps",
+      "cost": 0.0409818157116
+    },
+    {
+      "service": "Key Vault",
+      "cost": 0.000612
+    },
+    {
+      "service": "Bandwidth",
+      "cost": 0.000051940158009529
+    },
+    {
+      "service": "Azure App Service",
+      "cost": 0
+    },
+    {
+      "service": "Log Analytics",
+      "cost": 0
+    }
+  ]
+}

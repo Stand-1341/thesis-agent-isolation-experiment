@@ -328,6 +328,8 @@ replacement.
   after 49 rows, and the `v9` primary run needed one resume after a transient
   sandbox data-plane call failed. Those records stay in the locked container as
   history and are not part of the 400-cell dataset.
-- **Cost data.** The host identity cannot read Cost Management
-  (`RBACAccessDenied`), and the operator query was rate-limited (HTTP 429) at the
-  time of writing, so no 2026-11-18 cost summary is included yet.
+- **Cost data.** `evidence/400-20261118/cost-summary.json` holds the 2026-11-17 and
+  2026-11-18 ActualCost rows (about USD 4.92 for the two days, dominated by the
+  container registry, virtual network and firewall). ActualCost can lag and be
+  restated, so treat the figures as provisional. The host identity itself cannot
+  read Cost Management; the operator query supplied the numbers.

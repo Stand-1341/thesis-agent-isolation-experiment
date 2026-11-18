@@ -8,6 +8,8 @@ sandbox and verifier repairs described in `docs/RECOVERY-RUN-20261118.md`.
 - `records/` — one sealed evidence envelope per scheduled cell, exactly as written
   to the locked Azure Blob evidence container.
 - `run-summary.json` — merged counts, replaced cells and the viewable percentage.
+- `cost-summary.json` — ActualCost for 2026-11-17 and 2026-11-18, grouped by
+  service (provisional; billing can restate).
 
 ## Result
 
