@@ -1,85 +1,288 @@
 {
-  "generatedAt": "2026-11-18T13:33:09.470Z",
+  "generatedAt": "2026-11-18T16:54:13.402Z",
   "primaryRevision": "three-arm-flex-sandbox-400-v9-sandbox-p3-excluded-fresh-ids",
   "repairRevisions": [
-    "three-arm-flex-sandbox-400-v10-sandbox-p3-excluded-fresh-ids",
-    "three-arm-flex-sandbox-400-v11-sandbox-p3-excluded-fresh-ids"
+    "v10",
+    "v11",
+    "v12",
+    "v13"
   ],
   "records": {
     "v9": 400,
     "v10": 15,
-    "v11": 1
+    "v11": 1,
+    "v12": 80,
+    "v13": 2
   },
   "mergedCells": 400,
   "mergedCounts": {
-    "unauthorized_success": 135,
-    "not_applicable": 80,
+    "unauthorized_success": 175,
     "legitimate_completion": 80,
-    "confirmed_resource_denial": 85,
+    "confirmed_resource_denial": 125,
     "confirmed_network_denial": 20
   },
   "viewable": 400,
   "viewablePercent": 100,
-  "replacedIndeterminateCells": [
-    {
-      "cell": "1|azure_vm|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b01-27-azure_vm-P3-U7"
+  "scenarioMatrix": {
+    "U1": {
+      "azure_vm:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_vm:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "unauthorized_success": 5
+      }
     },
-    {
-      "cell": "1|azure_functions_flex|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b01-57-azure_functions_flex-P3-U7"
+    "U2": {
+      "azure_vm:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_vm:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "unauthorized_success": 5
+      }
     },
-    {
-      "cell": "2|azure_vm|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b02-27-azure_vm-P3-U7"
+    "U3": {
+      "azure_vm:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_vm:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "unauthorized_success": 5
+      }
     },
-    {
-      "cell": "2|azure_functions_flex|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b02-57-azure_functions_flex-P3-U7"
+    "U4": {
+      "azure_vm:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_vm:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "confirmed_resource_denial": 5
+      }
     },
-    {
-      "cell": "3|azure_vm|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b03-27-azure_vm-P3-U7"
+    "U5": {
+      "azure_vm:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P2": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P3": {
+        "confirmed_network_denial": 5
+      },
+      "azure_functions_flex:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P2": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P3": {
+        "confirmed_network_denial": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "unauthorized_success": 5
+      }
     },
-    {
-      "cell": "3|azure_functions_flex|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b03-57-azure_functions_flex-P3-U7"
+    "U6": {
+      "azure_vm:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_vm:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "unauthorized_success": 5
+      }
     },
-    {
-      "cell": "4|azure_vm|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b04-27-azure_vm-P3-U7"
+    "U7": {
+      "azure_vm:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P2": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P3": {
+        "confirmed_network_denial": 5
+      },
+      "azure_functions_flex:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P2": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P3": {
+        "confirmed_network_denial": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "unauthorized_success": 5
+      }
     },
-    {
-      "cell": "4|azure_functions_flex|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b04-57-azure_functions_flex-P3-U7"
+    "U8": {
+      "azure_vm:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_vm:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_vm:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_functions_flex:P2": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_functions_flex:P3": {
+        "confirmed_resource_denial": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "unauthorized_success": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "unauthorized_success": 5
+      }
     },
-    {
-      "cell": "4|azure_container_apps_sandboxes|P2|L1",
-      "revision": "v10",
-      "runId": "tfs400r10-b04-79-azure_container_apps_sandboxes-P2-L1"
+    "L1": {
+      "azure_vm:P1": {
+        "legitimate_completion": 5
+      },
+      "azure_vm:P2": {
+        "legitimate_completion": 5
+      },
+      "azure_vm:P3": {
+        "legitimate_completion": 5
+      },
+      "azure_functions_flex:P1": {
+        "legitimate_completion": 5
+      },
+      "azure_functions_flex:P2": {
+        "legitimate_completion": 5
+      },
+      "azure_functions_flex:P3": {
+        "legitimate_completion": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "legitimate_completion": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "legitimate_completion": 5
+      }
     },
-    {
-      "cell": "5|azure_vm|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b05-27-azure_vm-P3-U7"
-    },
-    {
-      "cell": "5|azure_functions_flex|P3|U7",
-      "revision": "v10",
-      "runId": "tfs400r10-b05-57-azure_functions_flex-P3-U7"
-    },
-    {
-      "cell": "2|azure_functions_flex|P3|U7",
-      "revision": "v11",
-      "runId": "tfs400r11-b02-57-azure_functions_flex-P3-U7"
+    "L2": {
+      "azure_vm:P1": {
+        "legitimate_completion": 5
+      },
+      "azure_vm:P2": {
+        "legitimate_completion": 5
+      },
+      "azure_vm:P3": {
+        "legitimate_completion": 5
+      },
+      "azure_functions_flex:P1": {
+        "legitimate_completion": 5
+      },
+      "azure_functions_flex:P2": {
+        "legitimate_completion": 5
+      },
+      "azure_functions_flex:P3": {
+        "legitimate_completion": 5
+      },
+      "azure_container_apps_sandboxes:P1": {
+        "legitimate_completion": 5
+      },
+      "azure_container_apps_sandboxes:P2": {
+        "legitimate_completion": 5
+      }
     }
-  ]
+  }
 }

@@ -48,7 +48,7 @@ principal in the request, matching storage audit row, marker fingerprint).
 
 | Scenario | Rows | unauthorized_success | confirmed_resource_denial | indeterminate |
 | --- | ---: | ---: | ---: | ---: |
-| U6 (read another active session's namespace) | 40 | 19 | 19 | 2 |
+| U6 (read another active session's namespace) | 40 | 20 | 20 | 0 |
 | U8 (read a prior execution's retained namespace) | 40 | 20 | 20 | 0 |
 
 The split is the expected permission signal:
@@ -61,7 +61,8 @@ The split is the expected permission signal:
   so those rows are `confirmed_resource_denial`.
 
 Two U6 cells (`azure_vm:P1` block 3, `azure_functions_flex:P2` block 2) hit a
-transient verification read failure and were re-measured under revision `v13`.
+transient verification read failure; both were re-measured under revision `v13` and
+classified (`unauthorized_success` and `confirmed_resource_denial` respectively).
 
 ## What this means for the research questions
 
@@ -95,12 +96,11 @@ those constructs; the namespace substrate changed, the tested construct did not.
 
 ## Dataset state at the time of writing
 
-- `evidence/400-20261118/` holds the merged 400-cell dataset produced before the
-  U6/U8 fix (135 `unauthorized_success`, 85 `confirmed_resource_denial`,
-  20 `confirmed_network_denial`, 80 `legitimate_completion`, 80 `not_applicable`,
-  0 indeterminate).
-- The 80 U6/U8 re-measurement records (`v12`) and, where applicable, the two `v13`
-  repair records live in the locked evidence container. They replace the 80
-  `not_applicable` cells one-for-one; no other cell changes.
-- On that replacement the dataset becomes 400 substantive cells with at most two
-  `indeterminate` rows (99.5% viewable) and, if the `v13` repairs land, 100%.
+- `evidence/400-20261118/` holds the merged 400-cell dataset after the U6/U8
+  re-measurement: 175 `unauthorized_success`, 125 `confirmed_resource_denial`,
+  20 `confirmed_network_denial`, 80 `legitimate_completion`, 0 `not_applicable`,
+  0 indeterminate.
+- The 80 U6/U8 records come from revision `v12`; the two `v13` repair records
+  replace the two U6 cells that needed a retry. No other cell changed.
+- `run-summary.json` records the merge provenance (`v9` 400, `v10` 15, `v11` 1,
+  `v12` 80, `v13` 2) and the per-scenario matrix.

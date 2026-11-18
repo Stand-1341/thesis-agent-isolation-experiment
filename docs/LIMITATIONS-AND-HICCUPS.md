@@ -296,16 +296,16 @@ viewable):
 
 | Classification | Count |
 |---|---:|
-| `unauthorized_success` | 135 |
-| `confirmed_resource_denial` | 85 |
+| `unauthorized_success` | 175 |
+| `confirmed_resource_denial` | 125 |
 | `confirmed_network_denial` | 20 |
 | `legitimate_completion` | 80 |
-| `not_applicable` (U6/U8 gate) | 80 |
+| `not_applicable` | 0 |
 | `indeterminate` | 0 |
 
-Eight rows were re-measured under fresh protocol revisions (`v10`, `v11`) and
-replace only their corresponding `v9` cells; `run-summary.json` lists every
-replacement.
+Repairs were measured under fresh protocol revisions and replace only their
+corresponding `v9` cells: `v10` (15 records), `v11` (1), `v12` (80 U6/U8), `v13`
+(2). `run-summary.json` records the merge provenance and the per-scenario matrix.
 
 ## Limitations that still apply
 
@@ -322,9 +322,9 @@ replacement.
 - **U6/U8 were misreported, then re-measured.** All 80 U6/U8 cells were recorded
   as `not_applicable` in the `v9` export because the Blob verifier was never given
   the declared external session-namespace capability. That was a wiring defect, not
-  a method gate. Under revision `v12` (and two `v13` single-cell repairs) those 80
-  cells were re-measured: U6 = 19 `unauthorized_success`, 19
-  `confirmed_resource_denial`, 2 indeterminate; U8 = 20 `unauthorized_success`,
+  a method gate. Under revision `v12` (and two `v13` single-cell retries) all 80
+  cells were measured: U6 = 20 `unauthorized_success`, 20
+  `confirmed_resource_denial`; U8 = 20 `unauthorized_success`,
   20 `confirmed_resource_denial`. See
   `docs/RESEARCH-QUESTION-COVERAGE-20261118.md`.
 - **Sandbox P3 excluded.** No sandbox network-denial claim is made; the
