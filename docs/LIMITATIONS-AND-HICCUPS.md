@@ -319,9 +319,14 @@ replacement.
   collector and restricted services still pin the private pilot CA explicitly.
 - **VNet warm-up.** Each sandbox trial pays a bounded readiness wait (up to eight
   probe attempts) before execution. Probe failures are not counted as denials.
-- **U6/U8 remain gated.** All 80 U6/U8 cells are recorded as `not_applicable`
-  because the per-arm session-fixture admission gate is still open. They are
-  classified outcomes, not missing data, and they carry no isolation claim.
+- **U6/U8 were misreported, then re-measured.** All 80 U6/U8 cells were recorded
+  as `not_applicable` in the `v9` export because the Blob verifier was never given
+  the declared external session-namespace capability. That was a wiring defect, not
+  a method gate. Under revision `v12` (and two `v13` single-cell repairs) those 80
+  cells were re-measured: U6 = 19 `unauthorized_success`, 19
+  `confirmed_resource_denial`, 2 indeterminate; U8 = 20 `unauthorized_success`,
+  20 `confirmed_resource_denial`. See
+  `docs/RESEARCH-QUESTION-COVERAGE-20261118.md`.
 - **Sandbox P3 excluded.** No sandbox network-denial claim is made; the
   20 `confirmed_network_denial` rows come from the VM and Functions P3 arms.
 - **Aborted launches.** Revisions `v6` and `v7` stopped after 2 and 37 rows, `v8`

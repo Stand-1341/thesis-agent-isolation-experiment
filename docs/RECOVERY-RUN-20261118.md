@@ -126,6 +126,16 @@ records:
 `evidence/400-20261118/run-summary.json` records the mapping, the counts and the
 viewable percentage.
 
+## U6/U8 follow-up
+
+The 80 `not_applicable` U6/U8 cells in the merged export were not a method gate:
+the Blob verifier was never given the declared external session-namespace
+capability. After that wiring fix (revision `v12`, plus two `v13` retries) the
+session scenarios were measured: U6 = 19 `unauthorized_success` /
+19 `confirmed_resource_denial` / 2 indeterminate, U8 = 20 / 20 / 0. See
+`docs/RESEARCH-QUESTION-COVERAGE-20261118.md` and the consolidated
+`docs/FINDINGS-20261118.md`.
+
 ## Limitations introduced by the recovery
 
 - The sandbox arm uses a different **port** for the research service than the VM

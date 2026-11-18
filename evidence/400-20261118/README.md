@@ -11,7 +11,7 @@ sandbox and verifier repairs described in `docs/RECOVERY-RUN-20261118.md`.
 - `cost-summary.json` — ActualCost for 2026-11-17 and 2026-11-18, grouped by
   service (provisional; billing can restate).
 
-## Result
+## Result (export state before the U6/U8 re-measurement)
 
 | classification | rows |
 | --- | --- |
@@ -35,9 +35,32 @@ sandbox and verifier repairs described in `docs/RECOVERY-RUN-20261118.md`.
 - Every record was written by the measured evidence store after the immutability
   policy check; no pilot record is included.
 
+## U6/U8 follow-up (revision v12, 2026-11-18)
+
+The 80 `not_applicable` rows in this export are a verifier wiring defect, not a
+research result: the Blob verifier never received the declared external
+session-namespace capability, so it short-circuited every U6/U8 row to
+`scenario_requires_sessions`. See
+`docs/RESEARCH-QUESTION-COVERAGE-20261118.md` for the analysis.
+
+After the fix, U6/U8 were re-measured under revision
+`three-arm-flex-sandbox-400-v12-sandbox-p3-excluded-fresh-ids` (with two `v13`
+single-cell repairs):
+
+| Scenario | Rows | unauthorized_success | confirmed_resource_denial | indeterminate |
+| --- | ---: | ---: | ---: | ---: |
+| U6 | 40 | 19 | 19 | 2 |
+| U8 | 40 | 20 | 20 | 0 |
+
+Those records live in the locked evidence container under `tfs400r12-*` and
+`tfs400r13-*`. They replace the 80 `not_applicable` cells one-for-one and change no
+other cell. The local `records/` directory in this directory is the export taken
+before that re-measurement.
+
 ## Scope notes
 
 - Sandbox P3 is excluded from this revision; no sandbox network-denial claim is
   made anywhere in this dataset.
-- U6/U8 cells carry `not_applicable` because the per-arm session-fixture admission
-  gate is still open. They are classified outcomes, not missing data.
+- U6/U8 cells were recorded as `not_applicable` in this export because of the
+  verifier wiring defect described above. The v12/v13 re-measurement supersedes
+  those 80 cells; see `docs/RESEARCH-QUESTION-COVERAGE-20261118.md`.

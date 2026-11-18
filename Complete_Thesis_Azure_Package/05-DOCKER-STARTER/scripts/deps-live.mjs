@@ -554,6 +554,14 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
     clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED'),pilotMode});
 
   // ---- Blob-backed scenarios ---------------------------------------------
+  // U6/U8 are application-level shared-state authorization tests. The verifier
+  // must be told which arms realize them as run-scoped external Blob namespaces,
+  // otherwise every U6/U8 row is reported not_applicable even after the fixtures
+  // were seeded. The declaration is the same one the scope analysis and the
+  // fixture adapters use.
+  const declaredSessionCapabilities=Object.fromEntries(Object.entries(config.deployments??{})
+    .filter(([,entry])=>entry?.sessionDataStore==='azure_blob_external_namespace')
+    .map(([name])=>[name,true]));
   const blobVerifier=createAzureBlobVerifier({
     readAudit:createStorageAuditReader({workspaceId,getToken:getLogsToken}),
     principalForTrial:trial=>principalForConfiguredTrial(config,trial),
@@ -562,6 +570,7 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
     workspaceId,
     runAuthorizationControl:undefined,
     sessionFixtureOwnerPrincipalId:env.THESIS_SESSION_FIXTURE_OWNER_PRINCIPAL_ID,
+    sessionDataCapabilities:declaredSessionCapabilities,
     auditPipelineValidated:flag(env,'THESIS_AUDIT_PIPELINE_VALIDATED'),
     authorizationValidated:flag(env,'THESIS_AUTHORIZATION_VALIDATED'),
     clockSyncValidated:flag(env,'THESIS_CLOCK_SYNC_VALIDATED'),
