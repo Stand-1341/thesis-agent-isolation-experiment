@@ -35,21 +35,22 @@
         "P3": "th30f2e487-sg-p3"
       },
       "diskImageIds": {
-        "P1": "b2b632af-4ad5-4551-8f8d-e67c86bbcb3c",
-        "P2": "9c2d2ded-5204-4963-9815-52aa47ac6f45",
-        "P3": "fecfb27f-61aa-4652-82aa-9e195f9b4a7e"
+        "P1": "782104ec-395e-41a6-8e19-ad5a295ecec8",
+        "P2": "02f89136-f452-45a6-9213-db7c2ec28788",
+        "P3": "3413598f-a8d1-436f-b452-0328640430d3"
       },
-      "agentImage": "th30f2e487acr.azurecr.io/thesis/agent@sha256:87b23a4247c715233baf8518177366417abbdc97afe3e1fdb0096ead3b16f141",
+      "agentImage": "th30f2e487acr.azurecr.io/thesis/agent@sha256:1818303bd576d9d8e95c6d920463d261a81b891a0bd432bffc8282a583262d90",
       "imagePullIdentityResourceId": "/subscriptions/a0129b37-1075-48a4-82f9-bbc6d96d8eb3/resourceGroups/rg-thesis-study-central-a0129b37/providers/Microsoft.ManagedIdentity/userAssignedIdentities/th30f2e487imgpull",
       "resources": {
         "cpu": "1000m",
         "memory": "1Gi",
         "disk": "10Gi"
       },
-      "resourceUrl": "https://10.48.9.4",
+      "resourceUrl": "https://10.48.9.4:10443",
       "collectorUrl": "https://10.48.9.5:8443",
       "restrictedUrl": "https://10.48.9.6:9443",
       "sessionDataStore": "azure_blob_external_namespace",
+      "customerVnetConnectionName": "sandbox-egress",
       "apiVersion": "2026-02-01-preview",
       "timeoutMs": 300000
     }

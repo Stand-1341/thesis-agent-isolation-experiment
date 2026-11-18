@@ -291,6 +291,10 @@ export function validateExperimentConfig(raw,{requiredRoutes=REVISION_3_ROUTES,r
       const collectorUrl=httpsUrl(entry.collectorUrl,`deployments.${name}.collectorUrl`);
       const restrictedUrl=restrictedServiceUrl(entry,name,collectorUrl,restrictedServiceRequired);
       const dataStore=sessionDataStore(entry,`deployments.${name}`,externalNamespaceRequired);
+      const customerVnetConnectionName=entry.customerVnetConnectionName;
+      if(customerVnetConnectionName!==undefined && (typeof customerVnetConnectionName!=='string' ||
+        !/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$/.test(customerVnetConnectionName)))
+        throw new Error(`deployments.${name}.customerVnetConnectionName must be a safe connection name`);
       const apiVersion=entry.apiVersion??'2026-02-01-preview';
       if(typeof apiVersion!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}-preview$/.test(apiVersion))
         throw new Error(`deployments.${name}.apiVersion must be a preview YYYY-MM-DD-preview version`);
@@ -300,7 +304,8 @@ export function validateExperimentConfig(raw,{requiredRoutes=REVISION_3_ROUTES,r
       deployments[name]={kind:'aca_sandbox',subscriptionId:entry.subscriptionId,resourceGroup,
         profileRegions:normalizedProfileRegions,...(uniqueRegions.length===1?{region:uniqueRegions[0]}:{}),
         sandboxGroups,diskImageIds,agentImage,imagePullIdentityResourceId,resources,resourceUrl,collectorUrl,
-        ...(restrictedUrl?{restrictedUrl}:{}),...(dataStore?{sessionDataStore:dataStore}:{}),apiVersion,timeoutMs};
+        ...(restrictedUrl?{restrictedUrl}:{}),...(dataStore?{sessionDataStore:dataStore}:{}),
+        ...(customerVnetConnectionName===undefined?{}:{customerVnetConnectionName}),apiVersion,timeoutMs};
     }
   }
 

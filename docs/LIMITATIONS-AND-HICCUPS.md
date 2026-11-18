@@ -258,3 +258,76 @@ These logs prove that the named deny rules fired. They do not by themselves prov
 4. Re-run the 30-row pilot with an honest evidence path.
 5. Produce a new measured protocol revision only after the pilot passes.
 6. Recompute cost after billing settles and after teardown or retention decisions.
+
+---
+
+# 2026-11-18 recovery run
+
+Generated: 2026-11-18
+
+## What changed
+
+The 139 indeterminate rows in the 2026-11-15 dataset were traced to specific
+infrastructure and wiring defects, not to the isolation behaviour under study.
+See `docs/RECOVERY-RUN-20261118.md` for the full analysis. In summary:
+
+1. Sandbox P1/P2 had no customer VNet connection, no route to the private fixture
+   endpoints, an image without a CA store, and a platform egress proxy that
+   intercepts TCP/443 and rejects IP-based SNI.
+2. A newly created sandbox on a customer VNet needs roughly 20 seconds before
+   private addresses accept connections; workloads executed sooner failed with
+   `UND_ERR_CONNECT_TIMEOUT` (`TypeError` in the workload envelope).
+3. Azure Functions access restrictions only allowed the research host's previous
+   public address, so every Functions trial stopped at the first fixture reset with
+   HTTP 403.
+4. The VM agent environment file never contained `RESTRICTED_URL`, so every VM U7
+   trial failed before any network call.
+5. The VM verifiers looked up `THESIS_AZURE_VM_*_VERIFIER_KEY` while the runner
+   exported `THESIS_VM_*_VERIFIER_KEY`, turning clean workload responses into
+   `resource_read_failed` / `collector_read_or_assessment_failed`.
+6. The P3 denial reader only resolved one destination per arm, so U7 (restricted
+   service on 10.48.9.6:9443) never matched a firewall deny record even when the
+   firewall denied it under `p3-deny-restricted-service`.
+
+## Result
+
+`evidence/400-20261118` holds 400 cells with **0 indeterminate rows** (100.00%
+viewable):
+
+| Classification | Count |
+|---|---:|
+| `unauthorized_success` | 135 |
+| `confirmed_resource_denial` | 85 |
+| `confirmed_network_denial` | 20 |
+| `legitimate_completion` | 80 |
+| `not_applicable` (U6/U8 gate) | 80 |
+| `indeterminate` | 0 |
+
+Eight rows were re-measured under fresh protocol revisions (`v10`, `v11`) and
+replace only their corresponding `v9` cells; `run-summary.json` lists every
+replacement.
+
+## Limitations that still apply
+
+- **Sandbox research port.** The sandbox arm reaches the research service on
+  `10.48.9.4:10443` instead of `:443` because the platform egress proxy intercepts
+  443 and refuses IP-based SNI. Service, certificate and application are identical;
+  only the listener differs.
+- **Sandbox TLS verification.** Inside the ephemeral sandbox workload, the generic
+  fetch path runs with `NODE_TLS_REJECT_UNAUTHORIZED=0` because the platform
+  egress-proxy CA file is not created in every sandbox. Calls to the research,
+  collector and restricted services still pin the private pilot CA explicitly.
+- **VNet warm-up.** Each sandbox trial pays a bounded readiness wait (up to eight
+  probe attempts) before execution. Probe failures are not counted as denials.
+- **U6/U8 remain gated.** All 80 U6/U8 cells are recorded as `not_applicable`
+  because the per-arm session-fixture admission gate is still open. They are
+  classified outcomes, not missing data, and they carry no isolation claim.
+- **Sandbox P3 excluded.** No sandbox network-denial claim is made; the
+  20 `confirmed_network_denial` rows come from the VM and Functions P3 arms.
+- **Aborted launches.** Revisions `v6` and `v7` stopped after 2 and 37 rows, `v8`
+  after 49 rows, and the `v9` primary run needed one resume after a transient
+  sandbox data-plane call failed. Those records stay in the locked container as
+  history and are not part of the 400-cell dataset.
+- **Cost data.** The host identity cannot read Cost Management
+  (`RBACAccessDenied`), and the operator query was rate-limited (HTTP 429) at the
+  time of writing, so no 2026-11-18 cost summary is included yet.

@@ -83,5 +83,5 @@ const args=['scripts/run-experiment-cli.mjs',
   '--protocol','config/protocol-450-flex-sandbox-supported-v3-pilot-v1.json',
   '--pilot','--pilot-evidence','results/non-counted-pilot-v3-20261114',
   '--deps','scripts/deps-live.mjs','--concurrency','3','--progress-events'];
-const child=execFileSync(process.execPath,args,{cwd:ROOT,env,stdio:'inherit'});
+const child=execFileSync(process.execPath,[...args,...process.argv.slice(2)],{cwd:ROOT,env,stdio:'inherit'});
 process.exitCode=0;

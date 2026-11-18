@@ -246,7 +246,12 @@ export function createDenialReader({deployments={},query,clock=Date.now,auditWai
     const {t0,t1}=isoAndChecks(window);
     const srcIp=deployment.sourceIp;
     const sourceCidr=deployment.sourceCidr;
-    const destinationIp=deployment.destinationIp;
+    // Per-scenario destinations: the same P3 arm denies more than one receiver
+    // (U5 -> collector, U7 -> restricted service) with distinct named rules.
+    const networkTarget=trial?.scenario?deployment.networkTargets?.[trial.scenario]:undefined;
+    const destinationIp=networkTarget?.destinationIp ?? deployment.destinationIp;
+    const destinationPort=networkTarget?.destinationPort ?? deployment.destinationPort;
+    const denyRuleName=networkTarget?.denyRuleName ?? deployment.denyRuleName;
     const targetResourceId=deployment.targetResourceId;
 
     if(deployment.telemetry==='azure_firewall_application_rule') {
@@ -280,7 +285,7 @@ export function createDenialReader({deployments={},query,clock=Date.now,auditWai
     const useAzureDiagnostics=deployment.telemetry==='azure_diagnostics_firewall';
     if(useAzureDiagnostics) {
       const events=await queryAfterIngestion(azureDiagnosticsFirewallQuery({srcIp,sourceCidr,destinationIp,
-        destinationPort:deployment.destinationPort,t0,t1}));
+        destinationPort,t0,t1}));
       const projected=row=>({timeGenerated:row.TimeGenerated??row.timeGenerated??null,
         sourceIp:row.SourceIP??row.sourceIp??null,sourcePort:row.SourcePort??row.sourcePort??null,
         destinationIp:row.DestinationIP??row.destinationIp??null,
@@ -289,9 +294,9 @@ export function createDenialReader({deployments={},query,clock=Date.now,auditWai
         category:row.Category??row.category??'AzureFirewallNetworkRule'});
       const denied=(Array.isArray(events)?events:[]).filter(row=>
         String(row.Action??row.action??'').toLowerCase()==='deny');
-      const expectedDeny=denied.find(row=>String(row.RuleName??row.ruleName??'')===deployment.denyRuleName);
+      const expectedDeny=denied.find(row=>String(row.RuleName??row.ruleName??'')===denyRuleName);
       if(expectedDeny) return {verdict:LABELS.confirmedDenyFirewall,evidence:{
-        source:deployment.telemetry,deniedRecords:denied.filter(row=>String(row.RuleName??row.ruleName??'')===deployment.denyRuleName).length,
+        source:deployment.telemetry,deniedRecords:denied.filter(row=>String(row.RuleName??row.ruleName??'')===denyRuleName).length,
         sourceScope:srcIp??sourceCidr,first:projected(expectedDeny),window:{from:t0,to:t1}}};
       if(denied.length) return {verdict:LABELS.configOnly,evidence:{
         reason:'deny_observed_under_unexpected_rule',source:deployment.telemetry,
@@ -315,7 +320,7 @@ export function createDenialReader({deployments={},query,clock=Date.now,auditWai
     // No deny record. Ask the same window whether anything at all was ingested for
     // this source, so "allowed" is never confused with "logs had not arrived".
     const control=await query(useFlowLog?vnetFlowControlQuery({srcIp,targetResourceId,t0,t1,destinationIp})
-      :firewallControlQuery({srcIp,destinationIp,destinationPort:deployment.destinationPort,t0,t1}));
+      :firewallControlQuery({srcIp,destinationIp,destinationPort,t0,t1}));
     const summary=Array.isArray(control)?control[0]:control;
     const total=Number(summary?.total ?? summary?.attempts ?? 0);
     if(!Number.isFinite(total) || total<=0)
@@ -334,10 +339,15 @@ export function createDenialReader({deployments={},query,clock=Date.now,auditWai
       configured=typeof entry.targetResourceId==='string' && entry.targetResourceId.length>0 && ipv4(entry.destinationIp);
     else if(entry?.telemetry==='firewall')
       configured=ipv4(entry.sourceIp) && ipv4(entry.destinationIp);
-    else if(entry?.telemetry==='azure_diagnostics_firewall')
-      configured=(ipv4(entry.sourceIp)||ipv4Cidr(entry.sourceCidr)) && ipv4(entry.destinationIp) &&
-        Number.isInteger(entry.destinationPort) && entry.destinationPort>=1 && entry.destinationPort<=65535 &&
-        typeof entry.denyRuleName==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(entry.denyRuleName);
+    else if(entry?.telemetry==='azure_diagnostics_firewall') {
+      const validTarget=target=>ipv4(target?.destinationIp) &&
+        Number.isInteger(target?.destinationPort) && target.destinationPort>=1 && target.destinationPort<=65535 &&
+        typeof target?.denyRuleName==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(target.denyRuleName);
+      const perScenario=entry.networkTargets&&typeof entry.networkTargets==='object'
+        ? ['U5','U7'].every(scenario=>validTarget(entry.networkTargets[scenario])) : false;
+      configured=(ipv4(entry.sourceIp)||ipv4Cidr(entry.sourceCidr)) &&
+        (perScenario || validTarget({destinationIp:entry.destinationIp,destinationPort:entry.destinationPort,denyRuleName:entry.denyRuleName}));
+    }
     else if(entry?.telemetry==='azure_firewall_application_rule') {
       const hasSource=(ipv4(entry.sourceIp)||ipv4Cidr(entry.sourceCidr)) &&
         !((entry.sourceIp!==undefined)&&(entry.sourceCidr!==undefined));

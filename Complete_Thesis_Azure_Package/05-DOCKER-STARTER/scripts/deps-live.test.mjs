@@ -396,14 +396,14 @@ test('ACA Jobs log output reader binds one JSON result to the ARM window and fai
     /window/);
 });
 
-test('ACA Sandbox factory pins the profile group and disk image, deny-by-default egress and split identities',async()=>{
+test('ACA Sandbox factory pins the profile group and disk image, provider-default egress and split identities',async()=>{
   const shape=acaConfigShape();
   const env=acaEnv();
   const routeKeys=new Set(['azure_container_apps_sandboxes:P1','azure_container_apps_sandboxes:P3']);
   const config=withAcaCredentials(shape,env,routeKeys);
   config.deployments.azure_container_apps_sandboxes.profileRegions={P1:'centralus',P2:'centralus',P3:'westus2'};
   delete config.deployments.azure_container_apps_sandboxes.region;
-  const created=[],shell=[],deleted=[];
+  const created=[],shell=[],deleted=[],readiness=[];
   const sandboxClients=[];
   const decisions={networkEgress:{
     allowed:[{host:'resource.example.test',method:'GET',path:'/',timestamp:'2026-03-01T00:00:12Z'}],
@@ -412,7 +412,9 @@ test('ACA Sandbox factory pins the profile group and disk image, deny-by-default
   let currentTrial={runId:'aca-sbx-u1-p1',scenario:'U1'};
   const client={createSandbox:async(body,options)=>{created.push({body,options});sandboxSeq+=1;
       return {sandboxId:`sbx-${sandboxSeq}`,sandbox:{id:`sbx-${sandboxSeq}`,state:'running'}};},
-    executeShellCommand:async(id,command)=>{shell.push({id,command});
+    executeShellCommand:async(id,command)=>{
+      if(command.includes("'ready")) {readiness.push({id,command});return {exitCode:0,stdout:'ready\n'};}
+      shell.push({id,command});
       return {exitCode:0,stdout:JSON.stringify({runId:currentTrial.runId,scenario:currentTrial.scenario,status:'completed'})};},
     getEgressDecisions:async()=>decisions,
     deleteSandbox:async id=>{deleted.push(id);return undefined;}};
@@ -452,24 +454,32 @@ test('ACA Sandbox factory pins the profile group and disk image, deny-by-default
       {identity:p1.workloadIdentityResourceId,lifecycle:'main'},
       {identity:p1.secretReaderIdentityResourceId,lifecycle:'main'},
       {identity:acaUai('sandbox-image-pull'),lifecycle:'none'}]);
-    assert.equal(body.egressPolicy.defaultAction,'Deny');
-    assert.equal(body.egressPolicy.trafficInspection,'Full');
-    assert.ok(body.egressPolicy.rules.every(rule=>rule.action.type==='Allow'&&rule.match.host&&!/token|secret|password|credential|authorization|bearer/i.test(JSON.stringify(rule))));
-    assert.deepEqual(body.egressPolicy.rules.map(rule=>rule.match.host).sort(),
-      ['collector.example.test','fixture123.blob.core.windows.net','resource.example.test','restricted.example.test']);
+    // The live service accepted egress rules but did not enforce them, so the
+    // measured sandbox arm runs on provider-default egress and the 400-row
+    // revision excludes sandbox P3 from any network-denial claim.
+    assert.equal(body.egressPolicy.defaultAction,'Allow');
+    assert.equal(body.egressPolicy.trafficInspection,'None');
+    assert.deepEqual(body.egressPolicy.rules,[]);
     assert.equal(body.environment.RESEARCH_URL,'https://resource.example.test');
+    assert.equal(body.environment.NODE_EXTRA_CA_CERTS,'/tmp/thesis-sandbox-ca.pem');
     assert.equal(body.environment.THESIS_WORKLOAD_TOKEN_SECRET_URI,p1.workloadTokenSecretUri);
     assert.equal(body.environment.THESIS_SECRET_READER_CLIENT_ID,p1.secretReaderClientId);
     assert.equal(JSON.parse(body.environment.TRIAL_INPUT_JSON).runId,'aca-sbx-u1-p1');
     const output=await adapter.execute(currentTrial,reset);
     assert.equal(output.runId,'aca-sbx-u1-p1');
-    assert.deepEqual(shell,[{id:'sbx-1',command:'cd /app && node dist/agent-runner.js'}]);
+    assert.equal(shell.length,1);
+    assert.equal(shell[0].id,'sbx-1');
+    assert.equal(readiness.length,1);
+    assert.equal(readiness[0].id,'sbx-1');
+    assert.match(readiness[0].command,/net\.connect/);
+    assert.match(shell[0].command,/^cd \/app && \{ cat \/usr\/local\/share\/thesis-pilot-ca\.pem/);
+    assert.match(shell[0].command,/dist\/agent-runner\.js/);
     const evidence=await adapter.collect(currentTrial,reset,output,{});
     assert.equal(evidence.resource.authorized,'SYNTHETIC-a');
     assert.equal(evidence.sandboxEgressDecisions.networkEgress.denied[0].host,'collector.example.test');
 
-    // P3 is the network-denied profile: the collector and restricted services
-    // stay denied by the default action on its per-profile sandbox group.
+    // Sandbox P3 is excluded from the measured 400-row revision, but the factory
+    // must still pin its own per-profile group and disk image.
     const p3=config.routes.find(route=>route.deployment==='azure_container_apps_sandboxes'&&route.profile==='P3');
     currentTrial={runId:'aca-sbx-u5-p3',scenario:'U5'};
     const p3Adapter=deps.sessionFactory(p3,config.deployments.azure_container_apps_sandboxes);
@@ -478,9 +488,8 @@ test('ACA Sandbox factory pins the profile group and disk image, deny-by-default
     assert.equal(p3Reset.sandboxPolicy.sandboxGroup,'thesis-sandbox-p3');
     assert.equal(p3Reset.sandboxPolicy.diskImageId,'disk-image-p3');
     const p3Body=created.at(-1).body;
-    assert.equal(p3Body.egressPolicy.defaultAction,'Deny');
-    assert.deepEqual(p3Body.egressPolicy.rules.map(rule=>rule.match.host).sort(),
-      ['fixture123.blob.core.windows.net','resource.example.test']);
+    assert.equal(p3Body.egressPolicy.defaultAction,'Allow');
+    assert.deepEqual(p3Body.egressPolicy.rules,[]);
     assert.throws(()=>deps.sessionFactory({...p3,sandboxGroup:'thesis-sandbox-p1'},
       config.deployments.azure_container_apps_sandboxes),/configured per-profile group/);
     await p3Adapter.cleanup(currentTrial,p3Reset);

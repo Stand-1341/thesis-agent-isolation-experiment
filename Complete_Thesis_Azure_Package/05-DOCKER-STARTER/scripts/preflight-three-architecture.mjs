@@ -63,6 +63,48 @@ const APPROVED_FROZEN_CANDIDATES=Object.freeze({
     deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
     profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
     measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v11-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v11-sandbox-p3-excluded-fresh-ids',protocolSha256:'a9c6bf1400ebe37141dec0fc5ba931b9761a954b37d53e48ef752800b3221251',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v11-fresh-ids.csv',matrixSha256:'41b09aaf30a4d0976f28565758dcefbe5bcc673187faf0e2727137de74bacae9',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v10-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v10-sandbox-p3-excluded-fresh-ids',protocolSha256:'852cca8ef96bbd04397455ae9e3dc89d9a9aa3466b0b05a4435e1186ce8813a5',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v10-fresh-ids.csv',matrixSha256:'feb9b47d0c90576c7345ed8ce5978440bd2adca9acbe3d5f4072c2b554854dec',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v9-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v9-sandbox-p3-excluded-fresh-ids',protocolSha256:'e139661090b5e17d8b9cbad2eb2935c29a2663c3e5ad322e0aace6f3d53b49ee',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v9-fresh-ids.csv',matrixSha256:'54b08d4701a8132fec27ea6f1fddb8ee01f31e52729d989964372daf3563e613',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v8-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v8-sandbox-p3-excluded-fresh-ids',protocolSha256:'fa12a1c265ba562a6a30508f2fd7037968f3799871b7f598de3fdced431ce754',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v8-fresh-ids.csv',matrixSha256:'977bbd7f2990cbb60a3b6364b18bde6c959350afbbbe64ac0c33ddded576e921',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v7-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v7-sandbox-p3-excluded-fresh-ids',protocolSha256:'9cdf495bb4754bba6083f80477000e450781cbc05be0a5dde547f40203d4e548',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v7-fresh-ids.csv',matrixSha256:'bf719270600a54c38ed6c77ed7eac23990c4e0960e124834550cce0331c316fa',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
+  'protocol-400-flex-sandbox-no-sandbox-p3-v6-fresh-ids.json':Object.freeze({
+    revision:'three-arm-flex-sandbox-400-v6-sandbox-p3-excluded-fresh-ids',protocolSha256:'bc664130bdda2718f95732b7dbdc6a570beaf32211ac15bb571b761655e57b0f',
+    matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v6-fresh-ids.csv',matrixSha256:'9cccebca63b6f1638ca0e17900d853cadc63a22972ced1ee7535ef384c6578c7',
+    deployments:Object.freeze(['azure_vm','azure_functions_flex','azure_container_apps_sandboxes']),
+    deploymentKinds:Object.freeze({azure_vm:'http',azure_functions_flex:'http',azure_container_apps_sandboxes:'aca_sandbox'}),
+    profilesByDeployment:Object.freeze({azure_vm:Object.freeze(PROFILES),azure_functions_flex:Object.freeze(PROFILES),azure_container_apps_sandboxes:Object.freeze(['P1','P2'])}),
+    measuredExecutionEnabled:true}),
   'protocol-400-flex-sandbox-no-sandbox-p3-v5-fresh-ids.json':Object.freeze({
     revision:'three-arm-flex-sandbox-400-v5-sandbox-p3-excluded-fresh-ids',protocolSha256:'f45a60340eb8e7b74c6880ed7e5a51abd3e26f64998b072b3a732ebf272b7d4b',
     matrixFile:'plan-400-flex-sandbox-no-sandbox-p3-v5-fresh-ids.csv',matrixSha256:'a10a9685ba098665282c7d94e1f7f7c88deda67f9152c22c9e4c3db597e9720e',
@@ -163,7 +205,7 @@ export function validateSelectedProtocol({protocolBytes,matrixBytes,lock,paths={
   catch { throw new Error('selected protocol is not valid UTF-8 JSON'); }
   if(!protocol||typeof protocol!=='object'||Array.isArray(protocol))
     throw new Error('selected protocol must be a JSON object');
-  const measuredRequested=['protocol-400-flex-sandbox-no-sandbox-p3-v1.json','protocol-400-flex-sandbox-no-sandbox-p3-v2-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v3-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v4-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v5-fresh-ids.json'].includes(normalizedFilename(paths.protocolFile));
+  const measuredRequested=['protocol-400-flex-sandbox-no-sandbox-p3-v1.json','protocol-400-flex-sandbox-no-sandbox-p3-v2-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v3-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v4-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v4-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v5-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v5-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v6-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v6-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v7-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v7-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v8-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v8-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v9-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v9-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v10-fresh-ids.json','protocol-400-flex-sandbox-no-sandbox-p3-v11-fresh-ids.json'].includes(normalizedFilename(paths.protocolFile));
   if(measuredRequested) {
     if(protocol.measuredExecutionEnabled!==true||lock.measuredExecutionEnabled!==true)
       throw new Error('measured execution must be enabled in both protocol and freeze lock for the approved 400 revision');

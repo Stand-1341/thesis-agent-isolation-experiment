@@ -94,6 +94,11 @@ function parseArgs(argv) {
       }
       case '--deployment': options.deployment=value(); break;
       case '--profile': options.profile=value(); break;
+      case '--scenario': {
+        const scenario=value();
+        if(!/^(U[1-8]|L[12])$/.test(scenario)) throw new Error('--scenario must be one scheduled scenario (U1-U8, L1, L2)');
+        options.scenario=scenario; break;
+      }
       case '--gates': options.gates=value().split(',').map(s=>s.trim()).filter(Boolean); break;
       case '--dry-run': options.dryRun=true; break;
       case '--json': options.json=true; break;
@@ -183,6 +188,8 @@ export function sessionCapabilitiesFor(declared,configShape,available={}) {
     else if(store!==undefined) capabilities[deployment]=false;
     // No declaration: leave the arm unset so scope reports it not_applicable.
   }
+  // A scheduled arm that the protocol did not enumerate stays unset so scope
+  // reports it not_applicable, exactly as the legacy revisions require.
   return capabilities;
 }
 
@@ -214,6 +221,7 @@ function selectRows(rows,options) {
   let selected=rows;
   if(options.deployment) selected=selected.filter(row=>row.deployment===options.deployment);
   if(options.profile) selected=selected.filter(row=>row.permission_profile===options.profile);
+  if(options.scenario) selected=selected.filter(row=>row.scenario_id===options.scenario);
   const start=options.offset??0;
   selected=selected.slice(start,options.limit===undefined?undefined:start+options.limit);
   return selected;

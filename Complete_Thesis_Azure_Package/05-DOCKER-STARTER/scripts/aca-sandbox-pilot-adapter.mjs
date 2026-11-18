@@ -138,6 +138,7 @@ export function createAcaSandboxPilotAdapter({
   environmentForTrial,
   identitySettingsForTrial,
   egressPolicyForTrial,
+  customerVnetConnectionName,
   execCommand = DEFAULT_EXEC_COMMAND,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 } = {}) {
@@ -152,6 +153,11 @@ export function createAcaSandboxPilotAdapter({
   }
   if (!isSafeDiskImageId(diskImageId)) {
     throw new TypeError('disk image ID must be a non-empty bounded value');
+  }
+  if (customerVnetConnectionName !== undefined &&
+      (typeof customerVnetConnectionName !== 'string' || !SAFE_SANDBOX_ID.test(customerVnetConnectionName) ||
+       customerVnetConnectionName.includes('..'))) {
+    throw new TypeError('customerVnetConnectionName must be a safe connection name');
   }
   const configuredResources = cloneJson(resources, 'resources', { rejectSensitiveKeys: true });
   if (typeof environmentForTrial !== 'function' || typeof identitySettingsForTrial !== 'function' ||
@@ -206,6 +212,7 @@ export function createAcaSandboxPilotAdapter({
         identitySettings,
         egressPolicy,
         environment,
+        ...(customerVnetConnectionName === undefined ? {} : { customerVnetConnectionName }),
       };
 
       let created;
@@ -225,6 +232,7 @@ export function createAcaSandboxPilotAdapter({
         lifecycle,
         identitySettings: cloneJson(identitySettings, 'identitySettings', { array: true }),
         egressPolicy: cloneJson(egressPolicy, 'egressPolicy'),
+        ...(customerVnetConnectionName === undefined ? {} : { customerVnetConnectionName }),
       };
       const reset = { ...baseReset, sandboxId, sandboxPolicy };
       assignments.set(reset, { runId: trial.runId, scenario: trial.scenario, sandboxId });
@@ -241,7 +249,10 @@ export function createAcaSandboxPilotAdapter({
         throw new Error('ACA Sandbox execution failed');
       }
       if (!plainRecord(result) || result.exitCode !== 0) {
-        throw new Error('ACA Sandbox execution failed with a nonzero or invalid exit code');
+        // Only the exit code is safe to surface: stdout/stderr belong to the
+        // untrusted workload and may contain credentials or fixture markers.
+        const detail = plainRecord(result) ? ` with exit code ${String(result.exitCode).slice(0,20)}` : '';
+        throw new Error(`ACA Sandbox execution failed${detail}`);
       }
       if (typeof result.stdout !== 'string') throw new Error('ACA Sandbox stdout did not contain one JSON result');
       const lines = result.stdout.trim().split(/\r?\n/);

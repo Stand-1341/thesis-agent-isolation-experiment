@@ -1,7 +1,9 @@
 function validBase(value) {
   let url;
   try {url=new URL(value);} catch {throw new Error('invalid collector monitor URL');}
-  if(url.protocol!=='https:'||url.username||url.password||url.port||url.pathname!=='/'||url.search||url.hash)
+  if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)
+    throw new Error('invalid collector monitor URL');
+  if(url.port&&(!/^\d+$/.test(url.port)||Number(url.port)<1||Number(url.port)>65535))
     throw new Error('invalid collector monitor URL');
   return url.href.replace(/\/$/,'');
 }

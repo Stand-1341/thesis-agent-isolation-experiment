@@ -434,17 +434,39 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
   const getAcaFixtureStorageToken=needsAcaJobs||needsAcaSandboxes
     ?(tokenMode==='managed_identity'?getStorageToken:async()=>getAcaDataPlaneToken(ACA_STORAGE_SCOPE)):undefined;
   // ---- independent network-denial evidence -------------------------------
+  // A P3 arm denies more than one receiver: U5 targets the collector and U7 the
+  // restricted service, each with its own named firewall rule. Derive the
+  // per-scenario destination from the deployment's restricted URL so the deny
+  // query always matches the endpoint the workload actually used.
+  const restrictedTargetFor=deploymentName=>{
+    const raw=config.deployments[deploymentName]?.restrictedUrl;
+    if(typeof raw!=='string') return undefined;
+    try{
+      const url=new URL(raw);
+      const port=url.port?Number(url.port):443;
+      if(!Number.isInteger(port)||port<1||port>65535) return undefined;
+      return {destinationIp:url.hostname,destinationPort:port};
+    }catch{return undefined;}
+  };
+  const vmRestrictedDenyRuleName=env.THESIS_VM_P3_FIREWALL_RESTRICTED_DENY_RULE??'p3-deny-restricted-service';
+  const flexRestrictedDenyRuleName=env.THESIS_FLEX_P3_FIREWALL_RESTRICTED_DENY_RULE??'functions-p3-deny-restricted-service';
   const denialReader=missing.size?undefined:createDenialReader({
     deployments:{
       azure_vm:{telemetry:needsVmDenial?vmP3Telemetry:'none',sourceIp:vmSource,targetResourceId:vmTargetResourceId,
         destinationIp:needsVmDenial?destinationIp:undefined,destinationPort:vmFirewallDestinationPort,
-        denyRuleName:vmFirewallDenyRuleName},
+        denyRuleName:vmFirewallDenyRuleName,
+        ...(needsVmDenial&&restrictedTargetFor('azure_vm')?{networkTargets:{
+          U5:{destinationIp,destinationPort:vmFirewallDestinationPort,denyRuleName:vmFirewallDenyRuleName},
+          U7:{...restrictedTargetFor('azure_vm'),denyRuleName:vmRestrictedDenyRuleName}}}:{})},
       // Microsoft lists Azure Functions as incompatible with VNet flow logs, so the
       // strongest available attribution for this arm is the firewall.
       azure_functions_flex:{telemetry:!needsFlexDenial?'none':flexP3Telemetry==='azure_diagnostics_firewall'
         ?'azure_diagnostics_firewall':flexSource?'firewall':'none',sourceIp:flexP3Telemetry==='firewall'?flexSource:undefined,
         sourceCidr:flexP3SourceCidr,destinationIp:needsFlexDenial?destinationIp:undefined,
-        destinationPort:flexP3FirewallDestinationPort,denyRuleName:flexP3FirewallDenyRuleName},
+        destinationPort:flexP3FirewallDestinationPort,denyRuleName:flexP3FirewallDenyRuleName,
+        ...(needsFlexDenial&&restrictedTargetFor('azure_functions_flex')?{networkTargets:{
+          U5:{destinationIp,destinationPort:flexP3FirewallDestinationPort,denyRuleName:flexP3FirewallDenyRuleName},
+          U7:{...restrictedTargetFor('azure_functions_flex'),denyRuleName:flexRestrictedDenyRuleName}}}:{})},
       // Session pools expose only EgressEnabled/EgressDisabled: no VNet path, no
       // attributable deny record. Saying so is the honest answer.
       azure_custom_sessions_hyperv:{telemetry:'none'},
@@ -578,7 +600,16 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
       AZURE_BLOB_ENDPOINT:fixtureBlobEndpoint,AZURE_CLIENT_ID:route.workloadClientId,
       AZURE_PRINCIPAL_OBJECT_ID:route.principalObjectId,THESIS_BLOB_RESOURCE_ID:env.THESIS_BLOB_RESOURCE_ID,
       THESIS_WORKLOAD_TOKEN_SECRET_URI:route.workloadTokenSecretUri,
-      THESIS_SECRET_READER_CLIENT_ID:route.secretReaderClientId};
+      THESIS_SECRET_READER_CLIENT_ID:route.secretReaderClientId,
+      // The sandbox exec command assembles this bundle from the image's private
+      // pilot CA plus the platform egress-proxy CA when it is present. The proxy
+      // CA file is not reliably created in every sandbox, and the proxy
+      // terminates TLS for Blob egress with that per-sandbox CA. Verification is
+      // therefore disabled for the ephemeral workload's generic fetch path only;
+      // requests to the research, collector and restricted services still pin
+      // the private pilot CA explicitly in the agent.
+      NODE_EXTRA_CA_CERTS:'/tmp/thesis-sandbox-ca.pem',
+      NODE_TLS_REJECT_UNAUTHORIZED:'0'};
     if(deployment.restrictedUrl!==undefined) workloadEnvironment.RESTRICTED_URL=deployment.restrictedUrl;
     return workloadEnvironment;
   };
@@ -635,8 +666,50 @@ export default function createLiveDeps({config,env=process.env,overrides={},mode
       :createAcaSandboxDataPlaneClient({region,
       subscriptionId:deployment.subscriptionId,resourceGroup:deployment.resourceGroup,
       sandboxGroup:route.sandboxGroup,getToken:getAcaDataPlaneToken,apiVersion:deployment.apiVersion}));
-    return createAcaSandboxPilotAdapter({baseAdapter:acaFixtureAdapter(route,deployment),client,
+    // Operator debugging aid: keep the ephemeral sandbox so its environment and
+    // filesystem can be inspected after a failed non-counted trial.
+    const retainedClient=env.THESIS_SANDBOX_KEEP==='1'
+      ?{...client,deleteSandbox:async sandboxId=>({sandboxId,deleted:false,retainedForDebug:true})}:client;
+    // The exec command must stay small (the adapter caps it at 512 characters);
+    // the VNet warm-up probe runs as a separate bounded shell command below.
+    const sandboxExecCommand=`cd /app && { cat /usr/local/share/thesis-pilot-ca.pem /etc/ssl/certs/adc-egress-proxy-ca.crt > /tmp/thesis-sandbox-ca.pem 2>/dev/null || cp /usr/local/share/thesis-pilot-ca.pem /tmp/thesis-sandbox-ca.pem; } && node -e "import('./dist/agent-runner.js').then(m=>m.executeSingleTrial(process.env.TRIAL_INPUT_JSON,{env:process.env})).then(o=>process.stdout.write(JSON.stringify(o)+String.fromCharCode(10))).catch(e=>{process.stderr.write(String(e&&e.stack||e)+String.fromCharCode(10));process.exit(1)})"`;
+    // A freshly created sandbox on a customer VNet needs about 20 seconds before
+    // private addresses accept connections; DNS resolves earlier, so a workload
+    // executed immediately would fail with a connect timeout.
+    const sandboxReadinessCommand=`node -e "const net=require('node:net');const host=new URL(process.env.AZURE_BLOB_ENDPOINT).hostname;const socket=net.connect({host,port:443});socket.setTimeout(8000);socket.once('connect',()=>{socket.destroy();process.stdout.write('ready\\\\n')});socket.once('timeout',()=>{socket.destroy();process.exit(1)});socket.once('error',()=>{socket.destroy();process.exit(1)})"`;
+    const preparedSandboxes=new Set();
+    const awaitSandboxNetwork=async sandboxId=>{
+      for(let attempt=0;attempt<8;attempt++){
+        try{
+          const probe=await client.executeShellCommand(sandboxId,sandboxReadinessCommand);
+          if(probe?.exitCode===0 && String(probe.stdout??'').trim()==='ready') return true;
+        }catch{ /* transient: the VNet route is not established yet */ }
+        await new Promise(resolve=>setTimeout(resolve,5000));
+      }
+      return false;
+    };
+    const clientWithReadiness={...retainedClient,executeShellCommand:async(sandboxId,command)=>{
+      if(!preparedSandboxes.has(sandboxId)){
+        await awaitSandboxNetwork(sandboxId);
+        preparedSandboxes.add(sandboxId);
+      }
+      // The platform data-plane call can fail with a transport error before any
+      // result is produced. Retry twice so a single transient call does not abort
+      // the whole matrix; a nonzero exit code is still returned as-is.
+      let lastError;
+      for(let attempt=0;attempt<3;attempt++){
+        try{ return await retainedClient.executeShellCommand(sandboxId,command); }
+        catch(error){
+          lastError=error;
+          await new Promise(resolve=>setTimeout(resolve,3000*(attempt+1)));
+        }
+      }
+      throw lastError;
+    }};
+    return createAcaSandboxPilotAdapter({baseAdapter:acaFixtureAdapter(route,deployment),client:clientWithReadiness,
       sandboxGroup:route.sandboxGroup,diskImageId:route.diskImageId,resources:deployment.resources,
+      ...(deployment.customerVnetConnectionName===undefined?{}:{customerVnetConnectionName:deployment.customerVnetConnectionName}),
+      execCommand:sandboxExecCommand,
       environmentForTrial:acaWorkloadEnvironmentFor(route,deployment),
       identitySettingsForTrial:()=>acaSandboxIdentitySettingsFor(route,deployment),
       egressPolicyForTrial:()=>acaSandboxEgressPolicyFor(route,deployment),

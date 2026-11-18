@@ -16,6 +16,14 @@ test('collector monitor reader fetches the protected health record and validates
   assert.equal(seen.options.redirect,'error');
 });
 
+test('collector monitor reader accepts an explicit HTTPS collector port',async()=>{
+  let seen;
+  const read=createCollectorMonitorReader({collectorUrl:'https://collector.example.test:8443',verifierKey:'synthetic-verifier-key',
+    fetchImpl:async(url,options)=>{seen={url:String(url),options};return new Response(JSON.stringify(monitor),{status:200});}});
+  assert.deepEqual(await read(),monitor);
+  assert.equal(seen.url,'https://collector.example.test:8443/admin/monitor');
+});
+
 test('collector monitor reader rejects unsafe URLs, credentials and invalid monitor bodies',async()=>{
   for(const value of ['http://collector.example.test','https://user:pass@collector.example.test','https://collector.example.test/path'])
     assert.throws(()=>createCollectorMonitorReader({collectorUrl:value,verifierKey:'synthetic-verifier-key'}));

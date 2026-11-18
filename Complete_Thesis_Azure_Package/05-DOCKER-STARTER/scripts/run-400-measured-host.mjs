@@ -74,7 +74,7 @@ const env={...process.env,
   THESIS_FLEX_P3_FIREWALL_DESTINATION_PORT:'8443',
   THESIS_FLEX_P3_FIREWALL_DENY_RULE:'functions-p3-deny-collector'};
 for(const [name,key] of SECRETS) env[key]=await secret(token,name);
-for(const deployment of ['VM','AZURE_FUNCTIONS_FLEX','AZURE_CONTAINER_APPS_SANDBOXES']) {
+for(const deployment of ['VM','AZURE_VM','AZURE_FUNCTIONS_FLEX','AZURE_CONTAINER_APPS_SANDBOXES']) {
   env[`THESIS_${deployment}_RESOURCE_VERIFIER_KEY`]=env.THESIS_AZURE_FUNCTIONS_FLEX_RESOURCE_VERIFIER_KEY;
   env[`THESIS_${deployment}_COLLECTOR_VERIFIER_KEY`]=env.THESIS_AZURE_FUNCTIONS_FLEX_COLLECTOR_VERIFIER_KEY;
 }
@@ -91,11 +91,11 @@ Object.assign(env,{
 });
 const args=['scripts/run-experiment-cli.mjs',
   '--config','config/experiment.azure-live-400.json',
-  '--protocol','config/protocol-400-flex-sandbox-no-sandbox-p3-v2-fresh-ids.json',
+  '--protocol','config/protocol-400-flex-sandbox-no-sandbox-p3-v9-fresh-ids.json',
   '--deps','scripts/deps-live.mjs',
   '--gates','protocolFrozen,deploymentValidated,isolationValidated,verifierValidated',
   '--concurrency','3','--progress-events'];
-const child=execFileSync(process.execPath,args,{cwd:ROOT,env,stdio:'inherit'});
+const child=execFileSync(process.execPath,[...args,...process.argv.slice(2)],{cwd:ROOT,env,stdio:'inherit'});
 process.exitCode=0;
 
 

@@ -1,0 +1,12 @@
+{
+  "status": "frozen_structural_launch_gated",
+  "revision": "three-arm-flex-sandbox-400-v8-sandbox-p3-excluded-fresh-ids",
+  "protocolFile": "protocol-400-flex-sandbox-no-sandbox-p3-v8-fresh-ids.json",
+  "protocolSha256": "fa12a1c265ba562a6a30508f2fd7037968f3799871b7f598de3fdced431ce754",
+  "matrixFile": "plan-400-flex-sandbox-no-sandbox-p3-v8-fresh-ids.csv",
+  "matrixSha256": "977bbd7f2990cbb60a3b6364b18bde6c959350afbbbe64ac0c33ddded576e921",
+  "scope": "Measured 400-row fresh-ID revision; sandbox P3 excluded; sandbox P1/P2 on customer VNet",
+  "measuredExecutionEnabled": true,
+  "countedAsStudyTrials": true,
+  "note": "Owner-directed measured freeze."
+}
